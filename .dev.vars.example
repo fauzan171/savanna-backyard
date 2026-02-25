@@ -1,0 +1,3 @@
+# Local development secrets
+# Copy this file to .dev.vars and update values
+JWT_SECRET=your-super-secret-jwt-key-change-in-production

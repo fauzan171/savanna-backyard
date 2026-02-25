@@ -1,85 +1,115 @@
-# React + Vite + Hono + Cloudflare Workers
+# Savanna Backyard
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/vite-react-template)
+Vehicle Rental Admin Panel built with Cloudflare Workers, Hono, and React.
 
-This template provides a minimal setup for building a React application with TypeScript and Vite, designed to run on Cloudflare Workers. It features hot module replacement, ESLint integration, and the flexibility of Workers deployments.
+## Tech Stack
 
-![React + TypeScript + Vite + Cloudflare Workers](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/fc7b4b62-442b-4769-641b-ad4422d74300/public)
-
-<!-- dash-content-start -->
-
-🚀 Supercharge your web development with this powerful stack:
-
-- [**React**](https://react.dev/) - A modern UI library for building interactive interfaces
-- [**Vite**](https://vite.dev/) - Lightning-fast build tooling and development server
-- [**Hono**](https://hono.dev/) - Ultralight, modern backend framework
-- [**Cloudflare Workers**](https://developers.cloudflare.com/workers/) - Edge computing platform for global deployment
-
-### ✨ Key Features
-
-- 🔥 Hot Module Replacement (HMR) for rapid development
-- 📦 TypeScript support out of the box
-- 🛠️ ESLint configuration included
-- ⚡ Zero-config deployment to Cloudflare's global network
-- 🎯 API routes with Hono's elegant routing
-- 🔄 Full-stack development setup
-- 🔎 Built-in Observability to monitor your Worker
-
-Get started in minutes with local development or deploy directly via the Cloudflare dashboard. Perfect for building modern, performant web applications at the edge.
-
-<!-- dash-content-end -->
+- **Runtime**: Cloudflare Workers
+- **Backend**: Hono + TypeScript
+- **Database**: Cloudflare D1 (SQLite) + Drizzle ORM
+- **Frontend**: React 19 + React Router v7
+- **Styling**: Tailwind CSS v4 + shadcn/ui
+- **State**: Zustand + TanStack Query
+- **Auth**: JWT via @tsndr/cloudflare-worker-jwt
 
 ## Getting Started
 
-To start a new project with this template, run:
+### Prerequisites
 
-```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/vite-react-template
+- Node.js 20+
+- npm or pnpm
+- Wrangler CLI (`npm install -g wrangler`)
+
+### Setup
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Configure local secrets**
+   ```bash
+   cp .dev.vars.example .dev.vars
+   # Edit .dev.vars and set your JWT_SECRET
+   ```
+
+3. **Create local D1 database**
+   ```bash
+   wrangler d1 create savanna-backyard-db --local
+   ```
+
+4. **Run migrations**
+   ```bash
+   wrangler d1 migrations apply savanna-backyard-db --local
+   ```
+
+5. **Seed super admin**
+   ```bash
+   npm run db:seed
+   ```
+
+6. **Start development server**
+   ```bash
+   npm run dev
+   ```
+
+### Default Credentials
+
+- **Email**: admin@savanna.local
+- **Password**: admin123
+
+## Project Structure
+
+```
+src/
+├── worker/                 # Backend (Cloudflare Worker)
+│   ├── index.ts           # Entry point
+│   ├── core/              # Core infrastructure
+│   │   ├── container/     # DI container
+│   │   ├── database/      # Drizzle schema
+│   │   ├── middleware/    # Auth, error, validation
+│   │   ├── services/      # Shared services
+│   │   └── types/         # Shared types
+│   └── modules/           # Feature modules
+│       └── auth/          # Auth module
+│
+└── react-app/             # Frontend
+    ├── main.tsx           # Entry point
+    ├── App.tsx            # Root component
+    ├── router/            # React Router config
+    ├── features/          # Feature modules
+    │   ├── auth/          # Auth feature
+    │   └── dashboard/     # Dashboard feature
+    ├── components/        # UI components
+    ├── hooks/             # Global hooks
+    └── lib/               # Utilities
 ```
 
-A live deployment of this template is available at:
-[https://react-vite-template.templates.workers.dev](https://react-vite-template.templates.workers.dev)
+## API Endpoints
 
-## Development
+### Auth (`/api/v1/auth`)
 
-Install dependencies:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | /login | Login with email/password |
+| GET | /me | Get current user (protected) |
+| POST | /logout | Logout (clear cookie) |
 
-```bash
-npm install
-```
+### Health
 
-Start the development server with:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | /api/v1/health | Health check |
 
-```bash
-npm run dev
-```
-
-Your application will be available at [http://localhost:5173](http://localhost:5173).
-
-## Production
-
-Build your project for production:
+## Scripts
 
 ```bash
-npm run build
-```
-
-Preview your build locally:
-
-```bash
-npm run preview
-```
-
-Deploy your project to Cloudflare Workers:
-
-```bash
-npm run build && npm run deploy
-```
-
-Monitor your workers:
-
-```bash
-npx wrangler tail
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run deploy       # Deploy to Cloudflare Workers
+npm run db:generate  # Generate Drizzle migrations
+npm run db:migrate   # Apply migrations (local)
+npm run db:seed      # Seed database (local)
 ```
 
 ## Additional Resources
@@ -88,3 +118,4 @@ npx wrangler tail
 - [Vite Documentation](https://vitejs.dev/guide/)
 - [React Documentation](https://reactjs.org/)
 - [Hono Documentation](https://hono.dev/)
+- [Drizzle ORM Documentation](https://orm.drizzle.team/)
