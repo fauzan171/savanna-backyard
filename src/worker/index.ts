@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { errorHandler } from './core/middleware/error-handler';
-import { createAuthRoutes } from './modules/auth/auth.routes';
+import { createAuthRouter } from './modules/auth/auth.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -20,17 +20,14 @@ app.use('*', errorHandler);
 // API v1 routes
 const v1Routes = new Hono<{ Bindings: Env }>();
 
-// Health check (no env needed)
+// Health check
 v1Routes.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Auth routes - router created once, services injected per-request via middleware
+v1Routes.route('/auth', createAuthRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
-
-// Auth routes - use wildcard to handle all auth routes
-app.all('/api/v1/auth/*', async (c) => {
-	const authRoutes = createAuthRoutes(c.env);
-	return authRoutes.getRouter().fetch(c.req.raw, c.env, c.executionCtx);
-});
 
 // Legacy /api redirect to /api/v1 (optional)
 app.get('/api/*', (c) => {

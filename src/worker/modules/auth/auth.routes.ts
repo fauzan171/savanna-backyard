@@ -1,39 +1,82 @@
-import { Hono } from 'hono';
-import { AuthController, validateBody, loginSchema } from './auth.controller';
+import { Hono, Context } from 'hono';
 import { authMiddleware } from '@/worker/core/middleware/auth';
 import { createDb } from '@/worker/core/database';
 import { UserRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { JwtService } from '@/worker/core/services/jwt.service';
+import { setCookie } from 'hono/cookie';
+import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
+import { loginSchema, type LoginRequest } from './auth.dto';
 
-export class AuthRoutes {
-	private router = new Hono<{ Bindings: Env }>();
+// Type for storing services in context
+type AuthVariables = {
+	authService: AuthService;
+	jwtService: JwtService;
+	user: { userId: string };
+};
 
-	constructor(controller: AuthController) {
-		this.setupRoutes(controller);
-	}
+type AuthEnv = { Bindings: Env; Variables: AuthVariables };
 
-	private setupRoutes(controller: AuthController) {
-		// Public routes
-		this.router.post('/login', validateBody(loginSchema), controller.login);
-
-		// Protected routes
-		this.router.get('/me', authMiddleware(), controller.me);
-		this.router.post('/logout', controller.logout);
-	}
-
-	getRouter() {
-		return this.router;
-	}
-}
-
-// Factory function to create auth routes with env
-export function createAuthRoutes(env: Env): AuthRoutes {
-	const db = createDb(env.DB);
-	const jwtService = new JwtService(env.JWT_SECRET);
+// Middleware to inject auth services into context
+export const authServicesMiddleware = () => async (c: Context<AuthEnv>, next: () => Promise<void>) => {
+	const db = createDb(c.env.DB);
+	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const userRepository = new UserRepository(db);
 	const authService = new AuthService(userRepository, jwtService);
-	const authController = new AuthController(authService);
 
-	return new AuthRoutes(authController);
+	c.set('jwtService', jwtService);
+	c.set('authService', authService);
+	await next();
+};
+
+// Route handlers that use services from context
+const loginHandler = async (c: Context<AuthEnv>) => {
+	const authService = c.get('authService');
+	const body = getValidatedBody<LoginRequest>(c);
+	const result = await authService.login(body);
+
+	setCookie(c, 'token', result.token, {
+		httpOnly: true,
+		secure: c.env.ENVIRONMENT === 'production',
+		sameSite: 'Strict',
+		maxAge: 60 * 60 * 24 * 7,
+		path: '/',
+	});
+
+	return c.json({ data: result.user });
+};
+
+const meHandler = async (c: Context<AuthEnv>) => {
+	const authService = c.get('authService');
+	const user = c.get('user');
+	const result = await authService.me(user.userId);
+	return c.json({ data: result });
+};
+
+const logoutHandler = async (c: Context<AuthEnv>) => {
+	setCookie(c, 'token', '', {
+		httpOnly: true,
+		secure: c.env.ENVIRONMENT === 'production',
+		sameSite: 'Strict',
+		maxAge: 0,
+		path: '/',
+	});
+	return c.json({ message: 'Logged out successfully' });
+};
+
+// Factory function to create auth router
+export function createAuthRouter(): Hono<AuthEnv> {
+	const router = new Hono<AuthEnv>();
+
+	// Apply services middleware to all auth routes
+	router.use('*', authServicesMiddleware());
+
+	// Public routes
+	router.post('/login', validateBody(loginSchema), loginHandler);
+
+	// Protected routes
+	router.get('/me', authMiddleware(), meHandler);
+	router.post('/logout', logoutHandler);
+
+	return router;
 }
