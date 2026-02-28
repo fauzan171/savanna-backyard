@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { errorHandler } from './core/middleware/error-handler';
 import { createAuthRouter } from './modules/auth/auth.routes';
+import { createCustomersRouter } from './modules/customers/customers.routes';
+import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
+import { createLeadsRouter } from './modules/leads/leads.routes';
+import { createPaymentsRouter } from './modules/payments/payments.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -23,8 +27,20 @@ const v1Routes = new Hono<{ Bindings: Env }>();
 // Health check
 v1Routes.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// Auth routes - router created once, services injected per-request via middleware
+// Auth routes
 v1Routes.route('/auth', createAuthRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Customer management routes
+v1Routes.route('/customers', createCustomersRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Vehicle management routes
+v1Routes.route('/vehicles', createVehiclesRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Leads management routes
+v1Routes.route('/leads', createLeadsRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Payments routes (includes gateway status and webhooks)
+v1Routes.route('/payments', createPaymentsRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
