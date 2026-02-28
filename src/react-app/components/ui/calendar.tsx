@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { DayPicker, type Matcher } from 'react-day-picker';
+import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
@@ -78,7 +78,7 @@ export interface CalendarEvent {
 	color?: string;
 }
 
-export interface CalendarWithEventsProps extends Omit<CalendarProps, 'modifiers' | 'modifiersStyles'> {
+export interface CalendarWithEventsProps extends Omit<CalendarProps, 'modifiers' | 'modifiersStyles' | 'mode' | 'selected' | 'onSelect'> {
 	/** Events to display on the calendar */
 	events?: CalendarEvent[];
 	/** Callback when a date is clicked */
@@ -93,6 +93,8 @@ function CalendarWithEvents({
 	onEventClick,
 	...props
 }: CalendarWithEventsProps) {
+	const [selected, setSelected] = React.useState<Date | undefined>(undefined);
+
 	// Group events by date string for quick lookup
 	const eventsByDate = React.useMemo(() => {
 		const map = new Map<string, CalendarEvent[]>();
@@ -113,25 +115,30 @@ function CalendarWithEvents({
 	const modifiersStyles = React.useMemo(() => {
 		return {
 			hasEvent: {
-				position: 'relative',
+				position: 'relative' as const,
 			},
 		};
 	}, []);
 
+	const handleSelect = (date: Date | undefined) => {
+		setSelected(date);
+		if (date) {
+			onDateClick?.(date);
+			const dateEvents = eventsByDate.get(date.toDateString());
+			if (dateEvents?.length === 1) {
+				onEventClick?.(dateEvents[0]);
+			}
+		}
+	};
+
 	return (
 		<div className="relative">
 			<Calendar
+				mode="single"
+				selected={selected}
+				onSelect={handleSelect}
 				modifiers={modifiers}
 				modifiersStyles={modifiersStyles}
-				onSelect={(date, selectedDay) => {
-					if (date) {
-						onDateClick?.(date);
-						const dateEvents = eventsByDate.get(date.toDateString());
-						if (dateEvents?.length === 1) {
-							onEventClick?.(dateEvents[0]);
-						}
-					}
-				}}
 				{...props}
 			/>
 			{/* Event indicators rendered via CSS ::after pseudo-element would require custom styling */}

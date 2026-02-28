@@ -71,11 +71,12 @@ const connectorStyles = {
  */
 function Timeline({
 	items,
-	orientation = 'vertical',
+	orientation: orientationProp,
 	renderItem,
 	className,
 	...props
 }: TimelineProps) {
+	const orientation = orientationProp ?? 'vertical';
 	return (
 		<div className={cn(timelineVariants({ orientation }), className)} {...props}>
 			{items.map((item, index) => (
@@ -229,4 +230,3 @@ export {
 	timelineVariants,
 	timelineItemVariants,
 };
-export type { TimelineItem };

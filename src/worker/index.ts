@@ -6,6 +6,7 @@ import { createCustomersRouter } from './modules/customers/customers.routes';
 import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
 import { createLeadsRouter } from './modules/leads/leads.routes';
 import { createPaymentsRouter } from './modules/payments/payments.routes';
+import { createBookingsRouter } from './modules/bookings/bookings.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -38,6 +39,9 @@ v1Routes.route('/vehicles', createVehiclesRouter() as unknown as Hono<{ Bindings
 
 // Leads management routes
 v1Routes.route('/leads', createLeadsRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Bookings management routes
+v1Routes.route('/bookings', createBookingsRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Payments routes (includes gateway status and webhooks)
 v1Routes.route('/payments', createPaymentsRouter() as unknown as Hono<{ Bindings: Env }>);

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Upload, X, File, Image, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, X, File, Image, FileText, AlertCircle } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
 

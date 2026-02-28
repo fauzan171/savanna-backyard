@@ -28,5 +28,6 @@
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true
 	},
-	"include": ["src/react-app"]
+	"include": ["src/react-app"],
+	"exclude": ["src/react-app/**/*.stories.tsx", "src/react-app/**/*.stories.ts"]
 }

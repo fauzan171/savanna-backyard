@@ -1,0 +1,290 @@
+import { eq, and, desc, inArray, lt, gt, not, sql } from 'drizzle-orm';
+import {
+	bookings,
+	bookingAddons,
+	customers,
+	vehicles,
+	users,
+	payments,
+	type Booking,
+	type NewBooking,
+	type BookingAddon,
+	type NewBookingAddon,
+} from '@/worker/core/database/schema';
+import type { Database } from '@/worker/core/database';
+import type { ListBookingsQuery } from './bookings.dto';
+
+export class BookingsRepository {
+	constructor(private db: Database) {}
+
+	async findById(id: string): Promise<Booking | null> {
+		const result = await this.db
+			.select()
+			.from(bookings)
+			.where(eq(bookings.id, id))
+			.limit(1);
+		return result[0] ?? null;
+	}
+
+	async findByBookingNumber(bookingNumber: string): Promise<Booking | null> {
+		const result = await this.db
+			.select()
+			.from(bookings)
+			.where(eq(bookings.bookingNumber, bookingNumber))
+			.limit(1);
+		return result[0] ?? null;
+	}
+
+	async list(query: ListBookingsQuery): Promise<{ items: Booking[]; total: number }> {
+		const offset = (query.page - 1) * query.limit;
+
+		// Build where conditions
+		const conditions = [];
+
+		if (query.status) {
+			conditions.push(eq(bookings.status, query.status));
+		}
+
+		if (query.customerId) {
+			conditions.push(eq(bookings.customerId, query.customerId));
+		}
+
+		if (query.vehicleId) {
+			conditions.push(eq(bookings.vehicleId, query.vehicleId));
+		}
+
+		if (query.startDateFrom) {
+			conditions.push(sql`${bookings.startDate} >= ${query.startDateFrom}`);
+		}
+
+		if (query.startDateTo) {
+			conditions.push(sql`${bookings.startDate} <= ${query.startDateTo}`);
+		}
+
+		if (query.search) {
+			conditions.push(eq(bookings.bookingNumber, query.search));
+		}
+
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+		// Get items
+		const items = await this.db
+			.select()
+			.from(bookings)
+			.where(whereClause)
+			.orderBy(desc(bookings.createdAt))
+			.limit(query.limit)
+			.offset(offset);
+
+		// Get total count
+		const countResult = await this.db
+			.select({ id: bookings.id })
+			.from(bookings)
+			.where(whereClause);
+
+		const total = countResult.length;
+
+		return { items, total };
+	}
+
+	async create(data: Omit<NewBooking, 'id'>): Promise<Booking> {
+		const id = crypto.randomUUID();
+		await this.db.insert(bookings).values({ id, ...data });
+		const booking = await this.findById(id);
+		if (!booking) {
+			throw new Error('Failed to create booking');
+		}
+		return booking;
+	}
+
+	async update(id: string, data: Partial<Omit<NewBooking, 'id' | 'createdAt' | 'bookingNumber'>>): Promise<Booking | null> {
+		await this.db
+			.update(bookings)
+			.set({ ...data, updatedAt: new Date().toISOString() })
+			.where(eq(bookings.id, id));
+		return this.findById(id);
+	}
+
+	async updateStatus(id: string, status: Booking['status']): Promise<Booking | null> {
+		return this.update(id, { status });
+	}
+
+	async confirm(id: string): Promise<Booking | null> {
+		return this.update(id, { status: 'Confirmed' });
+	}
+
+	async startRental(id: string, startKm: number): Promise<Booking | null> {
+		return this.update(id, { status: 'Active', startKm });
+	}
+
+	async completeRental(
+		id: string,
+		data: { actualReturnDate: string; endKm: number; lateFee: number; totalAmount: number }
+	): Promise<Booking | null> {
+		return this.update(id, {
+			status: 'Completed',
+			actualReturnDate: data.actualReturnDate,
+			endKm: data.endKm,
+			lateFee: data.lateFee,
+			totalAmount: data.totalAmount,
+		});
+	}
+
+	async cancel(id: string): Promise<Booking | null> {
+		return this.update(id, {
+			status: 'Cancelled',
+			cancelledAt: new Date().toISOString(),
+		});
+	}
+
+	async extend(id: string, newEndDate: string, newTotalAmount: number): Promise<Booking | null> {
+		return this.update(id, {
+			endDate: newEndDate,
+			totalAmount: newTotalAmount,
+		});
+	}
+
+	// Addons
+	async getAddons(bookingId: string): Promise<BookingAddon[]> {
+		return this.db
+			.select()
+			.from(bookingAddons)
+			.where(eq(bookingAddons.bookingId, bookingId));
+	}
+
+	async createAddon(data: Omit<NewBookingAddon, 'id'>): Promise<BookingAddon> {
+		const id = crypto.randomUUID();
+		await this.db.insert(bookingAddons).values({ id, ...data });
+		const result = await this.db
+			.select()
+			.from(bookingAddons)
+			.where(eq(bookingAddons.id, id))
+			.limit(1);
+		if (!result[0]) {
+			throw new Error('Failed to create addon');
+		}
+		return result[0];
+	}
+
+	async deleteAddon(bookingId: string, addonId: string): Promise<boolean> {
+		await this.db
+			.delete(bookingAddons)
+			.where(and(
+				eq(bookingAddons.id, addonId),
+				eq(bookingAddons.bookingId, bookingId)
+			));
+		return true;
+	}
+
+	async updateAddonsAmount(bookingId: string, addonsAmount: number, totalAmount: number): Promise<Booking | null> {
+		return this.update(bookingId, { addonsAmount, totalAmount });
+	}
+
+	// Get booking with related data
+	async getBookingWithDetails(id: string): Promise<{
+		booking: Booking;
+		customer: typeof customers.$inferSelect;
+		vehicle: typeof vehicles.$inferSelect;
+		creator: { id: string; name: string } | null;
+	} | null> {
+		const booking = await this.findById(id);
+		if (!booking) return null;
+
+		// Get customer
+		const customerResult = await this.db
+			.select()
+			.from(customers)
+			.where(eq(customers.id, booking.customerId))
+			.limit(1);
+		const customer = customerResult[0];
+		if (!customer) return null;
+
+		// Get vehicle
+		const vehicleResult = await this.db
+			.select()
+			.from(vehicles)
+			.where(eq(vehicles.id, booking.vehicleId))
+			.limit(1);
+		const vehicle = vehicleResult[0];
+		if (!vehicle) return null;
+
+		// Get creator
+		let creator: { id: string; name: string } | null = null;
+		if (booking.createdBy) {
+			const userResult = await this.db
+				.select({ id: users.id, name: users.name })
+				.from(users)
+				.where(eq(users.id, booking.createdBy))
+				.limit(1);
+			creator = userResult[0] ?? null;
+		}
+
+		return { booking, customer, vehicle, creator };
+	}
+
+	// Check for conflicting bookings (for availability)
+	async findConflictingBookings(
+		vehicleId: string,
+		startDate: string,
+		endDate: string,
+		excludeBookingId?: string
+	): Promise<Booking[]> {
+		const conditions = [
+			eq(bookings.vehicleId, vehicleId),
+			inArray(bookings.status, ['Confirmed', 'Active']),
+			// End date exclusive overlap: existing.start < new.end AND existing.end > new.start
+			lt(bookings.startDate, endDate),
+			gt(bookings.endDate, startDate),
+		];
+
+		if (excludeBookingId) {
+			conditions.push(not(eq(bookings.id, excludeBookingId)));
+		}
+
+		return this.db
+			.select()
+			.from(bookings)
+			.where(and(...conditions));
+	}
+
+	// Get payments for a booking
+	async getPaymentsByBookingId(bookingId: string): Promise<typeof payments.$inferSelect[]> {
+		return this.db
+			.select()
+			.from(payments)
+			.where(eq(payments.bookingId, bookingId))
+			.orderBy(desc(payments.createdAt));
+	}
+
+	// Get booking stats
+	async getStats(): Promise<{
+		total: number;
+		byStatus: Record<string, number>;
+		totalRevenue: number;
+	}> {
+		const allBookings = await this.db.select().from(bookings);
+
+		const byStatus: Record<string, number> = {
+			Pending: 0,
+			Confirmed: 0,
+			Active: 0,
+			Completed: 0,
+			Cancelled: 0,
+		};
+
+		let totalRevenue = 0;
+
+		for (const booking of allBookings) {
+			byStatus[booking.status] = (byStatus[booking.status] ?? 0) + 1;
+			if (booking.status === 'Completed') {
+				totalRevenue += booking.totalAmount;
+			}
+		}
+
+		return {
+			total: allBookings.length,
+			byStatus,
+			totalRevenue,
+		};
+	}
+}
