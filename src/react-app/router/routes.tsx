@@ -4,7 +4,7 @@ import { GuestGuard } from './guards/GuestGuard';
 
 // Layouts
 import RootLayout from './layouts/RootLayout';
-import DashboardLayout from './layouts/DashboardLayout';
+import DashboardLayout from '@/react-app/components/layout/dashboard-layout';
 import AuthLayout from './layouts/AuthLayout';
 
 // Pages
