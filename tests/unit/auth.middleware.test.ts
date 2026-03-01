@@ -13,15 +13,32 @@ vi.mock('@tsndr/cloudflare-worker-jwt', () => ({
 	},
 }));
 
+// Mock the database
+vi.mock('@/worker/core/database', () => ({
+	createDb: vi.fn(() => ({})),
+}));
+
+// Mock the token blacklist repository with a proper class constructor
+vi.mock('@/worker/core/repositories/token-blacklist.repository', () => {
+	return {
+		TokenBlacklistRepository: class MockTokenBlacklistRepository {
+			isJtiBlacklisted = vi.fn().mockResolvedValue(false);
+		},
+	};
+});
+
 const mockJwt = vi.mocked(jwt);
+
+// Mock D1Database
+const mockDb = {} as D1Database;
 
 describe('Auth Middleware', () => {
 	const testSecret = 'test-secret';
-	let app: Hono<{ Bindings: { JWT_SECRET: string } }>;
+	let app: Hono<{ Bindings: { JWT_SECRET: string; DB: D1Database } }>;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		app = new Hono<{ Bindings: { JWT_SECRET: string } }>();
+		app = new Hono<{ Bindings: { JWT_SECRET: string; DB: D1Database } }>();
 	});
 
 	describe('authMiddleware', () => {
@@ -30,7 +47,7 @@ describe('Auth Middleware', () => {
 		// ============================================
 
 		it('[P0] should pass with valid Bearer token', async () => {
-			const mockPayload = { userId: 'user-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'user-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -39,16 +56,16 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 			const body = await res.json();
 			expect(body.success).toBe(true);
-			expect(body.user).toEqual(mockPayload);
+			expect(body.user).toEqual({ userId: 'user-123', role: 'STAFF' });
 		});
 
 		it('[P0] should pass with valid cookie token', async () => {
-			const mockPayload = { userId: 'user-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'user-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -62,7 +79,7 @@ describe('Auth Middleware', () => {
 					// Use both Authorization and Cookie to test the code path
 					Authorization: 'Bearer valid-token',
 				},
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 		});
@@ -104,7 +121,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'Bearer invalid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(401);
 			const body = await res.json();
@@ -113,7 +130,7 @@ describe('Auth Middleware', () => {
 
 		it('[P0] should reject when token payload is missing userId', async () => {
 			mockJwt.verify.mockResolvedValue(true);
-			mockJwt.decode.mockReturnValue({ payload: { role: 'STAFF' } }); // Missing userId
+			mockJwt.decode.mockReturnValue({ payload: { role: 'STAFF', jti: 'jti-123' } }); // Missing userId
 
 			app.use('/protected', authMiddleware());
 			app.get('/protected', (c) => c.json({ success: true }));
@@ -127,7 +144,30 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
+
+			expect(res.status).toBe(401);
+			const body = await res.json();
+			expect(body.error).toBe('Invalid token payload');
+		});
+
+		it('[P0] should reject when token payload is missing jti', async () => {
+			mockJwt.verify.mockResolvedValue(true);
+			mockJwt.decode.mockReturnValue({ payload: { userId: 'user-123', role: 'STAFF' } }); // Missing jti
+
+			app.use('/protected', authMiddleware());
+			app.get('/protected', (c) => c.json({ success: true }));
+
+			app.onError((err, c) => {
+				if (err instanceof UnauthorizedError) {
+					return c.json({ error: err.message }, err.statusCode);
+				}
+				return c.json({ error: 'Unknown error' }, 500);
+			});
+
+			const res = await app.request('/protected', {
+				headers: { Authorization: 'Bearer valid-token' },
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(401);
 			const body = await res.json();
@@ -140,7 +180,7 @@ describe('Auth Middleware', () => {
 
 		it('[P1] should handle Bearer token with extra spaces', async () => {
 			mockJwt.verify.mockResolvedValue(true);
-			mockJwt.decode.mockReturnValue({ payload: { userId: 'user-123', role: 'STAFF' } });
+			mockJwt.decode.mockReturnValue({ payload: { userId: 'user-123', role: 'STAFF', jti: 'jti-123' } });
 
 			app.use('/protected', authMiddleware());
 			app.get('/protected', (c) => c.json({ success: true }));
@@ -148,14 +188,14 @@ describe('Auth Middleware', () => {
 			// Authorization header with extra space
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'Bearer  valid-token' }, // Double space
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			// Should still work as we slice from index 7
 			expect(res.status).toBe(200);
 		});
 
 		it('[P1] should prioritize Bearer token over cookie', async () => {
-			const bearerPayload = { userId: 'bearer-user', role: 'SUPER_ADMIN' as const };
+			const bearerPayload = { userId: 'bearer-user', role: 'SUPER_ADMIN' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: bearerPayload });
 
@@ -167,7 +207,7 @@ describe('Auth Middleware', () => {
 					Authorization: 'Bearer bearer-token',
 					Cookie: 'token=cookie-token',
 				},
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			const body = await res.json();
 			expect(body.user.userId).toBe('bearer-user');
@@ -188,7 +228,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'Bearer token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(401);
 			const body = await res.json();
@@ -209,7 +249,7 @@ describe('Auth Middleware', () => {
 			// Token without Bearer prefix - should look for cookie
 			const res = await app.request('/protected', {
 				headers: { Authorization: 'just-a-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			// Should fail as no cookie token either
 			expect(res.status).toBe(401);
@@ -242,7 +282,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/optional', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 			const body = await res.json();
@@ -261,7 +301,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/optional', {
 				headers: { Authorization: 'Bearer invalid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 			const body = await res.json();
@@ -276,7 +316,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/optional', {
 				headers: { Authorization: 'Bearer token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 		});
@@ -288,7 +328,7 @@ describe('Auth Middleware', () => {
 		// ============================================
 
 		it('[P0] should pass for user with required role', async () => {
-			const mockPayload = { userId: 'admin-123', role: 'SUPER_ADMIN' as const };
+			const mockPayload = { userId: 'admin-123', role: 'SUPER_ADMIN' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -297,7 +337,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/admin', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 		});
@@ -307,7 +347,7 @@ describe('Auth Middleware', () => {
 		// ============================================
 
 		it('[P0] should reject user without required role', async () => {
-			const mockPayload = { userId: 'staff-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'staff-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -323,7 +363,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/admin', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(401);
 			const body = await res.json();
@@ -353,7 +393,7 @@ describe('Auth Middleware', () => {
 		// ============================================
 
 		it('[P1] should allow multiple roles', async () => {
-			const staffPayload = { userId: 'staff-123', role: 'STAFF' as const };
+			const staffPayload = { userId: 'staff-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: staffPayload });
 
@@ -362,7 +402,7 @@ describe('Auth Middleware', () => {
 
 			const res = await app.request('/staff', {
 				headers: { Authorization: 'Bearer valid-token' },
-			}, { JWT_SECRET: testSecret } as Env);
+			}, { JWT_SECRET: testSecret, DB: mockDb } as Env);
 
 			expect(res.status).toBe(200);
 		});

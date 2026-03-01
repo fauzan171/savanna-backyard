@@ -30,6 +30,13 @@ describe('AuthService', () => {
 		authService = new AuthService(mockUserRepo, mockJwtService);
 	});
 
+	// Helper to mock JwtService.sign to return the correct format
+	const mockSignSuccess = (token: string) => ({
+		token,
+		jti: 'mock-jti',
+		exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
+	});
+
 	describe('login', () => {
 		// ============================================
 		// P0: Happy Path - Critical business scenarios
@@ -40,7 +47,7 @@ describe('AuthService', () => {
 			const mockToken = 'mock-jwt-token';
 
 			vi.mocked(mockUserRepo.findByEmail).mockResolvedValue(testUser);
-			vi.mocked(mockJwtService.sign).mockResolvedValue(mockToken);
+			vi.mocked(mockJwtService.sign).mockResolvedValue(mockSignSuccess(mockToken));
 
 			const result = await authService.login({
 				email: testUser.email,
@@ -71,7 +78,7 @@ describe('AuthService', () => {
 			const mockToken = 'admin-jwt-token';
 
 			vi.mocked(mockUserRepo.findByEmail).mockResolvedValue(adminUser);
-			vi.mocked(mockJwtService.sign).mockResolvedValue(mockToken);
+			vi.mocked(mockJwtService.sign).mockResolvedValue(mockSignSuccess(mockToken));
 
 			const result = await authService.login({
 				email: adminUser.email,
@@ -150,7 +157,7 @@ describe('AuthService', () => {
 			const mockToken = 'mock-token';
 
 			vi.mocked(mockUserRepo.findByEmail).mockResolvedValue(testUser);
-			vi.mocked(mockJwtService.sign).mockResolvedValue(mockToken);
+			vi.mocked(mockJwtService.sign).mockResolvedValue(mockSignSuccess(mockToken));
 
 			const result = await authService.login({
 				email: testUser.email,
@@ -166,7 +173,7 @@ describe('AuthService', () => {
 			const mockToken = 'mock-token';
 
 			vi.mocked(mockUserRepo.findByEmail).mockResolvedValue(testUser);
-			vi.mocked(mockJwtService.sign).mockResolvedValue(mockToken);
+			vi.mocked(mockJwtService.sign).mockResolvedValue(mockSignSuccess(mockToken));
 
 			const result = await authService.login({
 				email: testUser.email,
@@ -182,7 +189,7 @@ describe('AuthService', () => {
 			const mockToken = 'mock-token';
 
 			vi.mocked(mockUserRepo.findByEmail).mockResolvedValue(testUser);
-			vi.mocked(mockJwtService.sign).mockResolvedValue(mockToken);
+			vi.mocked(mockJwtService.sign).mockResolvedValue(mockSignSuccess(mockToken));
 
 			const result = await authService.login({
 				email: testUser.email,

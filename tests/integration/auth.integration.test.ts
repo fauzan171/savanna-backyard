@@ -15,6 +15,20 @@ vi.mock('@tsndr/cloudflare-worker-jwt', () => ({
 	},
 }));
 
+// Mock the database
+vi.mock('@/worker/core/database', () => ({
+	createDb: vi.fn(() => ({})),
+}));
+
+// Mock the token blacklist repository with a proper class constructor
+vi.mock('@/worker/core/repositories/token-blacklist.repository', () => {
+	return {
+		TokenBlacklistRepository: class MockTokenBlacklistRepository {
+			isJtiBlacklisted = vi.fn().mockResolvedValue(false);
+		},
+	};
+});
+
 const mockJwt = vi.mocked(jwt);
 
 /**
@@ -54,7 +68,7 @@ describe('Auth Integration Tests', () => {
 		// ============================================
 
 		it('[P0] should grant access with valid Bearer token', async () => {
-			const mockPayload = { userId: 'user-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'user-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -63,9 +77,9 @@ describe('Auth Integration Tests', () => {
 			}, { JWT_SECRET: testJwtSecret } as Env);
 
 			expect(res.status).toBe(200);
-			const body = await res.json() as { message: string; user: typeof mockPayload };
+			const body = await res.json() as { message: string; user: { userId: string; role: string } };
 			expect(body.message).toBe('Access granted');
-			expect(body.user).toEqual(mockPayload);
+			expect(body.user).toEqual({ userId: 'user-123', role: 'STAFF' });
 		});
 
 		it('[P0] should deny access without token', async () => {
@@ -104,7 +118,7 @@ describe('Auth Integration Tests', () => {
 		// ============================================
 
 		it('[P1] should handle multiple protected routes', async () => {
-			const mockPayload = { userId: 'user-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'user-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 
@@ -124,7 +138,7 @@ describe('Auth Integration Tests', () => {
 		});
 
 		it('[P1] should handle concurrent requests', async () => {
-			const mockPayload = { userId: 'user-123', role: 'STAFF' as const };
+			const mockPayload = { userId: 'user-123', role: 'STAFF' as const, jti: 'jti-123' };
 			mockJwt.verify.mockResolvedValue(true);
 			mockJwt.decode.mockReturnValue({ payload: mockPayload });
 

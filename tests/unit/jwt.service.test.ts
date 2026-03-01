@@ -20,11 +20,13 @@ describe('JwtService', () => {
 				role: 'STAFF' as const,
 			};
 
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
-			expect(token).toBeDefined();
-			expect(typeof token).toBe('string');
-			expect(token.split('.').length).toBe(3); // JWT has 3 parts
+			expect(result.token).toBeDefined();
+			expect(typeof result.token).toBe('string');
+			expect(result.token.split('.').length).toBe(3); // JWT has 3 parts
+			expect(result.jti).toBeDefined();
+			expect(result.exp).toBeDefined();
 		});
 
 		it('[P0] should sign token with SUPER_ADMIN role', async () => {
@@ -33,10 +35,10 @@ describe('JwtService', () => {
 				role: 'SUPER_ADMIN' as const,
 			};
 
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
-			expect(token).toBeDefined();
-			expect(await jwtService.verify(token)).toBe(true);
+			expect(result.token).toBeDefined();
+			expect(await jwtService.verify(result.token)).toBe(true);
 		});
 
 		it('[P0] should include expiration time', async () => {
@@ -45,8 +47,8 @@ describe('JwtService', () => {
 				role: 'STAFF' as const,
 			};
 
-			const token = await jwtService.sign(payload);
-			const decoded = jwtService.decode(token);
+			const result = await jwtService.sign(payload);
+			const decoded = jwtService.decode(result.token);
 
 			expect(decoded).not.toBeNull();
 			expect(decoded?.payload.exp).toBeDefined();
@@ -64,8 +66,8 @@ describe('JwtService', () => {
 			};
 			const customDays = 30;
 
-			const token = await jwtService.sign(payload, customDays);
-			const decoded = jwtService.decode(token);
+			const result = await jwtService.sign(payload, customDays);
+			const decoded = jwtService.decode(result.token);
 
 			const expectedExp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * customDays;
 			// Allow 1 second tolerance
@@ -79,14 +81,16 @@ describe('JwtService', () => {
 				role: 'STAFF' as const,
 			};
 
-			const token1 = await jwtService.sign(payload);
+			const result1 = await jwtService.sign(payload);
 			// Wait a bit to ensure different iat
 			await new Promise(resolve => setTimeout(resolve, 10));
-			const token2 = await jwtService.sign(payload);
+			const result2 = await jwtService.sign(payload);
 
 			// Both tokens should be valid
-			expect(await jwtService.verify(token1)).toBe(true);
-			expect(await jwtService.verify(token2)).toBe(true);
+			expect(await jwtService.verify(result1.token)).toBe(true);
+			expect(await jwtService.verify(result2.token)).toBe(true);
+			// JTIs should be unique
+			expect(result1.jti).not.toBe(result2.jti);
 		});
 
 		it('[P1] should handle long user IDs', async () => {
@@ -96,10 +100,23 @@ describe('JwtService', () => {
 				role: 'STAFF' as const,
 			};
 
-			const token = await jwtService.sign(payload);
-			const decoded = jwtService.decode(token);
+			const result = await jwtService.sign(payload);
+			const decoded = jwtService.decode(result.token);
 
 			expect(decoded?.payload.userId).toBe(longId);
+		});
+
+		it('[P1] should include jti in token payload', async () => {
+			const payload = {
+				userId: 'user-123',
+				role: 'STAFF' as const,
+			};
+
+			const result = await jwtService.sign(payload);
+			const decoded = jwtService.decode(result.token);
+
+			expect(decoded?.payload.jti).toBeDefined();
+			expect(decoded?.payload.jti).toBe(result.jti);
 		});
 	});
 
@@ -113,9 +130,9 @@ describe('JwtService', () => {
 				userId: 'user-123',
 				role: 'STAFF' as const,
 			};
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
-			const isValid = await jwtService.verify(token);
+			const isValid = await jwtService.verify(result.token);
 
 			expect(isValid).toBe(true);
 		});
@@ -131,8 +148,8 @@ describe('JwtService', () => {
 				role: 'STAFF' as const,
 			};
 
-			const token = await otherService.sign(payload);
-			const isValid = await jwtService.verify(token);
+			const result = await otherService.sign(payload);
+			const isValid = await jwtService.verify(result.token);
 
 			expect(isValid).toBe(false);
 		});
@@ -166,10 +183,10 @@ describe('JwtService', () => {
 				userId: 'user-123',
 				role: 'STAFF' as const,
 			};
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
 			// Tamper with the token by changing the payload
-			const parts = token.split('.');
+			const parts = result.token.split('.');
 			// Change a character in the payload (middle part)
 			const tamperedPayload = parts[1].slice(0, -1) + (parts[1].endsWith('A') ? 'B' : 'A');
 			const tamperedToken = `${parts[0]}.${tamperedPayload}.${parts[2]}`;
@@ -177,9 +194,9 @@ describe('JwtService', () => {
 			// The library should reject the tampered token
 			// It may throw or return false depending on the tampering
 			try {
-				const result = await jwtService.verify(tamperedToken);
+				const verifyResult = await jwtService.verify(tamperedToken);
 				// If it doesn't throw, it should return false
-				expect(result).toBe(false);
+				expect(verifyResult).toBe(false);
 			} catch {
 				// Expected - library threw an error for tampered token
 				expect(true).toBe(true);
@@ -197,13 +214,14 @@ describe('JwtService', () => {
 				userId: 'user-123',
 				role: 'STAFF' as const,
 			};
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
-			const decoded = jwtService.decode(token);
+			const decoded = jwtService.decode(result.token);
 
 			expect(decoded).not.toBeNull();
 			expect(decoded?.payload.userId).toBe(payload.userId);
 			expect(decoded?.payload.role).toBe(payload.role);
+			expect(decoded?.payload.jti).toBe(result.jti);
 		});
 
 		// ============================================
@@ -222,17 +240,18 @@ describe('JwtService', () => {
 			expect(decoded).toBeNull();
 		});
 
-		it('[P1] should include iat and exp in decoded payload', async () => {
+		it('[P1] should include iat, exp, and jti in decoded payload', async () => {
 			const payload = {
 				userId: 'user-123',
 				role: 'STAFF' as const,
 			};
-			const token = await jwtService.sign(payload);
+			const result = await jwtService.sign(payload);
 
-			const decoded = jwtService.decode(token);
+			const decoded = jwtService.decode(result.token);
 
 			expect(decoded?.payload.iat).toBeDefined();
 			expect(decoded?.payload.exp).toBeDefined();
+			expect(decoded?.payload.jti).toBeDefined();
 		});
 	});
 
@@ -244,17 +263,20 @@ describe('JwtService', () => {
 			};
 
 			// Sign
-			const token = await jwtService.sign(payload);
-			expect(token).toBeDefined();
+			const result = await jwtService.sign(payload);
+			expect(result.token).toBeDefined();
+			expect(result.jti).toBeDefined();
+			expect(result.exp).toBeDefined();
 
 			// Verify
-			const isValid = await jwtService.verify(token);
+			const isValid = await jwtService.verify(result.token);
 			expect(isValid).toBe(true);
 
 			// Decode
-			const decoded = jwtService.decode(token);
+			const decoded = jwtService.decode(result.token);
 			expect(decoded?.payload.userId).toBe(payload.userId);
 			expect(decoded?.payload.role).toBe(payload.role);
+			expect(decoded?.payload.jti).toBe(result.jti);
 		});
 	});
 });

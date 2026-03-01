@@ -9,3 +9,4 @@ export * from './booking-addons';
 export * from './payments';
 export * from './maintenance';
 export * from './system-config';
+export * from './token-blacklist';

@@ -4,9 +4,12 @@ import { createDb } from '@/worker/core/database';
 import { UserRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { JwtService } from '@/worker/core/services/jwt.service';
-import { setCookie } from 'hono/cookie';
+import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
+import { setCookie, getCookie } from 'hono/cookie';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { loginSchema, type LoginRequest } from './auth.dto';
+import jwt from '@tsndr/cloudflare-worker-jwt';
+import type { JwtPayload } from '@/worker/core/types';
 
 // Type for storing services in context
 type AuthVariables = {
@@ -54,6 +57,33 @@ const meHandler = async (c: Context<AuthEnv>) => {
 };
 
 const logoutHandler = async (c: Context<AuthEnv>) => {
+	const token = getCookie(c, 'token');
+
+	// If token exists, add it to the blacklist
+	if (token) {
+		try {
+			const decoded = jwt.decode(token) as { payload: JwtPayload };
+			if (decoded?.payload?.jti && decoded?.payload?.exp && decoded?.payload?.userId) {
+				const db = createDb(c.env.DB);
+				const tokenBlacklistRepo = new TokenBlacklistRepository(db);
+
+				// Calculate expiration date from JWT exp (Unix timestamp)
+				const expiresAt = new Date(decoded.payload.exp * 1000).toISOString();
+
+				await tokenBlacklistRepo.add({
+					jti: decoded.payload.jti,
+					userId: decoded.payload.userId,
+					tokenHash: await hashToken(token),
+					expiresAt,
+				});
+			}
+		} catch (error) {
+			// Log but don't fail logout if blacklisting fails
+			console.error('Failed to blacklist token:', error);
+		}
+	}
+
+	// Clear the cookie
 	setCookie(c, 'token', '', {
 		httpOnly: true,
 		secure: c.env.ENVIRONMENT === 'production',
@@ -63,6 +93,17 @@ const logoutHandler = async (c: Context<AuthEnv>) => {
 	});
 	return c.json({ message: 'Logged out successfully' });
 };
+
+/**
+ * Helper function to compute SHA-256 hash of a token
+ */
+async function hashToken(token: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(token);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 // Factory function to create auth router
 export function createAuthRouter(): Hono<AuthEnv> {

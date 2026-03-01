@@ -4,16 +4,20 @@ import type { JwtPayload } from '../types';
 export class JwtService {
 	constructor(private secret: string) {}
 
-	async sign(payload: Omit<JwtPayload, 'iat' | 'exp'>, expiresInDays = 7): Promise<string> {
+	async sign(payload: Omit<JwtPayload, 'iat' | 'exp' | 'jti'>, expiresInDays = 7): Promise<{ token: string; jti: string; exp: number }> {
+		const jti = crypto.randomUUID();
 		const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * expiresInDays;
 
-		return await jwt.sign(
+		const token = await jwt.sign(
 			{
 				...payload,
+				jti,
 				exp,
 			},
 			this.secret
 		);
+
+		return { token, jti, exp };
 	}
 
 	async verify(token: string): Promise<boolean> {

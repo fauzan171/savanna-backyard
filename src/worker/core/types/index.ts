@@ -26,6 +26,7 @@ export interface PaginationParams {
 export interface JwtPayload {
 	userId: string;
 	role: 'SUPER_ADMIN' | 'STAFF';
+	jti: string; // Unique token ID for revocation
 	iat?: number;
 	exp?: number;
 }

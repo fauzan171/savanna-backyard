@@ -14,14 +14,39 @@ import { createReportsRouter } from './modules/reports/reports.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS middleware
+// CORS middleware - uses environment variable for allowed origins
 app.use(
 	'*',
 	cors({
-		origin: ['http://localhost:5173'],
+		origin: (origin, c) => {
+			const defaultOrigins = ['http://localhost:5173'];
+			const allowedOrigins = c.env.CORS_ALLOWED_ORIGINS?.split(',').map((o: string) => o.trim()) ?? defaultOrigins;
+			// Also allow localhost for development
+			if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
+				return origin;
+			}
+			return allowedOrigins[0] ?? defaultOrigins[0];
+		},
 		credentials: true,
 	})
 );
+
+// Security headers middleware
+app.use('*', async (c, next) => {
+	await next();
+	// Prevent MIME type sniffing
+	c.header('X-Content-Type-Options', 'nosniff');
+	// Prevent clickjacking
+	c.header('X-Frame-Options', 'DENY');
+	// XSS protection (legacy browsers)
+	c.header('X-XSS-Protection', '1; mode=block');
+	// Referrer policy
+	c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+	// HSTS in production
+	if (c.env.ENVIRONMENT === 'production') {
+		c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+	}
+});
 
 // Error handler
 app.use('*', errorHandler);

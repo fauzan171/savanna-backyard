@@ -96,12 +96,20 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
     // Apply services middleware to all public API routes
     router.use('*', publicApiServicesMiddleware());
 
-    // CORS: Allow external web forms
+    // CORS: Allow configured origins for public API
+    // Allowed origins should be set via ALLOWED_PUBLIC_API_ORIGINS env var (comma-separated)
     router.use('*', cors({
-        origin: (origin) => {
-            // Allow all origins for public API endpoints
-            // In production, this should be configured via environment variable
-            return origin;
+        origin: (origin, c) => {
+            const allowedOrigins = c.env.ALLOWED_PUBLIC_API_ORIGINS?.split(',').map((o: string) => o.trim()) ?? [];
+            // Check if origin is in allowed list
+            if (origin && allowedOrigins.includes(origin)) {
+                return origin;
+            }
+            // Also allow localhost for development
+            if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+                return origin;
+            }
+            return allowedOrigins[0] ?? null;
         },
         credentials: false,
         allowMethods: ['GET', 'POST', 'OPTIONS'],

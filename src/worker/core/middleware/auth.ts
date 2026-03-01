@@ -3,6 +3,8 @@ import { getCookie } from 'hono/cookie';
 import jwt from '@tsndr/cloudflare-worker-jwt';
 import { UnauthorizedError } from '../types/errors';
 import type { UserContext, JwtPayload } from '../types';
+import { createDb } from '../database';
+import { TokenBlacklistRepository } from '../repositories/token-blacklist.repository';
 
 // Extend Hono's context variables
 declare module 'hono' {
@@ -37,15 +39,26 @@ export function authMiddleware() {
 			}
 
 			// Decode to get payload
-			const payload = jwt.decode(token) as { payload: JwtPayload };
-			if (!payload?.payload?.userId) {
+			const decoded = jwt.decode(token) as { payload: JwtPayload };
+			if (!decoded?.payload?.userId || !decoded?.payload?.jti) {
 				throw new UnauthorizedError('Invalid token payload');
+			}
+
+			const payload = decoded.payload;
+
+			// Check if token is blacklisted
+			const db = createDb(c.env.DB);
+			const tokenBlacklistRepo = new TokenBlacklistRepository(db);
+
+			const isBlacklisted = await tokenBlacklistRepo.isJtiBlacklisted(payload.jti);
+			if (isBlacklisted) {
+				throw new UnauthorizedError('Token has been revoked');
 			}
 
 			// Set user context
 			c.set('user', {
-				userId: payload.payload.userId,
-				role: payload.payload.role,
+				userId: payload.userId,
+				role: payload.role,
 			});
 
 			await next();

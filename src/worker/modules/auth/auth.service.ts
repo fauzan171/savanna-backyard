@@ -39,11 +39,16 @@ async function verifyPassword(password: string, storedHash: string): Promise<boo
 			256
 		);
 
-		// Compare
+		// Compare using constant-time comparison to prevent timing attacks
 		const derivedKey = new Uint8Array(derivedBits);
 		if (derivedKey.length !== storedKey.length) return false;
 
-		return derivedKey.every((byte, i) => byte === storedKey[i]);
+		// Constant-time comparison using XOR
+		let result = 0;
+		for (let i = 0; i < derivedKey.length; i++) {
+			result |= derivedKey[i] ^ storedKey[i];
+		}
+		return result === 0;
 	} catch {
 		return false;
 	}
@@ -71,7 +76,7 @@ export class AuthService {
 			throw new UnauthorizedError('Account is deactivated');
 		}
 
-		const token = await this.jwtService.sign({
+		const { token } = await this.jwtService.sign({
 			userId: user.id,
 			role: user.role,
 		});
