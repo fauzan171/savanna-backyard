@@ -9,6 +9,8 @@ import { createPaymentsRouter } from './modules/payments/payments.routes';
 import { createBookingsRouter } from './modules/bookings/bookings.routes';
 import { createMaintenanceRouter } from './modules/maintenance/maintenance.routes';
 import { createPublicApiRouter } from './modules/public-api/public-api.routes';
+import { createDashboardRouter } from './modules/dashboard/dashboard.routes';
+import { createReportsRouter } from './modules/reports/reports.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -53,6 +55,12 @@ v1Routes.route('/maintenance', createMaintenanceRouter() as unknown as Hono<{ Bi
 
 // Public API routes (external access with API key)
 v1Routes.route('/public', createPublicApiRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Dashboard routes
+v1Routes.route('/dashboard', createDashboardRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Reports routes
+v1Routes.route('/reports', createReportsRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
