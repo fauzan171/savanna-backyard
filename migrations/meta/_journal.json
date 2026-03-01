@@ -15,6 +15,13 @@
       "when": 1740800000000,
       "tag": "0001_token_blacklist",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772351512977,
+      "tag": "0002_smart_molten_man",
+      "breakpoints": true
     }
   ]
 }
