@@ -1,7 +1,7 @@
 /**
  * Test factory functions for creating test data
  */
-import type { Customer, Vehicle, Lead, Booking, Payment, BookingAddon, User } from '@/worker/core/database/schema';
+import type { Customer, Vehicle, Lead, Booking, Payment, BookingAddon, User, MaintenanceRecord, SystemConfiguration } from '@/worker/core/database/schema';
 
 let idCounter = 0;
 const generateId = () => `test-${++idCounter}-${Date.now()}`;
@@ -148,6 +148,37 @@ export function createTestUser(overrides: Partial<User> = {}): User {
 		isActive: true,
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
+		...overrides,
+	};
+}
+
+export function createTestMaintenance(overrides: Partial<MaintenanceRecord> = {}): MaintenanceRecord {
+	return {
+		id: generateId(),
+		vehicleId: 'test-vehicle-id',
+		type: 'Scheduled',
+		description: 'Test maintenance description',
+		cost: 500000,
+		startDate: '2026-03-05',
+		endDate: '2026-03-06',
+		status: 'Scheduled',
+		bookingId: null,
+		photos: null,
+		createdBy: 'test-user-id',
+		createdAt: new Date().toISOString(),
+		updatedAt: new Date().toISOString(),
+		...overrides,
+	};
+}
+
+export function createTestSystemConfig(overrides: Partial<SystemConfiguration> = {}): SystemConfiguration {
+	return {
+		id: generateId(),
+		key: 'test_config_key',
+		value: 'test_value',
+		description: 'Test configuration',
+		updatedAt: new Date().toISOString(),
+		updatedBy: null,
 		...overrides,
 	};
 }

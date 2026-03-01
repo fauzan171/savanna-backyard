@@ -14,6 +14,7 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
 	endDate: text('end_date'),
 	status: text('status', { enum: ['Scheduled', 'InProgress', 'Completed'] }).notNull().default('Scheduled'),
 	bookingId: text('booking_id').references(() => bookings.id),
+	photos: text('photos'), // JSON array of photo URLs with captions
 	createdBy: text('created_by').references(() => users.id),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),

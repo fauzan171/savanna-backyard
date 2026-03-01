@@ -7,6 +7,8 @@ import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
 import { createLeadsRouter } from './modules/leads/leads.routes';
 import { createPaymentsRouter } from './modules/payments/payments.routes';
 import { createBookingsRouter } from './modules/bookings/bookings.routes';
+import { createMaintenanceRouter } from './modules/maintenance/maintenance.routes';
+import { createPublicApiRouter } from './modules/public-api/public-api.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -45,6 +47,12 @@ v1Routes.route('/bookings', createBookingsRouter() as unknown as Hono<{ Bindings
 
 // Payments routes (includes gateway status and webhooks)
 v1Routes.route('/payments', createPaymentsRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Maintenance routes
+v1Routes.route('/maintenance', createMaintenanceRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Public API routes (external access with API key)
+v1Routes.route('/public', createPublicApiRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
