@@ -16,6 +16,7 @@ import {
 	X,
 	ChevronLeft,
 	ChevronRight,
+	Wrench,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -92,6 +93,11 @@ const defaultNavItems: NavItem[] = [
 		label: 'Customers',
 		href: '/customers',
 		icon: <UserCircle className="size-5" />,
+	},
+	{
+		label: 'Maintenance',
+		href: '/maintenance',
+		icon: <Wrench className="size-5" />,
 	},
 	{
 		label: 'Reports',

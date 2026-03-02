@@ -31,6 +31,17 @@ import { BookingsPage, BookingDetailPage } from '@/react-app/features/bookings';
 // Payment Pages
 import { PaymentsPage, PaymentDetailPage } from '@/react-app/features/payments';
 
+// Maintenance Pages
+import { MaintenancePage, MaintenanceDetailPage } from '@/react-app/features/maintenance';
+
+// Reports Pages
+import {
+	ReportsPage,
+	RevenueReportPage,
+	FleetReportPage,
+	LeadSourceReportPage,
+} from '@/react-app/features/reports';
+
 export const routes: RouteObject[] = [
 	{
 		path: '/',
@@ -75,6 +86,16 @@ export const routes: RouteObject[] = [
 							// Payment routes
 							{ path: 'payments', element: <PaymentsPage /> },
 							{ path: 'payments/:id', element: <PaymentDetailPage /> },
+
+							// Maintenance routes
+							{ path: 'maintenance', element: <MaintenancePage /> },
+							{ path: 'maintenance/:id', element: <MaintenanceDetailPage /> },
+
+							// Reports routes
+							{ path: 'reports', element: <ReportsPage /> },
+							{ path: 'reports/revenue', element: <RevenueReportPage /> },
+							{ path: 'reports/fleet', element: <FleetReportPage /> },
+							{ path: 'reports/leads', element: <LeadSourceReportPage /> },
 						],
 					},
 				],
