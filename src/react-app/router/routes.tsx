@@ -25,6 +25,12 @@ import VehicleDetailPage from '@/react-app/features/vehicles/pages/VehicleDetail
 import LeadsPage from '@/react-app/features/leads/pages/LeadsPage';
 import LeadDetailPage from '@/react-app/features/leads/pages/LeadDetailPage';
 
+// Booking Pages
+import { BookingsPage, BookingDetailPage } from '@/react-app/features/bookings';
+
+// Payment Pages
+import { PaymentsPage, PaymentDetailPage } from '@/react-app/features/payments';
+
 export const routes: RouteObject[] = [
 	{
 		path: '/',
@@ -61,6 +67,14 @@ export const routes: RouteObject[] = [
 							// Leads routes
 							{ path: 'leads', element: <LeadsPage /> },
 							{ path: 'leads/:id', element: <LeadDetailPage /> },
+
+							// Booking routes
+							{ path: 'bookings', element: <BookingsPage /> },
+							{ path: 'bookings/:id', element: <BookingDetailPage /> },
+
+							// Payment routes
+							{ path: 'payments', element: <PaymentsPage /> },
+							{ path: 'payments/:id', element: <PaymentDetailPage /> },
 						],
 					},
 				],
