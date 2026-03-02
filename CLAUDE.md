@@ -41,16 +41,25 @@ worker/
 ├── index.ts              # Hono app entry point, route mounting
 ├── core/
 │   ├── database/         # Drizzle schema and db wrapper
-│   ├── middleware/       # Auth, error handling, validation
-│   ├── services/         # Shared services (JWT)
+│   │   ├── schema/       # Table definitions (users, customers, etc.)
+│   │   └── index.ts      # Database connection factory
+│   ├── middleware/       # Auth, error handling, validation, API key
+│   ├── repositories/     # Shared repositories (config, statistics, token-blacklist)
+│   ├── services/         # Shared services (JWT, payment gateway)
+│   ├── lib/              # Utilities (CSV export)
 │   └── types/            # Shared types and custom errors
 └── modules/
-    └── auth/             # Auth feature module
-        ├── auth.routes.ts    # Routes + middleware-based DI
-        ├── auth.service.ts   # Business logic
-        ├── auth.repository.ts # Data access
-        ├── auth.dto.ts       # Zod schemas
-        └── auth.types.ts     # TypeScript types
+    ├── auth/             # Auth module (login, logout, me)
+    ├── customers/        # Customer CRUD + blacklist
+    ├── vehicles/         # Vehicle CRUD + status + availability
+    ├── leads/            # Lead management + notes + assignment
+    ├── bookings/         # Booking workflow + addons
+    ├── payments/         # Payment management + gateway integration
+    ├── maintenance/      # Maintenance scheduling + history
+    ├── dashboard/        # Dashboard statistics
+    ├── reports/          # Report generation (JSON/CSV)
+    ├── statistics/       # Statistics service (shared)
+    └── public-api/       # External API with API key auth
 ```
 
 ### Frontend (src/react-app/)
@@ -60,7 +69,20 @@ react-app/
 ├── main.tsx              # Entry point
 ├── App.tsx               # Root component with providers
 ├── router/               # React Router config, layouts, guards
-├── features/             # Feature modules (auth, dashboard)
+│   ├── routes.tsx        # Route definitions
+│   ├── guards/           # AuthGuard, GuestGuard
+│   └── layouts/          # RootLayout, DashboardLayout, AuthLayout
+├── features/             # Feature modules
+│   ├── auth/             # Login page
+│   ├── dashboard/        # Dashboard page
+│   ├── customers/        # Customers list + detail
+│   ├── vehicles/         # Vehicles list + detail
+│   ├── leads/            # Leads list + detail
+│   ├── bookings/         # Bookings list + detail
+│   ├── payments/         # Payments list + detail
+│   ├── maintenance/      # Maintenance list + detail
+│   ├── reports/          # Report pages (revenue, fleet, etc.)
+│   └── shared/           # Shared components
 ├── components/ui/        # shadcn/ui components
 ├── hooks/                # Global hooks
 └── lib/                  # Utilities (api-client, utils)
@@ -84,17 +106,18 @@ tests/
 Services are injected per-request via Hono middleware, NOT at module load time. This ensures `c.env` (containing DB, JWT_SECRET) is available when services are created.
 
 ```typescript
-// auth.routes.ts - CORRECT pattern
-const authServicesMiddleware = () => async (c, next) => {
+// customers.routes.ts - CORRECT pattern
+const customersServicesMiddleware = () => async (c, next) => {
   const db = createDb(c.env.DB);
-  const authService = new AuthService(new UserRepository(db), new JwtService(c.env.JWT_SECRET));
-  c.set('authService', authService);
+  const customersRepository = new CustomersRepository(db);
+  const customersService = new CustomersService(customersRepository);
+  c.set('customersService', customersService);
   await next();
 };
 
-router.use('*', authServicesMiddleware());
-router.post('/login', (c) => {
-  const authService = c.get('authService');
+router.use('*', customersServicesMiddleware());
+router.get('/', (c) => {
+  const customersService = c.get('customersService');
   // ...
 });
 ```
@@ -116,15 +139,142 @@ Custom error classes in `src/worker/core/types/errors.ts`:
 - `UnauthorizedError` → 401
 - `NotFoundError` → 404
 - `ValidationError` → 400
+- `ForbiddenError` → 403
 
 All errors flow through `errorHandler` middleware.
+
+### API Response Format
+
+All API responses follow this format:
+```typescript
+// Success
+{ success: true, data: {...} }
+
+// Error
+{ success: false, error: { code: 'ERROR_CODE', message: 'Error description' } }
+```
 
 ## API Structure
 
 All API routes are under `/api/v1`:
-- `POST /api/v1/auth/login` - Login
-- `GET /api/v1/auth/me` - Get current user (protected)
-- `POST /api/v1/auth/logout` - Logout
+
+### Auth (`/api/v1/auth`)
+- `POST /login` - Login
+- `GET /me` - Get current user (protected)
+- `POST /logout` - Logout (blacklist token)
+
+### Customers (`/api/v1/customers`)
+- `GET /` - List customers
+- `GET /:id` - Get customer
+- `GET /by-phone/:phone` - Get by phone
+- `POST /` - Create customer
+- `PATCH /:id` - Update customer
+- `PATCH /:id/blacklist` - Set blacklist status
+
+### Vehicles (`/api/v1/vehicles`)
+- `GET /` - List vehicles
+- `GET /availability` - Check availability
+- `GET /:id` - Get vehicle
+- `GET /:id/calendar` - Get calendar
+- `POST /` - Create vehicle
+- `PATCH /:id` - Update vehicle
+- `PATCH /:id/status` - Update status
+
+### Leads (`/api/v1/leads`)
+- `GET /` - List leads
+- `GET /stats` - Statistics
+- `GET /:id` - Get lead
+- `POST /` - Create lead
+- `PATCH /:id` - Update lead
+- `PATCH /:id/status` - Update status
+- `POST /:id/notes` - Add note
+- `POST /:id/assign` - Assign to user
+
+### Bookings (`/api/v1/bookings`)
+- `GET /` - List bookings
+- `GET /availability` - Check availability
+- `GET /stats` - Statistics
+- `GET /number/:bookingNumber` - Get by number
+- `GET /:id` - Get booking
+- `POST /` - Create booking
+- `PATCH /:id` - Update booking
+- `POST /:id/confirm` - Confirm
+- `POST /:id/start` - Start rental
+- `POST /:id/complete` - Complete rental
+- `POST /:id/extend` - Extend rental
+- `POST /:id/cancel` - Cancel
+- `POST /:id/addons` - Add addon
+- `DELETE /:id/addons/:addonId` - Remove addon
+
+### Payments (`/api/v1/payments`)
+- `GET /` - List payments
+- `GET /pending` - Pending payments
+- `GET /stats` - Statistics
+- `GET /gateway/status` - Gateway status
+- `GET /:id` - Get payment
+- `POST /` - Create payment
+- `POST /:id/verify` - Verify payment
+- `POST /:id/reject` - Reject payment
+- `POST /webhooks/:vendor` - Webhook (no auth)
+
+### Maintenance (`/api/v1/maintenance`)
+- `GET /` - List records
+- `GET /upcoming` - Upcoming maintenance
+- `GET /:id` - Get record
+- `GET /vehicles/:vehicleId/history` - Vehicle history
+- `GET /vehicles/:vehicleId/summary` - Vehicle summary
+- `POST /` - Create record
+- `PATCH /:id` - Update record
+- `POST /:id/start` - Start maintenance
+- `POST /:id/complete` - Complete maintenance
+
+### Dashboard (`/api/v1/dashboard`)
+- `GET /overview` - Overview stats
+- `GET /revenue` - Revenue stats
+- `GET /leads` - Lead stats
+- `GET /fleet` - Fleet utilization
+- `GET /payments` - Payment overview
+- `GET /activities` - Upcoming activities
+
+### Reports (`/api/v1/reports`)
+- `GET /revenue` - Revenue report (supports ?format=csv)
+- `GET /fleet-utilization` - Fleet report
+- `GET /lead-sources` - Lead source report
+- `GET /payments` - Payment report
+- `GET /customers` - Customer report
+
+### Public API (`/api/v1/public`)
+Requires `X-API-Key` header.
+- `POST /leads` - Submit lead
+- `GET /availability` - Check availability
+- `GET /vehicle-types` - Get vehicle types
+- `GET /vehicles/:id` - Get vehicle details
+
+### Health
 - `GET /api/v1/health` - Health check
 
 JWT token stored in httpOnly cookie named `token`.
+
+## Database Tables
+
+Located in `src/worker/core/database/schema/`:
+- `users.ts` - Admin users
+- `customers.ts` - Customers with blacklist
+- `vehicles.ts` - Vehicle fleet
+- `vehicle-status-logs.ts` - Status change history
+- `leads.ts` - Sales leads
+- `bookings.ts` - Rental bookings
+- `booking-addons.ts` - Booking addons
+- `payments.ts` - Payment records
+- `maintenance.ts` - Maintenance records
+- `system-config.ts` - Key-value config
+- `token-blacklist.ts` - JWT blacklist
+
+## Payment Gateway Integration
+
+Supports multiple payment gateways via `PaymentGatewayFactory`:
+- **Manual** - Bank transfer, cash (default)
+- **Midtrans** - QRIS, gateway payment
+- **Xendit** - Alternative gateway
+
+Gateway configuration stored in `system_config` table.
