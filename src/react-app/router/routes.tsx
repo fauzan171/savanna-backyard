@@ -40,6 +40,8 @@ import {
 	RevenueReportPage,
 	FleetReportPage,
 	LeadSourceReportPage,
+	PaymentReportPage,
+	CustomerReportPage,
 } from '@/react-app/features/reports';
 
 export const routes: RouteObject[] = [
@@ -96,6 +98,8 @@ export const routes: RouteObject[] = [
 							{ path: 'reports/revenue', element: <RevenueReportPage /> },
 							{ path: 'reports/fleet', element: <FleetReportPage /> },
 							{ path: 'reports/leads', element: <LeadSourceReportPage /> },
+							{ path: 'reports/payments', element: <PaymentReportPage /> },
+							{ path: 'reports/customers', element: <CustomerReportPage /> },
 						],
 					},
 				],

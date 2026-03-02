@@ -3,22 +3,13 @@ import { Link } from 'react-router';
 import { ArrowLeft, DollarSign, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { StatCard } from '@/react-app/components/ui/stat-card';
+import { formatCurrency } from '@/react-app/lib/utils';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { ExportButton } from '../components/ExportButton';
 import { LineChart } from '../components/charts/LineChart';
 import { BarChart } from '../components/charts/BarChart';
 import { PieChart } from '../components/charts/PieChart';
 import { useRevenueReport } from '../hooks/useReports';
-
-const formatCurrency = (value: number) => {
-	return new Intl.NumberFormat('id-ID', {
-		style: 'currency',
-		currency: 'IDR',
-		minimumFractionDigits: 0,
-		maximumFractionDigits: 0,
-		notation: value >= 1000000 ? 'compact' : 'standard',
-	}).format(value);
-};
 
 export default function RevenueReportPage() {
 	const [startDate, setStartDate] = useState<Date>();
