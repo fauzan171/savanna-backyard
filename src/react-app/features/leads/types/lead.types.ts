@@ -24,10 +24,9 @@ export interface Lead extends BaseEntity {
 
 // Lead with notes (for detail page)
 export interface LeadWithNotes extends Lead {
-	notes: LeadNote[];
-	booking: BookingReference | null;
+    notes: LeadNote[] | string | null;  // backend sends string
+    booking: BookingReference | null;
 }
-
 export interface LeadNote {
 	id: string;
 	content: string;

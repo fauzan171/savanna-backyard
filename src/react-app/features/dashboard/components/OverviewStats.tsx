@@ -8,7 +8,7 @@ interface OverviewStatsProps {
 }
 
 export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
-	const formatCurrency = (amount: number, currency: 'IDR' | 'USD') => {
+	const formatCurrency = (amount: number, currency: string) => {
 		if (currency === 'IDR') {
 			return new Intl.NumberFormat('id-ID', {
 				style: 'currency',
@@ -26,27 +26,27 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 	const stats = [
 		{
 			title: 'Total Leads',
-			value: data?.leads.total ?? 0,
+			value: data?.leads?.new ?? 0,
 			icon: <FileText className="h-4 w-4" />,
-			description: `${data?.leads.new ?? 0} new this period`,
+			description: `${data?.leads?.converted ?? 0} converted this period`,
 		},
 		{
 			title: 'Active Bookings',
-			value: data?.bookings.active ?? 0,
+			value: data?.activeBookings ?? 0,
 			icon: <Car className="h-4 w-4" />,
-			description: `${data?.bookings.total ?? 0} total`,
+			description: `${data?.upcomingPickups ?? 0} pickups today`,
 		},
 		{
 			title: 'Available Vehicles',
-			value: data?.vehicles.available ?? 0,
+			value: data?.fleet?.available ?? 0,
 			icon: <TrendingUp className="h-4 w-4" />,
-			description: `${data?.vehicles.total ?? 0} total fleet`,
+			description: `${data?.fleet?.total ?? 0} total fleet`,
 		},
 		{
-			title: 'Total Customers',
-			value: data?.customers.total ?? 0,
+			title: 'Payments Pending',
+			value: data?.payments?.pending ?? 0,
 			icon: <Users className="h-4 w-4" />,
-			description: `${data?.customers.new ?? 0} new this period`,
+			description: `${data?.payments?.overdue ?? 0} overdue`,
 		},
 	];
 
@@ -67,11 +67,11 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 				value={data ? formatCurrency(data.revenue.total, data.revenue.currency) : '-'}
 				icon={<DollarSign className="h-4 w-4" />}
 				trend={
-					data
+					data?.revenue?.change
 						? {
-								value: data.revenue.collected / (data.revenue.total || 1) * 100,
-								direction: 'up' as const,
-								label: 'collected',
+								value: Math.abs(data.revenue.change.value ?? 0),
+								direction: data.revenue.change.direction === 'neutral' ? 'up' : data.revenue.change.direction,
+								label: data.revenue.change.direction === 'up' ? 'increase' : 'decrease',
 							}
 						: undefined
 				}

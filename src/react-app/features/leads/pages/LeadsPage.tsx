@@ -27,6 +27,7 @@ export default function LeadsPage() {
 			}
 		} catch (error) {
 			// Error is handled by the mutation
+			console.log(error)
 		}
 	};
 

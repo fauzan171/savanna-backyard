@@ -2,6 +2,7 @@ import { useApiQuery, useApiList, useApiCreate, useApiUpdate, useApiMutation } f
 import { leadApi } from '../api/leadApi';
 import type {
 	Lead,
+	LeadNote,
 	LeadWithNotes,
 	CreateLeadRequest,
 	UpdateLeadRequest,
@@ -66,7 +67,7 @@ export function useUpdateLead() {
 
 // Hook for adding note
 export function useAddNote(id: string) {
-	return useApiMutation<LeadWithNotes['notes'][0], AddNoteRequest>(
+	return useApiMutation<LeadNote, AddNoteRequest>(
 		leadKeys.detail(id),
 		async (data) => leadApi.addNote(id, data)
 	);

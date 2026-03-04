@@ -20,7 +20,7 @@ run_worker_first = ["/api/*"]
 [[d1_databases]]
 binding = "DB"
 database_name = "savanna-backyard-db"
-database_id = "local-dev"
+database_id = "5e24783d-8b24-455a-94e2-cbc0480ff8e7"
 
 # Environment Variables
 [vars]

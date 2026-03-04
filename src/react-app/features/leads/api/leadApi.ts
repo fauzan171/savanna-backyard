@@ -2,6 +2,7 @@ import { api } from '@/react-app/lib/api-client';
 import type { ApiSuccessResponse, ApiPaginatedSuccessResponse } from '@/react-app/features/shared/types/api.types';
 import type {
 	Lead,
+	LeadNote,
 	LeadWithNotes,
 	CreateLeadRequest,
 	UpdateLeadRequest,
@@ -48,7 +49,7 @@ export const leadApi = {
 
 	// Add note to lead
 	addNote: async (id: string, data: AddNoteRequest) => {
-		return api.post<ApiSuccessResponse<LeadWithNotes['notes'][0]>>(`${BASE_PATH}/${id}/notes`, data);
+		return api.post<ApiSuccessResponse<LeadNote>>(`${BASE_PATH}/${id}/notes`, data);
 	},
 
 	// Convert lead to booking

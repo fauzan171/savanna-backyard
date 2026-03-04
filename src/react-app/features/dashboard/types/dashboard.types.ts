@@ -12,36 +12,36 @@ export type PeriodFilter = 'today' | 'week' | 'month' | 'year';
 
 export interface DashboardOverview {
 	period: string;
-	leads: {
+	revenue: {
 		total: number;
+		currency: string;
+		bookingsCount: number;
+		change: {
+			value: number | null;
+			direction: 'up' | 'down' | 'neutral';
+		};
+	};
+	leads: {
 		new: number;
 		converted: number;
 		conversionRate: number;
+		followUpsDue: number;
 	};
-	bookings: {
-		total: number;
-		active: number;
-		completed: number;
-		cancelled: number;
-	};
-	vehicles: {
+	fleet: {
 		total: number;
 		available: number;
-		inUse: number;
-		inMaintenance: number;
+		rented: number;
+		maintenance: number;
+		utilizationRate: number;
 	};
-	customers: {
-		total: number;
-		new: number;
-		repeat: number;
-		blacklisted: number;
-	};
-	revenue: {
-		total: number;
-		collected: number;
+	payments: {
+		verified: number;
 		pending: number;
-		currency: 'IDR' | 'USD';
+		overdue: number;
 	};
+	activeBookings: number;
+	upcomingPickups: number;
+	upcomingReturns: number;
 }
 
 // ============================================

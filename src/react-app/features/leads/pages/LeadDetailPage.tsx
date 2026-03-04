@@ -23,7 +23,7 @@ export default function LeadDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
-			// Error is handled by the mutation
+			console.log(error)
 		}
 	};
 
