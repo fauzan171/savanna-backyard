@@ -21,6 +21,8 @@ import {
 	type BookingFormData,
 	type CreateAddonRequest,
 } from '../types/booking.types';
+import { useCustomers } from '@/react-app/features/customers/hooks/useCustomers';
+import { useVehicles } from '@/react-app/features/vehicles/hooks/useVehicles';
 
 interface BookingFormProps {
 	onSubmit: (data: BookingFormData) => Promise<void>;
@@ -29,9 +31,9 @@ interface BookingFormProps {
 }
 
 const addonTypes: Array<{ value: CreateAddonRequest['type']; label: string }> = [
-	{ value: 'Tour_Guide', label: 'Tour Guide' },
-	{ value: 'Safety_Gear', label: 'Safety Gear' },
-	{ value: 'Pickup_Dropoff', label: 'Pickup/Dropoff' },
+	{ value: 'TourGuide', label: 'Tour Guide' },
+	{ value: 'SafetyGear', label: 'Safety Gear' },
+	{ value: 'PickupDropoff', label: 'Pickup/Dropoff' },
 	{ value: 'Package', label: 'Package' },
 	{ value: 'Other', label: 'Other' },
 ];
@@ -51,11 +53,28 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 	const [addons, setAddons] = useState<CreateAddonRequest[]>([]);
 	const [showAddonForm, setShowAddonForm] = useState(false);
 	const [newAddon, setNewAddon] = useState<CreateAddonRequest>({
-		type: 'Safety_Gear',
+		type: 'SafetyGear',
 		description: '',
 		amount: 0,
 		isMandatory: false,
 	});
+
+	// Fetch real data from API
+	const { data: customersData } = useCustomers({ limit: 100 });
+	const { data: vehiclesData } = useVehicles({ limit: 100, status: 'Available' });
+
+	// Map to ComboboxOption with real UUIDs
+	const customerOptions: ComboboxOption[] = customersData?.items?.map((c) => ({
+		value: c.id,
+		label: c.name,
+		sublabel: c.phone,
+	})) ?? [];
+
+	const vehicleOptions: ComboboxOption[] = vehiclesData?.items?.map((v) => ({
+		value: v.id,
+		label: v.name,
+		sublabel: `${v.plateNumber} • ${formatCurrency(v.dailyRateIdr)}/day`,
+	})) ?? [];
 
 	const {
 		register,
@@ -76,7 +95,6 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 		},
 	});
 
-	// Update form values when selections change
 	const handleCustomerChange = (value: string | null) => {
 		setSelectedCustomer(value);
 		if (value) setValue('customerId', value);
@@ -87,24 +105,11 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 		if (value) setValue('vehicleId', value);
 	};
 
-	// Customer options (mock - would come from API)
-	const customerOptions: ComboboxOption[] = [
-		{ value: '1', label: 'John Doe', sublabel: '+6281234567890' },
-		{ value: '2', label: 'Jane Smith', sublabel: '+6289876543210' },
-	];
-
-	// Vehicle options (mock - would come from API)
-	const vehicleOptions: ComboboxOption[] = [
-		{ value: '1', label: 'Honda CRF 250L', sublabel: 'B 1234 ABC • Rp 450.000/day' },
-		{ value: '2', label: 'Yamaha R15', sublabel: 'B 5678 XYZ • Rp 350.000/day' },
-	];
-
-	// Add-on handlers
 	const handleAddAddon = () => {
 		if (newAddon.description && newAddon.amount > 0) {
 			setAddons([...addons, newAddon]);
 			setNewAddon({
-				type: 'Safety_Gear',
+				type: 'SafetyGear',
 				description: '',
 				amount: 0,
 				isMandatory: false,
@@ -232,7 +237,6 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 					</Button>
 				</div>
 
-				{/* Add-ons List */}
 				{addons.length > 0 && (
 					<div className="space-y-2">
 						{addons.map((addon, index) => (
@@ -266,7 +270,6 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 					</div>
 				)}
 
-				{/* Add Add-on Form */}
 				{showAddonForm && (
 					<div className="p-4 border rounded-lg space-y-4 bg-muted/50">
 						<FormField label="Type">

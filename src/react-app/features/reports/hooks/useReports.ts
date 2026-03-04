@@ -32,7 +32,16 @@ export function useRevenueReport(params?: ReportQueryParams) {
 				'/v1/reports/revenue',
 				params as Record<string, string>
 			),
-		select: (data) => data.data,
+		select: (data) => {
+			const report = data.data;
+			if (!report) return report;
+			return {
+				...report,
+				byPeriod: report.byPeriod ?? [],
+				byVehicleType: report.byVehicleType ?? [],
+				byPaymentMethod: report.byPaymentMethod ?? [],
+			};
+		},
 	});
 }
 
@@ -47,7 +56,16 @@ export function useFleetUtilizationReport(params?: ReportQueryParams) {
 				'/v1/reports/fleet-utilization',
 				params as Record<string, string>
 			),
-		select: (data) => data.data,
+		select: (data) => {
+			const report = data.data;
+			if (!report) return report;
+			return {
+				...report,
+				byVehicle: report.byVehicle ?? [],
+				byType: report.byType ?? [],
+				trend: report.trend ?? [],
+			};
+		},
 	});
 }
 
@@ -62,7 +80,16 @@ export function useLeadSourceReport(params?: DateRangeParams) {
 				'/v1/reports/lead-sources',
 				params as Record<string, string>
 			),
-		select: (data) => data.data,
+		select: (data) => {
+			const report = data.data;
+			if (!report) return report;
+			return {
+				...report,
+				bySource: report.bySource ?? [],
+				byStatus: report.byStatus ?? [],
+				trend: report.trend ?? [],
+			};
+		},
 	});
 }
 
@@ -77,7 +104,16 @@ export function usePaymentReport(params?: DateRangeParams) {
 				'/v1/reports/payments',
 				params as Record<string, string>
 			),
-		select: (data) => data.data,
+		select: (data) => {
+			const report = data.data;
+			if (!report) return report;
+			return {
+				...report,
+				byStatus: report.byStatus ?? [],
+				byMethod: report.byMethod ?? [],
+				trend: report.trend ?? [],
+			};
+		},
 	});
 }
 
@@ -92,6 +128,15 @@ export function useCustomerReport(params?: DateRangeParams) {
 				'/v1/reports/customers',
 				params as Record<string, string>
 			),
-		select: (data) => data.data,
+		select: (data) => {
+			const report = data.data;
+			if (!report) return report;
+			return {
+				...report,
+				byBookingCount: report.byBookingCount ?? [],
+				topCustomers: report.topCustomers ?? [],
+				trend: report.trend ?? [],
+			};
+		},
 	});
 }

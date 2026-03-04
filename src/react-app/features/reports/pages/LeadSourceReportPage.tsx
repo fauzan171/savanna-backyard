@@ -22,28 +22,32 @@ export default function LeadSourceReportPage() {
 
 	const { data: report, isLoading } = useLeadSourceReport(params);
 
-	const trendData = report?.trend.map((item) => ({
+	const trendData = (report?.trend ?? []).map((item) => ({
 		date: item.date,
 		new: item.new,
 		converted: item.converted,
 	}));
 
-	const sourceData = report?.bySource.map((item) => ({
+	const sourceData = (report?.bySource ?? []).map((item) => ({
 		source: item.source,
 		count: item.count,
 		converted: item.converted,
-		conversionRate: item.conversionRate,
+		conversionRate: item.conversionRate ?? 0,
 	}));
 
-	const statusData = report?.byStatus.map((item) => ({
-		name: item.status,
-		value: item.count,
+	const priorityData = (report?.byPriority ?? []).map((item) => ({
+		name: item.priority,
+		value: item.total,
 	}));
 
-	const sourcePieData = report?.bySource.map((item) => ({
+	const sourcePieData = (report?.bySource ?? []).map((item) => ({
 		name: item.source,
 		value: item.count,
 	}));
+
+	const conversionRate = report?.summary?.overallConversionRate
+		?? report?.summary?.conversionRate
+		?? 0;
 
 	return (
 		<div className="space-y-6">
@@ -95,7 +99,7 @@ export default function LeadSourceReportPage() {
 				/>
 				<StatCard
 					title="Conversion Rate"
-					value={report ? `${report.summary.conversionRate.toFixed(1)}%` : '-'}
+					value={report ? `${conversionRate.toFixed(1)}%` : '-'}
 					icon={<TrendingUp className="h-4 w-4" />}
 					loading={isLoading}
 				/>
@@ -103,55 +107,55 @@ export default function LeadSourceReportPage() {
 
 			<LineChart
 				title="Lead Trend"
-				data={trendData ?? []}
+				data={trendData}
 				xKey="date"
 				lines={[
 					{ dataKey: 'new', name: 'New Leads', color: 'hsl(var(--primary))' },
 					{ dataKey: 'converted', name: 'Converted', color: 'hsl(142.1 76.2% 36.3%)' },
 				]}
 				loading={isLoading}
-				empty={!trendData || trendData.length === 0}
+				empty={trendData.length === 0}
 			/>
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				<BarChart
 					title="Leads by Source"
-					data={sourceData ?? []}
+					data={sourceData}
 					xKey="source"
 					bars={[
 						{ dataKey: 'count', name: 'Total Leads' },
 						{ dataKey: 'converted', name: 'Converted', color: 'hsl(142.1 76.2% 36.3%)' },
 					]}
 					loading={isLoading}
-					empty={!sourceData || sourceData.length === 0}
+					empty={sourceData.length === 0}
 				/>
 
 				<PieChart
 					title="Leads by Source Distribution"
-					data={sourcePieData ?? []}
+					data={sourcePieData}
 					loading={isLoading}
-					empty={!sourcePieData || sourcePieData.length === 0}
+					empty={sourcePieData.length === 0}
 				/>
 			</div>
 
 			<div className="grid gap-6 lg:grid-cols-2">
 				<BarChart
 					title="Conversion Rate by Source"
-					data={sourceData ?? []}
+					data={sourceData}
 					xKey="source"
 					bars={[
 						{ dataKey: 'conversionRate', name: 'Conversion Rate %', color: 'hsl(262.1 83.3% 57.8%)' },
 					]}
 					loading={isLoading}
-					empty={!sourceData || sourceData.length === 0}
+					empty={sourceData.length === 0}
 					formatY={(v) => `${v.toFixed(1)}%`}
 				/>
 
 				<PieChart
-					title="Leads by Status"
-					data={statusData ?? []}
+					title="Leads by Priority"
+					data={priorityData}
 					loading={isLoading}
-					empty={!statusData || statusData.length === 0}
+					empty={priorityData.length === 0}
 				/>
 			</div>
 		</div>

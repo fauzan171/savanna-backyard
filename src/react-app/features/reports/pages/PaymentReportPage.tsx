@@ -7,6 +7,7 @@ import {
 	AlertCircle,
 	DollarSign,
 	FileText,
+	TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { StatCard } from '@/react-app/components/ui/stat-card';
@@ -30,22 +31,32 @@ export default function PaymentReportPage() {
 
 	const { data: report, isLoading } = usePaymentReport(params);
 
-	const trendData = report?.trend.map((item) => ({
+	// backend pakai dailyBreakdown, bukan trend
+	const trendData = (report?.dailyBreakdown ?? report?.trend ?? []).map((item) => ({
 		date: item.date,
 		count: item.count,
 		amount: item.amount,
 	}));
 
-	const methodData = report?.byMethod.map((item) => ({
+	const methodData = (report?.byMethod ?? []).map((item) => ({
 		method: item.method,
 		count: item.count,
-		amount: item.amount,
-		percentage: item.percentage,
+		amount: item.total ?? item.amount ?? 0,
 	}));
 
-	const statusPieData = report?.byStatus.map((item) => ({
+	// backend kirim byStatus sebagai object {Verified: 0, Pending: 0, Failed: 0}
+	const byStatusArray = Array.isArray(report?.byStatus)
+		? report.byStatus
+		: Object.entries(report?.byStatus ?? {}).map(([status, count]) => ({
+				status,
+				count: count as number,
+				amount: 0,
+				percentage: 0,
+		  }));
+
+	const statusPieData = byStatusArray.map((item) => ({
 		name: item.status,
-		value: item.amount,
+		value: item.count,
 	}));
 
 	return (
@@ -85,27 +96,27 @@ export default function PaymentReportPage() {
 
 			<div className="grid gap-4 md:grid-cols-4">
 				<StatCard
-					title="Total Payments"
-					value={report?.summary.totalPayments ?? 0}
+					title="Total Expected"
+					value={report ? formatCurrency(report.summary.totalExpected) : '-'}
 					icon={<FileText className="h-4 w-4" />}
 					loading={isLoading}
 				/>
 				<StatCard
-					title="Total Amount"
-					value={report ? formatCurrency(report.summary.totalAmount) : '-'}
+					title="Total Received"
+					value={report ? formatCurrency(report.summary.totalReceived) : '-'}
 					icon={<DollarSign className="h-4 w-4" />}
 					loading={isLoading}
 				/>
 				<StatCard
-					title="Verified"
-					value={report ? formatCurrency(report.summary.verified) : '-'}
-					icon={<CheckCircle className="h-4 w-4" />}
+					title="Pending"
+					value={report ? formatCurrency(report.summary.totalPending) : '-'}
+					icon={<Clock className="h-4 w-4" />}
 					loading={isLoading}
 				/>
 				<StatCard
-					title="Pending"
-					value={report ? formatCurrency(report.summary.pending) : '-'}
-					icon={<Clock className="h-4 w-4" />}
+					title="Collection Rate"
+					value={report ? `${(report.summary.collectionRate ?? 0).toFixed(1)}%` : '-'}
+					icon={<TrendingUp className="h-4 w-4" />}
 					loading={isLoading}
 				/>
 			</div>
@@ -113,25 +124,25 @@ export default function PaymentReportPage() {
 			<div className="grid gap-6 lg:grid-cols-2">
 				<LineChart
 					title="Payment Trend"
-					data={trendData ?? []}
+					data={trendData}
 					xKey="date"
 					lines={[
 						{ dataKey: 'amount', name: 'Amount', color: 'hsl(var(--primary))' },
 					]}
 					loading={isLoading}
-					empty={!trendData || trendData.length === 0}
+					empty={trendData.length === 0}
 					formatY={formatCurrency}
 				/>
 
 				<BarChart
 					title="Payments by Method"
-					data={methodData ?? []}
+					data={methodData}
 					xKey="method"
 					bars={[
 						{ dataKey: 'amount', name: 'Amount' },
 					]}
 					loading={isLoading}
-					empty={!methodData || methodData.length === 0}
+					empty={methodData.length === 0}
 					formatY={formatCurrency}
 				/>
 			</div>
@@ -139,21 +150,20 @@ export default function PaymentReportPage() {
 			<div className="grid gap-6 lg:grid-cols-2">
 				<PieChart
 					title="Payments by Status"
-					data={statusPieData ?? []}
+					data={statusPieData}
 					loading={isLoading}
-					empty={!statusPieData || statusPieData.length === 0}
-					formatValue={formatCurrency}
+					empty={statusPieData.length === 0}
 				/>
 
 				<BarChart
 					title="Payment Count by Method"
-					data={methodData ?? []}
+					data={methodData}
 					xKey="method"
 					bars={[
 						{ dataKey: 'count', name: 'Count', color: 'hsl(217.2 91.2% 59.8%)' },
 					]}
 					loading={isLoading}
-					empty={!methodData || methodData.length === 0}
+					empty={methodData.length === 0}
 				/>
 			</div>
 
@@ -174,29 +184,23 @@ export default function PaymentReportPage() {
 								<th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
 									Count
 								</th>
-								<th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-									Amount
-								</th>
-								<th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-									Percentage
-								</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-800">
 							{isLoading ? (
 								<tr>
-									<td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+									<td colSpan={2} className="px-6 py-4 text-center text-gray-500">
 										Loading...
 									</td>
 								</tr>
-							) : !report?.byStatus || report.byStatus.length === 0 ? (
+							) : byStatusArray.length === 0 ? (
 								<tr>
-									<td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+									<td colSpan={2} className="px-6 py-4 text-center text-gray-500">
 										No payment data available
 									</td>
 								</tr>
 							) : (
-								report.byStatus.map((item) => (
+								byStatusArray.map((item) => (
 									<tr key={item.status}>
 										<td className="whitespace-nowrap px-6 py-4">
 											<div className="flex items-center gap-2">
@@ -216,12 +220,6 @@ export default function PaymentReportPage() {
 										</td>
 										<td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900 dark:text-white">
 											{item.count}
-										</td>
-										<td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900 dark:text-white">
-											{formatCurrency(item.amount)}
-										</td>
-										<td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-900 dark:text-white">
-											{(item.percentage ?? 0).toFixed(1)}%
 										</td>
 									</tr>
 								))

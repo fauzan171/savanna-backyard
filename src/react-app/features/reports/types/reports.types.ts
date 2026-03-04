@@ -90,23 +90,36 @@ export interface FleetUtilizationReport {
 // ============================================
 
 export interface LeadSourceReport {
-	period: {
-		startDate: string;
-		endDate: string;
+	reportInfo?: {
+		title: string;
+		period: { start: string; end: string };
+		generatedAt: string;
 	};
 	summary: {
 		totalLeads: number;
 		converted: number;
-		conversionRate: number;
+		lost?: number;
+		inProgress?: number;
+		// backend pakai overallConversionRate
+		overallConversionRate?: number;
+		// fallback jika backend berubah
+		conversionRate?: number;
 	};
 	bySource: Array<{
 		source: string;
 		count: number;
 		converted: number;
 		conversionRate: number;
-		percentage: number;
+		percentage?: number;
 	}>;
-	byStatus: Array<{
+	// backend pakai byPriority, bukan byStatus
+	byPriority?: Array<{
+		priority: string;
+		total: number;
+		converted: number;
+		conversionRate: number;
+	}>;
+	byStatus?: Array<{
 		status: string;
 		count: number;
 		percentage: number;
@@ -123,19 +136,26 @@ export interface LeadSourceReport {
 // ============================================
 
 export interface PaymentReport {
-	period: {
-		startDate: string;
-		endDate: string;
+	reportInfo?: {
+		title: string;
+		period: { start: string; end: string };
+		generatedAt: string;
 	};
 	summary: {
-		totalPayments: number;
-		totalAmount: number;
-		verified: number;
-		pending: number;
-		failed: number;
-		currency: 'IDR' | 'USD';
+		totalExpected: number;
+		totalReceived: number;
+		totalPending: number;
+		totalOverdue: number;
+		collectionRate: number;
+		// legacy fields (fallback)
+		totalPayments?: number;
+		totalAmount?: number;
+		verified?: number;
+		pending?: number;
+		failed?: number;
 	};
-	byStatus: Array<{
+	// backend kirim object, bukan array
+	byStatus: Record<string, number> | Array<{
 		status: string;
 		count: number;
 		amount: number;
@@ -143,11 +163,20 @@ export interface PaymentReport {
 	}>;
 	byMethod: Array<{
 		method: string;
+		total: number;
+		count: number;
+		avgAmount: number;
+		// legacy
+		amount?: number;
+		percentage?: number;
+	}>;
+	// backend pakai dailyBreakdown, bukan trend
+	dailyBreakdown?: Array<{
+		date: string;
 		count: number;
 		amount: number;
-		percentage: number;
 	}>;
-	trend: Array<{
+	trend?: Array<{
 		date: string;
 		count: number;
 		amount: number;
@@ -159,20 +188,23 @@ export interface PaymentReport {
 // ============================================
 
 export interface CustomerReport {
-	period: {
-		startDate: string;
-		endDate: string;
+	reportInfo?: {
+		title: string;
+		period: { start: string; end: string };
+		generatedAt: string;
 	};
 	summary: {
 		totalCustomers: number;
 		newCustomers: number;
 		repeatCustomers: number;
-		repeatRate: number;
+		blacklisted?: number;
+		// opsional karena backend tidak selalu kirim
+		repeatRate?: number;
 	};
 	byBookingCount: Array<{
 		bookingCount: string;
 		customerCount: number;
-		percentage: number;
+		percentage?: number;
 	}>;
 	topCustomers: Array<{
 		id: string;
@@ -182,7 +214,7 @@ export interface CustomerReport {
 		bookingCount: number;
 		totalSpent: number;
 	}>;
-	trend: Array<{
+	trend?: Array<{
 		date: string;
 		new: number;
 		repeat: number;

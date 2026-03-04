@@ -53,7 +53,7 @@ export function PaymentTable({ data, isLoading, onRowClick }: PaymentTableProps)
 					className="font-mono text-sm font-medium hover:underline text-primary"
 					onClick={(e) => e.stopPropagation()}
 				>
-					{row.original.booking.bookingNumber}
+					{row.original.booking?.bookingNumber ?? '-'}
 				</Link>
 			),
 		},
@@ -64,9 +64,9 @@ export function PaymentTable({ data, isLoading, onRowClick }: PaymentTableProps)
 				<div className="flex items-center gap-2">
 					<User className="size-4 text-muted-foreground shrink-0" />
 					<div className="min-w-0">
-						<div className="font-medium truncate">{row.original.booking.customer.name}</div>
+						<div className="font-medium truncate">{row.original.booking?.customer?.name ?? '-'}</div>
 						<div className="text-xs text-muted-foreground truncate">
-							{row.original.booking.customer.phone}
+							{row.original.booking?.customer?.phone ?? ''}
 						</div>
 					</div>
 				</div>
@@ -119,12 +119,12 @@ export function PaymentTable({ data, isLoading, onRowClick }: PaymentTableProps)
 			<div className="space-y-2 text-sm">
 				<div className="flex items-center gap-2">
 					<FileText className="size-4 text-muted-foreground" />
-					<span>Booking: {payment.booking.bookingNumber}</span>
+					<span>Booking: {payment.booking?.bookingNumber ?? '-'}</span>
 				</div>
 
 				<div className="flex items-center gap-2">
 					<User className="size-4 text-muted-foreground" />
-					<span className="font-medium">{payment.booking.customer.name}</span>
+					<span className="font-medium">{payment.booking?.customer?.name ?? '-'}</span>
 				</div>
 			</div>
 

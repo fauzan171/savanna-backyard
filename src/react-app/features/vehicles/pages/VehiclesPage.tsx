@@ -25,7 +25,7 @@ export default function VehiclesPage() {
 				navigate(`/vehicles/${result.data.id}`);
 			}
 		} catch (error) {
-			// Error is handled by the mutation
+			console.log(error)
 		}
 	};
 

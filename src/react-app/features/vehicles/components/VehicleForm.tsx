@@ -20,7 +20,7 @@ const vehicleFormSchema = z.object({
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']),
 	brand: z.string().optional(),
 	model: z.string().optional(),
-	year: z.coerce.number().min(1990).max(new Date().getFullYear() + 1).optional().or(z.literal('')),
+	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),	
 	dailyRateIdr: z.coerce.number().min(0, 'Rate must be positive'),
 	dailyRateUsd: z.coerce.number().min(0).optional().or(z.literal('')),
 	photoUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
