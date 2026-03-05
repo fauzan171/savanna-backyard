@@ -2,10 +2,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { Plus, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Textarea } from '@/react-app/components/ui/textarea';
 import { FormField } from '@/react-app/components/ui/form-field';
+import { Calendar } from '@/react-app/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/react-app/components/ui/popover';
+import { cn } from '@/react-app/lib/utils';
 import {
 	Select,
 	SelectContent,
@@ -158,25 +162,57 @@ export function BookingForm({ onSubmit, onCancel, isLoading }: BookingFormProps)
 			{/* Date Range */}
 			<div className="grid gap-4 md:grid-cols-2">
 				<FormField label="Start Date" required error={errors.startDate?.message}>
-					<div className="relative">
-						<Input
-							type="date"
-							{...register('startDate', { valueAsDate: true })}
-							disabled={isLoading || isSubmitting}
-						/>
-						<CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-					</div>
+					<Popover>
+						<PopoverTrigger asChild>
+							<Button
+								type="button"
+								variant="outline"
+								className={cn(
+									'w-full justify-start text-left font-normal',
+									!watch('startDate') && 'text-muted-foreground'
+								)}
+								disabled={isLoading || isSubmitting}
+							>
+								<CalendarIcon className="mr-2 size-4" />
+								{watch('startDate') ? format(watch('startDate'), 'dd MMM yyyy') : 'Pick a date'}
+							</Button>
+						</PopoverTrigger>
+						<PopoverContent className="w-auto p-0" align="start">
+							<Calendar
+								mode="single"
+								selected={watch('startDate')}
+								onSelect={(date) => date && setValue('startDate', date)}
+								initialFocus
+							/>
+						</PopoverContent>
+					</Popover>
 				</FormField>
 
 				<FormField label="End Date" required error={errors.endDate?.message}>
-					<div className="relative">
-						<Input
-							type="date"
-							{...register('endDate', { valueAsDate: true })}
-							disabled={isLoading || isSubmitting}
-						/>
-						<CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
-					</div>
+					<Popover>
+						<PopoverTrigger asChild>
+							<Button
+								type="button"
+								variant="outline"
+								className={cn(
+									'w-full justify-start text-left font-normal',
+									!watch('endDate') && 'text-muted-foreground'
+								)}
+								disabled={isLoading || isSubmitting}
+							>
+								<CalendarIcon className="mr-2 size-4" />
+								{watch('endDate') ? format(watch('endDate'), 'dd MMM yyyy') : 'Pick a date'}
+							</Button>
+						</PopoverTrigger>
+						<PopoverContent className="w-auto p-0" align="start">
+							<Calendar
+								mode="single"
+								selected={watch('endDate')}
+								onSelect={(date) => date && setValue('endDate', date)}
+								initialFocus
+							/>
+						</PopoverContent>
+					</Popover>
 				</FormField>
 			</div>
 

@@ -153,7 +153,7 @@ export interface StartRentalRequest {
 
 export interface CompleteRentalRequest {
   actualReturnDate: string; // ISO date
-  returnKm?: number;
+  endKm?: number;
   returnNotes?: string;
   damageNotes?: string;
 }
@@ -342,7 +342,7 @@ export const startRentalSchema = z.object({
 
 export const completeRentalSchema = z.object({
   actualReturnDate: z.string().min(1, "Return date is required"),
-  returnKm: z.number().int().positive().optional(),
+  endKm: z.number().int().positive().optional(),
   returnNotes: z.string().optional(),
   damageNotes: z.string().optional(),
 });

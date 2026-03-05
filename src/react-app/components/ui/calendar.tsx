@@ -6,10 +6,6 @@ import { cn } from '@/react-app/lib/utils';
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
 
-/**
- * Calendar is a standalone date picker component.
- * Supports single date, range, and multiple date selection.
- */
 function Calendar({
 	className,
 	classNames,
@@ -35,7 +31,7 @@ function Calendar({
 				nav_button_next: 'absolute right-1',
 				table: 'w-full border-collapse space-y-1',
 				head_row: 'flex',
-				head_cell: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]',
+				head_cell: 'text-muted-foreground rounded-md w-9 font-normal text-[0.8rem] flex items-center justify-center',
 				row: 'flex w-full mt-2',
 				cell: cn(
 					'relative p-0 text-center text-sm focus-within:relative focus-within:z-20',
@@ -68,10 +64,6 @@ function Calendar({
 }
 Calendar.displayName = 'Calendar';
 
-// ============================================
-// CALENDAR WITH EVENTS
-// ============================================
-
 export interface CalendarEvent {
 	date: Date;
 	label?: string;
@@ -79,11 +71,8 @@ export interface CalendarEvent {
 }
 
 export interface CalendarWithEventsProps extends Omit<CalendarProps, 'modifiers' | 'modifiersStyles' | 'mode' | 'selected' | 'onSelect'> {
-	/** Events to display on the calendar */
 	events?: CalendarEvent[];
-	/** Callback when a date is clicked */
 	onDateClick?: (date: Date) => void;
-	/** Callback when an event is clicked */
 	onEventClick?: (event: CalendarEvent) => void;
 }
 
@@ -95,7 +84,6 @@ function CalendarWithEvents({
 }: CalendarWithEventsProps) {
 	const [selected, setSelected] = React.useState<Date | undefined>(undefined);
 
-	// Group events by date string for quick lookup
 	const eventsByDate = React.useMemo(() => {
 		const map = new Map<string, CalendarEvent[]>();
 		events.forEach(event => {
@@ -107,17 +95,11 @@ function CalendarWithEvents({
 	}, [events]);
 
 	const modifiers = React.useMemo(() => {
-		return {
-			hasEvent: events.map(e => e.date),
-		};
+		return { hasEvent: events.map(e => e.date) };
 	}, [events]);
 
 	const modifiersStyles = React.useMemo(() => {
-		return {
-			hasEvent: {
-				position: 'relative' as const,
-			},
-		};
+		return { hasEvent: { position: 'relative' as const } };
 	}, []);
 
 	const handleSelect = (date: Date | undefined) => {
@@ -141,7 +123,6 @@ function CalendarWithEvents({
 				modifiersStyles={modifiersStyles}
 				{...props}
 			/>
-			{/* Event indicators rendered via CSS ::after pseudo-element would require custom styling */}
 		</div>
 	);
 }

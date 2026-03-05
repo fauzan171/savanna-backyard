@@ -406,6 +406,8 @@ function ActionDialog({
 	const [notes, setNotes] = useState('');
 	const [reason, setReason] = useState('');
 	const [newEndDate, setNewEndDate] = useState('');
+	const [startKm, setStartKm] = useState('');
+	const [endKm, setEndKm] = useState('');
 
 	const confirmBooking = useConfirmBooking();
 	const startRental = useStartRental();
@@ -420,12 +422,17 @@ function ActionDialog({
 					await confirmBooking.mutateAsync({ id: bookingId, notes });
 					break;
 				case 'start':
-					await startRental.mutateAsync({ id: bookingId, pickupNotes: notes });
+					await startRental.mutateAsync({
+						id: bookingId,
+						startKm: Number(startKm),
+						pickupNotes: notes,
+					});
 					break;
 				case 'complete':
 					await completeRental.mutateAsync({
 						id: bookingId,
 						actualReturnDate: new Date().toISOString().split('T')[0],
+						endKm: endKm ? Number(endKm) : undefined,
 						returnNotes: notes,
 					});
 					break;
@@ -444,6 +451,8 @@ function ActionDialog({
 			setNotes('');
 			setReason('');
 			setNewEndDate('');
+			setStartKm('');
+			setEndKm('');
 		} catch (e) {
 			console.error('Action failed:', e);
 		}
@@ -455,6 +464,11 @@ function ActionDialog({
 		completeRental.isPending ||
 		cancelBooking.isPending ||
 		extendBooking.isPending;
+
+	const isSubmitDisabled =
+		isLoading ||
+		(action.action === 'cancel' && reason.length < 10) ||
+		(action.action === 'start' && !startKm);
 
 	return (
 		<>
@@ -473,7 +487,9 @@ function ActionDialog({
 								? 'Please provide a reason for cancelling this booking.'
 								: action.action === 'extend'
 									? 'Select the new end date for this booking.'
-									: `Are you sure you want to ${action.label.toLowerCase()} this booking?`}
+									: action.action === 'start'
+										? 'Enter the starting odometer reading to begin the rental.'
+										: `Are you sure you want to ${action.label.toLowerCase()} this booking?`}
 						</DialogDescription>
 					</DialogHeader>
 
@@ -485,6 +501,30 @@ function ActionDialog({
 									onChange={(e) => setReason(e.target.value)}
 									placeholder="Enter reason for cancellation..."
 									rows={3}
+								/>
+							</FormField>
+						)}
+
+						{action.action === 'start' && (
+							<FormField label="Start Odometer (km)" required>
+								<Input
+									type="number"
+									value={startKm}
+									onChange={(e) => setStartKm(e.target.value)}
+									placeholder="e.g. 12500"
+									min={0}
+								/>
+							</FormField>
+						)}
+
+						{action.action === 'complete' && (
+							<FormField label="End Odometer (km)">
+								<Input
+									type="number"
+									value={endKm}
+									onChange={(e) => setEndKm(e.target.value)}
+									placeholder="e.g. 12800"
+									min={0}
 								/>
 							</FormField>
 						)}
@@ -518,7 +558,7 @@ function ActionDialog({
 						<Button
 							variant={action.variant === 'destructive' ? 'destructive' : 'default'}
 							onClick={handleAction}
-							disabled={isLoading || (action.action === 'cancel' && reason.length < 10)}
+							disabled={isSubmitDisabled}
 						>
 							{isLoading ? 'Processing...' : action.label}
 						</Button>
