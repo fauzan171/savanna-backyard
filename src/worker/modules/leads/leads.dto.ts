@@ -34,6 +34,15 @@ export const addNoteSchema = z.object({
 	note: z.string().min(1, 'Note cannot be empty').max(1000),
 });
 
+// Convert to booking schema
+export const convertToBookingSchema = z.object({
+	vehicleId: z.string().min(1, 'Vehicle is required'),
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+	paymentTerms: z.enum(['DP_Pickup', 'Full_Upfront', 'DP_After', 'Flexible']),
+	notes: z.string().optional().nullable(),
+});
+
 // List query schema
 export const listLeadsQuerySchema = z.object({
 	page: z.coerce.number().int().min(1).default(1),
@@ -51,4 +60,5 @@ export type CreateLeadRequest = z.infer<typeof createLeadSchema>;
 export type UpdateLeadRequest = z.infer<typeof updateLeadSchema>;
 export type UpdateLeadStatusRequest = z.infer<typeof updateLeadStatusSchema>;
 export type AddNoteRequest = z.infer<typeof addNoteSchema>;
+export type ConvertToBookingRequest = z.infer<typeof convertToBookingSchema>;
 export type ListLeadsQuery = z.infer<typeof listLeadsQuerySchema>;

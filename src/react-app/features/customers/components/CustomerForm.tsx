@@ -65,7 +65,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 				address: customer.address ?? '',
 				identityType: customer.identityType ?? undefined,
 				identityNumber: customer.identityNumber ?? '',
-				identityPhotoUrl: customer.identityPhotoUrl ?? '',
+					identityPhotoUrl: customer.identityPhotoUrl ?? '',
 				notes: customer.notes ?? '',
 			});
 		}

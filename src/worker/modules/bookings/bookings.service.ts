@@ -274,7 +274,7 @@ export class BookingsService {
 			);
 		}
 
-		let availabilityWarning: { message: string } | null = null;
+		const availabilityWarning: { message: string } | null = null;
 
 		// Check blacklist status
 		let blacklistWarning: { isBlacklisted: boolean; reason: string | null } | null = null;

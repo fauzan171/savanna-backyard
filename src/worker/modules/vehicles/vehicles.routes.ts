@@ -3,6 +3,8 @@ import { authMiddleware } from '@/worker/core/middleware/auth';
 import { createDb } from '@/worker/core/database';
 import { VehiclesRepository } from './vehicles.repository';
 import { VehiclesService } from './vehicles.service';
+import { BookingsRepository } from '../bookings/bookings.repository';
+import { MaintenanceRepository } from '../maintenance/maintenance.repository';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import {
 	createVehicleSchema,
@@ -19,7 +21,6 @@ import {
 	type CalendarQuery,
 } from './vehicles.dto';
 
-// Type for storing services in context
 type VehiclesVariables = {
 	vehiclesService: VehiclesService;
 	user: { userId: string; role: 'SUPER_ADMIN' | 'STAFF' };
@@ -27,17 +28,21 @@ type VehiclesVariables = {
 
 type VehiclesEnv = { Bindings: Env; Variables: VehiclesVariables };
 
-// Middleware to inject vehicles services into context
 export const vehiclesServicesMiddleware = () => async (c: Context<VehiclesEnv>, next: () => Promise<void>) => {
 	const db = createDb(c.env.DB);
 	const vehiclesRepository = new VehiclesRepository(db);
-	const vehiclesService = new VehiclesService(vehiclesRepository);
+	const bookingsRepository = new BookingsRepository(db);
+	const maintenanceRepository = new MaintenanceRepository(db);
+	const vehiclesService = new VehiclesService(
+		vehiclesRepository,
+		bookingsRepository,
+		maintenanceRepository,
+	);
 
 	c.set('vehiclesService', vehiclesService);
 	await next();
 };
 
-// Route handlers
 const listVehiclesHandler = async (c: Context<VehiclesEnv>) => {
 	const service = c.get('vehiclesService');
 	const query = getValidatedQuery<ListVehiclesQuery>(c);
@@ -96,35 +101,18 @@ const getCalendarHandler = async (c: Context<VehiclesEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
-// Factory function to create vehicles router
 export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	const router = new Hono<VehiclesEnv>();
 
-	// Apply services middleware to all vehicles routes
 	router.use('*', vehiclesServicesMiddleware());
-
-	// All routes require authentication
 	router.use('*', authMiddleware());
 
-	// Check availability (public-ish, but requires auth)
 	router.get('/availability', validateQuery(availabilityQuerySchema), checkAvailabilityHandler);
-
-	// List vehicles (with pagination and filters)
 	router.get('/', validateQuery(listVehiclesQuerySchema), listVehiclesHandler);
-
-	// Get vehicle by ID
 	router.get('/:id', getVehicleByIdHandler);
-
-	// Get vehicle calendar
 	router.get('/:id/calendar', validateQuery(calendarQuerySchema), getCalendarHandler);
-
-	// Create vehicle
 	router.post('/', validateBody(createVehicleSchema), createVehicleHandler);
-
-	// Update vehicle
 	router.patch('/:id', validateBody(updateVehicleSchema), updateVehicleHandler);
-
-	// Update vehicle status
 	router.patch('/:id/status', validateBody(updateStatusSchema), updateStatusHandler);
 
 	return router;
