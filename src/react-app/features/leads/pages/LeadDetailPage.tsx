@@ -159,7 +159,7 @@ export default function LeadDetailPage() {
 						onSubmit={handleUpdate}
 						onCancel={() => setIsEditDialogOpen(false)}
 						isLoading={updateMutation.isPending}
-					/>
+					/>	
 				</DialogContent>
 			</Dialog>
 
@@ -206,7 +206,7 @@ export default function LeadDetailPage() {
 											mode="single"
 											selected={watch('startDate')}
 											onSelect={(date) => date && setValue('startDate', date)}
-											initialFocus
+											// initialFocus
 										/>
 									</PopoverContent>
 								</Popover>
@@ -230,7 +230,7 @@ export default function LeadDetailPage() {
 											mode="single"
 											selected={watch('endDate')}
 											onSelect={(date) => date && setValue('endDate', date)}
-											initialFocus
+											// initialFocus
 										/>
 									</PopoverContent>
 								</Popover>
