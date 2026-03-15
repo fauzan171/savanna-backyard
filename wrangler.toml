@@ -25,12 +25,10 @@ database_id = "5e24783d-8b24-455a-94e2-cbc0480ff8e7"
 # Environment Variables
 [vars]
 ENVIRONMENT = "development"
-[vars]
 ALLOWED_PUBLIC_API_ORIGINS = "https://landingpage-cud.pages.dev,http://localhost:5173"
 CORS_ALLOWED_ORIGINS = "https://landingpage-cud.pages.dev,http://localhost:5173"
 MIDTRANS_CLIENT_KEY = "Mid-client-c4p1ertrnxxTEGpr"
 MIDTRANS_SERVER_KEY = "Mid-server-lr4rXOoe3sr52y2ueNjMfWaJ"
-ENVIRONMENT = "development"
 
 # Secrets (set via wrangler secret put)
 # JWT_SECRET
