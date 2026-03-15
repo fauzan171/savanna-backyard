@@ -23,11 +23,21 @@ export const checkAvailabilityQuerySchema = z.object({
 });
 
 // Get vehicle types query schema
-export const getVehicleTypesQuerySchema = z.object({
-	// No filters currently
+export const getVehicleTypesQuerySchema = z.object({});
+
+// Create booking schema
+export const createPublicBookingSchema = z.object({
+	vehicleId: z.string().min(1, 'Vehicle ID is required'),
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	customerName: z.string().min(2, 'Name must be at least 2 characters'),
+	customerPhone: z.string().min(10, 'Phone number must be at least 10 characters'),
+	customerEmail: z.string().email('Invalid email').optional().nullable(),
+	notes: z.string().max(1000).optional().nullable(),
 });
 
 // Types
 export type SubmitLeadRequest = z.infer<typeof submitLeadSchema>;
 export type CheckAvailabilityQuery = z.infer<typeof checkAvailabilityQuerySchema>;
 export type GetVehicleTypesQuery = z.infer<typeof getVehicleTypesQuerySchema>;
+export type CreatePublicBookingRequest = z.infer<typeof createPublicBookingSchema>;

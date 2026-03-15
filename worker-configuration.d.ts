@@ -14,6 +14,8 @@ declare namespace Cloudflare {
 		CORS_ALLOWED_ORIGINS?: string;
 		/** Comma-separated list of allowed origins for public API CORS */
 		ALLOWED_PUBLIC_API_ORIGINS?: string;
+		/** Midtrans server key for payment processing */
+		MIDTRANS_SERVER_KEY?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

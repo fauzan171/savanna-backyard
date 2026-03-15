@@ -1,7 +1,11 @@
 import { PublicApiRepository } from './public-api.repository';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { ValidationError } from '@/worker/core/types/errors';
-import type { SubmitLeadRequest, CheckAvailabilityQuery, GetVehicleTypesQuery } from './public-api.dto';
+import type {
+	SubmitLeadRequest,
+	CheckAvailabilityQuery,
+	CreatePublicBookingRequest,
+} from './public-api.dto';
 
 export class PublicApiService {
 	constructor(
@@ -9,16 +13,9 @@ export class PublicApiService {
 		private configRepo: ConfigRepository
 	) {}
 
-	// 1. Submit Lead (from public web forms)
-	async submitLead(data: SubmitLeadRequest): Promise<{
-		id: string;
-		status: string;
-		createdAt: string;
-	}> {
-		// Auto-assign source based on data or default
+	// 1. Submit Lead
+	async submitLead(data: SubmitLeadRequest): Promise<{ id: string; status: string; createdAt: string }> {
 		const source = data.source || 'Website';
-
-		// Create lead with default priority
 		const lead = await this.repo.createLead({
 			name: data.name,
 			phone: data.phone,
@@ -30,87 +27,65 @@ export class PublicApiService {
 			assignedTo: null,
 			followUpDate: null,
 		});
-
-		return {
-			id: lead.id,
-			status: lead.status,
-			createdAt: lead.createdAt,
-		};
+		return { id: lead.id, status: lead.status, createdAt: lead.createdAt };
 	}
 
-	// 2. Check Availability (filtered response)
+	// 2. Check Availability
 	async checkAvailability(query: CheckAvailabilityQuery): Promise<{
 		requestedPeriod: { startDate: string; endDate: string };
-		availableVehicles: Array<{
-			id: string;
-			name: string;
-			type: string;
-			dailyRate: number;
-			photoUrl: string | null;
-		}>;
-		unavailableVehicles: Array<{
-			id: string;
-			name: string;
-			reason: string;
-		}>;
+		availableVehicles: Array<{ id: string; name: string; type: string; dailyRateIdr: number; photoUrl: string | null }>;
+		unavailableVehicles: Array<{ id: string; name: string; reason: string }>;
 		totalAvailable: number;
 	}> {
-		// Validate date range
 		if (query.startDate > query.endDate) {
 			throw new ValidationError('Start date must be before or equal to end date');
 		}
 
-		// Get vehicles by type if specified
 		const vehicles = await this.repo.getAvailableVehicles(query.type);
 
-		// Filter: only show Available status vehicles
-		const available = vehicles
-			.filter(v => v.status === 'Available')
-			.map(v => ({
+		// Filter by actual booking conflicts
+		const availabilityChecks = await Promise.all(
+			vehicles
+				.filter(v => v.status === 'Available')
+				.map(async v => ({
+					vehicle: v,
+					isAvailable: await this.repo.isVehicleAvailableForDates(v.id, query.startDate, query.endDate),
+				}))
+		);
+
+		const available = availabilityChecks
+			.filter(({ isAvailable }) => isAvailable)
+			.map(({ vehicle: v }) => ({
 				id: v.id,
 				name: v.name,
 				type: v.type,
-				dailyRate: v.dailyRateIdr,
+				dailyRateIdr: v.dailyRateIdr,
 				photoUrl: v.photoUrl,
 			}));
 
-		// Unavailable vehicles (maintenance or inactive) - no booking details exposed
-		const unavailable = vehicles
-			.filter(v => v.status !== 'Available')
-			.map(v => ({
-				id: v.id,
-				name: v.name,
-				reason: v.status === 'Maintenance' ? 'Under maintenance' : 'Currently unavailable',
-			}));
+		const unavailable = [
+			...availabilityChecks
+				.filter(({ isAvailable }) => !isAvailable)
+				.map(({ vehicle: v }) => ({ id: v.id, name: v.name, reason: 'Already booked' })),
+			...vehicles
+				.filter(v => v.status !== 'Available')
+				.map(v => ({ id: v.id, name: v.name, reason: v.status === 'Maintenance' ? 'Under maintenance' : 'Currently unavailable' })),
+		];
 
 		return {
-			requestedPeriod: {
-				startDate: query.startDate,
-				endDate: query.endDate,
-			},
+			requestedPeriod: { startDate: query.startDate, endDate: query.endDate },
 			availableVehicles: available,
 			unavailableVehicles: unavailable,
 			totalAvailable: available.length,
 		};
 	}
 
-	// 3. Get Vehicle Types (aggregated, filtered data)
-	async getVehicleTypes(_query?: GetVehicleTypesQuery): Promise<{
-		types: Array<{
-			type: string;
-			displayName: string;
-			count: number;
-			minDailyRate: number;
-			maxDailyRate: number;
-		}>;
+	// 3. Get Vehicle Types
+	async getVehicleTypes(): Promise<{
+		types: Array<{ type: string; displayName: string; count: number; minDailyRate: number; maxDailyRate: number }>;
 	}> {
 		const vehicles = await this.repo.getActiveVehicles();
-
-		// Group by type
-		const typeMap = new Map<string, {
-			count: number;
-			rates: number[];
-		}>();
+		const typeMap = new Map<string, { count: number; rates: number[] }>();
 
 		for (const vehicle of vehicles) {
 			const existing = typeMap.get(vehicle.type) || { count: 0, rates: [] };
@@ -119,7 +94,6 @@ export class PublicApiService {
 			typeMap.set(vehicle.type, existing);
 		}
 
-		// Transform to response
 		const types = Array.from(typeMap.entries()).map(([type, data]) => ({
 			type,
 			displayName: this.getDisplayName(type),
@@ -128,33 +102,19 @@ export class PublicApiService {
 			maxDailyRate: Math.max(...data.rates),
 		}));
 
-		// Sort by type name
 		types.sort((a, b) => a.type.localeCompare(b.type));
-
 		return { types };
 	}
 
-	// 4. Get Vehicle Details (heavily filtered)
+	// 4. Get Vehicle Details
 	async getVehicleDetails(id: string): Promise<{
-		id: string;
-		name: string;
-		type: string;
-		brand: string | null;
-		model: string | null;
-		year: number | null;
-		dailyRate: number;
-		photoUrl: string | null;
-		specifications: {
-			description: string | null;
-		};
+		id: string; name: string; type: string; brand: string | null;
+		model: string | null; year: number | null; dailyRate: number;
+		photoUrl: string | null; specifications: { description: string | null };
 	} | null> {
 		const vehicle = await this.repo.getVehicleById(id);
+		if (!vehicle) return null;
 
-		if (!vehicle) {
-			return null;
-		}
-
-		// FILTER OUT: plateNumber, status, totalKm, createdAt, updatedAt
 		return {
 			id: vehicle.id,
 			name: vehicle.name,
@@ -164,13 +124,126 @@ export class PublicApiService {
 			year: vehicle.year,
 			dailyRate: vehicle.dailyRateIdr,
 			photoUrl: vehicle.photoUrl,
-			specifications: {
-				description: null, // Can be enhanced later with specs table
-			},
+			specifications: { description: null },
 		};
 	}
 
-	// Helper to get display name for vehicle type
+	// 5. Create Booking (public — no auth required, only API key)
+	async createPublicBooking(data: CreatePublicBookingRequest, midtransServerKey: string): Promise<{
+		bookingId: string;
+		bookingNumber: string;
+		snapToken: string | null;
+		snapRedirectUrl: string | null;
+		totalAmount: number;
+	}> {
+		// Validate dates
+		if (data.startDate >= data.endDate) {
+			throw new ValidationError('End date must be after start date');
+		}
+
+		// Check vehicle exists and is available
+		const vehicle = await this.repo.getVehicleById(data.vehicleId);
+		if (!vehicle) throw new ValidationError('Vehicle not found');
+		if (vehicle.status !== 'Available') throw new ValidationError('Vehicle is not available');
+
+		// Check date conflicts
+		const isAvailable = await this.repo.isVehicleAvailableForDates(data.vehicleId, data.startDate, data.endDate);
+		if (!isAvailable) throw new ValidationError('Vehicle is already booked for the selected dates');
+
+		// Find or create customer
+		let customer = await this.repo.findCustomerByPhone(data.customerPhone);
+		if (!customer) {
+			customer = await this.repo.createCustomer({
+				name: data.customerName,
+				phone: data.customerPhone,
+				email: data.customerEmail || null,
+				notes: data.notes || null,
+				isBlacklisted: false,
+			});
+		}
+
+		// Calculate amount
+		const days = Math.ceil(
+			(new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / (1000 * 60 * 60 * 24)
+		);
+		const totalAmount = days * vehicle.dailyRateIdr;
+
+		// Create booking
+		const booking = await this.repo.createBooking({
+			customerId: customer.id,
+			vehicleId: data.vehicleId,
+			startDate: data.startDate,
+			endDate: data.endDate,
+			status: 'Pending',
+			paymentTerms: 'Full_Upfront',
+			baseAmount: totalAmount,
+			addonsAmount: 0,
+			lateFee: 0,
+			totalAmount,
+			currency: 'IDR',
+			notes: data.notes || null,
+			createdBy: null,
+		});
+
+		// Request Midtrans Snap token
+		let snapToken: string | null = null;
+		let snapRedirectUrl: string | null = null;
+
+		if (midtransServerKey) {
+			try {
+				const midtransEnv = midtransServerKey.startsWith('SB-') ? 'sandbox' : 'production';
+				const midtransBaseUrl = midtransEnv === 'sandbox'
+					? 'https://app.sandbox.midtrans.com/snap/v1/transactions'
+					: 'https://app.midtrans.com/snap/v1/transactions';
+
+				const midtransResponse = await fetch(midtransBaseUrl, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Authorization': `Basic ${btoa(midtransServerKey + ':')}`,
+					},
+					body: JSON.stringify({
+						transaction_details: {
+							order_id: booking.bookingNumber,
+							gross_amount: totalAmount,
+						},
+						customer_details: {
+							first_name: customer.name,
+							phone: customer.phone,
+							email: customer.email || undefined,
+						},
+						item_details: [{
+							id: vehicle.id,
+							price: vehicle.dailyRateIdr,
+							quantity: days,
+							name: `${vehicle.name} (${days} day${days > 1 ? 's' : ''})`,
+						}],
+					}),
+				});
+
+				if (midtransResponse.ok) {
+					const midtransData = await midtransResponse.json() as { token: string; redirect_url: string };
+					snapToken = midtransData.token;
+					snapRedirectUrl = midtransData.redirect_url;
+				}
+			} catch {
+				// Midtrans failed — booking still created, payment pending
+			}
+		}
+
+		return {
+			bookingId: booking.id,
+			bookingNumber: booking.bookingNumber,
+			snapToken,
+			snapRedirectUrl,
+			totalAmount,
+		};
+	}
+
+	async isPublicApiEnabled(): Promise<boolean> {
+		return this.configRepo.getBoolean('public_api_enabled', false);
+	}
+
 	private getDisplayName(type: string): string {
 		const displayNames: Record<string, string> = {
 			TrailBike: 'Trail Bike',
@@ -180,10 +253,5 @@ export class PublicApiService {
 			Other: 'Other',
 		};
 		return displayNames[type] || type;
-	}
-
-	// Internal: Check if public API is enabled
-	async isPublicApiEnabled(): Promise<boolean> {
-		return this.configRepo.getBoolean('public_api_enabled', false);
 	}
 }
