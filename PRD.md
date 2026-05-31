@@ -2,7 +2,7 @@
 ## Software Design Document
 
 **Tanggal:** 29 Mei 2026
-**Versi:** 2.0
+**Versi:** 3.0
 **Status:** Ready for Implementation
 **Project:** Savanna Bromo Rental - Motor Trail Rental Website
 **Referensi FE:** `CONTRACT_API.md`
@@ -58,6 +58,13 @@ Perubahan yang diperlukan:
 5. **Midtrans Snap** - Integrasi payment pada booking flow
 6. **Webhook** - Terima notifikasi pembayaran dari Midtrans
 7. **Response format** - Standardisasi semua response ke `{ success, data, message, error }`
+8. **MVP Phase 2** - 6 fitur operasional rental (lihat `PRD-MVP2.md`):
+   - Inspeksi Kendaraan (pre/post rental)
+   - Deposit System
+   - Penalty / Denda
+   - Verifikasi KTP/SIM
+   - Surat Perjanjian Sewa
+   - Notifikasi WhatsApp
 
 ---
 
