@@ -2927,73 +2927,308 @@ Guards:
 
 ---
 
-## 30. End-to-End Business Flow End-to-End
+## 30. End-to-End Business Flow
 
-### 30.1 Happy Path
-
-```
-1. Customer booking via Landing Page
-   → POST /public/bookings → status: pending_payment
-   → iFortePay Payment Page → customer bayar
-
-2. Payment confirmed (webhook)
-   → Booking status: Confirmed
-   → WhatsApp: "Booking confirmed" ke customer
-
-3. Customer datang ke lokasi
-   → Staff cek KTP/SIM → Upload & Verify
-   → Status dokumen: verified
-
-4. Pre-Rental Inspection
-   → Staff isi checklist + foto 4 sisi
-   → Catat KM awal, BBM level
-   → Status: completed
-
-5. Contract Signing
-   → Generate kontrak dari data booking
-   → Customer tanda tangan (tablet)
-   → Staff tanda tangan
-   → Status: signed
-
-6. Rental Start
-   → Booking status: Active
-   → WhatsApp: "Rental started" ke customer
-   → Kendaraan diserahkan
-
-7. H-1 sebelum endDate (jika masih Active)
-   → WhatsApp: "Rental reminder" ke customer
-
-8. Customer kembalikan kendaraan
-   → Post-Rental Inspection
-   → Staff isi checklist + foto 4 sisi
-   → Catat KM akhir, BBM level
-   → System compare pre vs post
-
-9. Auto-detect penalties (jika ada)
-   → Kerusakan baru → penalty type: damage
-   → Telat → penalty type: late_return
-   → BBM kurang → penalty type: fuel_shortage
-   → Staff review & confirm penalties
-
-10. Deposit Settlement
-    → Deductions = total penalties from deposit
-    → Refund = deposit - deductions
-    → WhatsApp: "Deposit refund" ke customer
-
-11. Complete
-    → Booking status: Completed
-    → WhatsApp: "Return confirmed" ke customer
-```
-
-### 30.2 Overdue Path
+### 30.1 Sequence Diagram — Happy Path
 
 ```
-Melewati endDate, status masih Active:
-  → Cron/Scheduler check daily
-  → WhatsApp: "Rental overdue" ke customer
-  → Auto-create penalty: late_return
-  → Repeat daily until returned
+Customer        FE Landing       BE API          iFortePay        Webhook         CMS Staff        System/Cron
+   │                │               │                │               │                │               │
+   │  Pilih motor   │               │                │               │                │               │
+   │  Pilih tanggal │               │                │               │                │               │
+   │  Isi data diri │               │                │               │                │               │
+   │───────────────▶│               │                │               │                │               │
+   │                │  POST /public/bookings          │               │                │               │
+   │                │──────────────▶│                │               │                │               │
+   │                │               │  Cek avail     │               │                │               │
+   │                │               │  Hitung tarif  │               │                │               │
+   │                │               │  Generate SVN-YYYY-NNNN       │               │                │               │
+   │                │               │  Create booking (pending_payment)              │               │               │
+   │                │               │───────────────▶│               │                │               │
+   │                │               │  POST /payment-page/payment    │               │                │               │
+   │                │               │◀───────────────│               │                │               │
+   │                │               │  paymentPageUrl│               │                │               │
+   │                │◀──────────────│                │               │                │               │
+   │                │  { bookingNumber, paymentPageUrl, totalAmount } │               │                │               │
+   │◀───────────────│               │                │               │                │               │
+   │  Redirect ke iFortePay         │                │               │                │               │
+   │───────────────────────────────────────────────▶│               │                │               │
+   │  Bayar (QRIS/Transfer/Card)    │                │               │                │               │
+   │                │                │                │  Webhook:     │                │               │
+   │                │                │                │  transaction_  │                │               │
+   │                │                │                │  status:      │                │               │
+   │                │                │                │  SUCCESS      │                │               │
+   │                │                │◀───────────────────────────────│                │               │
+   │                │                │  POST /webhooks/ifortepay/     │                │               │
+   │                │                │       notification             │                │               │
+   │                │               │                │               │                │               │
+   │                │               │  Update booking:               │                │               │
+   │                │               │  Confirmed + paidAt            │                │               │
+   │                │               │  Create payment record         │                │               │
+   │                │               │────────────────────────────────────────────────▶│               │
+   │                │               │                │               │  WA: "Booking confirmed"        │
+   │◀─────────────────────────────────────────────────────────────────────────────────│               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │                │    ┌─────┐    │
+   │                │               │                │               │                │    │H-1  │    │
+   │                │               │                │               │                │    │cron │    │
+   │                │               │                │               │                │    └──┬──┘    │
+   │                │               │                │               │                │◀─────┘        │
+   │                │               │                │               │                │               │
+   │◀────────────────────────────────────────────────────────────────────────────────── WA: "Reminder besok rental"
+   │                │               │                │               │                │               │
+   │                │               │                │               │                │               │
+   │  ========== HARI H: CUSTOMER DATANG ==========                │               │               │
+   │                │               │                │               │                │               │
+   │  Datang ke lokasi, bawa KTP+SIM                                │               │               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │  Staff buka CMS│               │
+   │                │               │                │               │  ┌─────────────┤               │
+   │                │               │                │               │  │ 1. VERIFY   │               │
+   │  Serahkan KTP  │               │                │               │  │    KTP/SIM  │               │
+   │────────────────────────────────────────────────────────────────▶│  │             │               │
+   │                │               │                │               │  │ POST /cust- │               │
+   │                │               │                │               │  │ omers/:id/  │               │
+   │                │               │                │               │  │ documents   │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ PATCH verify│               │
+   │                │               │                │               │  │ → isVerified│               │
+   │                │               │                │               │  │ = true      │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │  ┌─────────────┤               │
+   │                │               │                │               │  │ 2. PRE-     │               │
+   │                │               │                │               │  │ INSPECTION  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Staff cek:  │               │
+   │                │               │                │               │  │ - Body      │               │
+   │                │               │                │               │  │ - Rem       │               │
+   │                │               │                │               │  │ - Ban       │               │
+   │                │               │                │               │  │ - Mesin     │               │
+   │                │               │                │               │  │ - Listrik   │               │
+   │                │               │                │               │  │ - Foto 4sisi│               │
+   │                │               │                │               │  │ - KM awal   │               │
+   │                │               │                │               │  │ - BBM level │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /book- │               │
+   │                │               │                │               │  │ ings/:id/   │               │
+   │                │               │                │               │  │ inspections │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /insp- │               │
+   │                │               │                │               │  │ ections/:id │               │
+   │                │               │                │               │  │ /complete   │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │  Bayar deposit │               │                │               │  ┌─────────────┤               │
+   │  Rp 500.000    │               │                │               │  │ 3. DEPOSIT  │               │
+   │────────────────────────────────────────────────────────────────▶│  │             │               │
+   │                │               │                │               │  │ POST /book- │               │
+   │                │               │                │               │  │ ings/:id/   │               │
+   │                │               │                │               │  │ deposit     │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ amount:     │               │
+   │                │               │                │               │  │ 500000      │               │
+   │                │               │                │               │  │ status:     │               │
+   │                │               │                │               │  │ collected   │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │  Tanda tangan  │               │                │               │  ┌─────────────┤               │
+   │  kontrak       │               │                │               │  │ 4. CONTRACT │               │
+   │────────────────────────────────────────────────────────────────▶│  │             │               │
+   │                │               │                │               │  │ POST /book- │               │
+   │                │               │                │               │  │ ings/:id/   │               │
+   │                │               │                │               │  │ contract    │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /cont- │               │
+   │                │               │                │               │  │ ract/sign   │               │
+   │                │               │                │               │  │ party:      │               │
+   │                │               │                │               │  │ customer    │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Staff ttd:  │               │
+   │                │               │                │               │  │ party:      │               │
+   │                │               │                │               │  │ staff       │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ status:     │               │
+   │                │               │                │               │  │ signed      │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │  ┌─────────────┤               │
+   │                │               │                │               │  │ 5. START    │               │
+   │                │               │                │               │  │ RENTAL      │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Guard check:│               │
+   │                │               │                │               │  │ ✅ Payment   │               │
+   │                │               │                │               │  │ ✅ KTP/SIM   │               │
+   │                │               │                │               │  │ ✅ Pre-insp  │               │
+   │                │               │                │               │  │ ✅ Deposit   │               │
+   │                │               │                │               │  │ ✅ Contract  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /book- │               │
+   │                │               │                │               │  │ ings/:id/   │               │
+   │                │               │                │               │  │ start       │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ → status:   │               │
+   │                │               │                │               │  │   Active    │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │◀─────────────────────────────────────────────── WA: "Rental started"               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │                │               │
+   │  ======== RENTAL PERIOD: Ahmad bawa motor ========            │               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │                │               │
+   │  ======== RETURN DAY: Ahmad kembalikan motor ========         │               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │  ┌─────────────┤               │
+   │                │               │                │               │  │ 6. POST-    │               │
+   │                │               │                │               │  │ INSPECTION  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Staff cek   │               │
+   │                │               │                │               │  │ ulang:      │               │
+   │                │               │                │               │  │ - Checklist │               │
+   │                │               │                │               │  │ - Foto 4sisi│               │
+   │                │               │                │               │  │ - KM akhir  │               │
+   │                │               │                │               │  │ - BBM level │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /insp- │               │
+   │                │               │                │               │  │ ections     │               │
+   │                │               │                │               │  │ /complete   │               │
+   │                │               │                │               │  └─────────────┤               │
+   │                │               │                │               │                │               │
+   │                │               │                │               │  ┌─────────────┤               │
+   │                │               │                │               │  │ 7. COMPARE  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ GET /insp-  │               │
+   │                │               │                │               │  │ ections/    │               │
+   │                │               │                │               │  │ compare     │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ System auto:│               │
+   │                │               │                │               │  │ • KM +280   │               │
+   │                │               │                │               │  │ • BBM turun │               │
+   │                │               │                │               │  │ • Damage?   │               │
+   │                │               │                │               │  └──────┬──────┘               │
+   │                │               │                │               │         │                      │
+   │                │               │                │               │         ▼                      │
+   │                │               │                │               │  ┌─────────────┐               │
+   │                │               │                │               │  │ 8. PENALTY  │               │
+   │                │               │                │               │  │ ASSESSMENT  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /pen-  │               │
+   │                │               │                │               │  │ alties/auto │               │
+   │                │               │                │               │  │ -detect     │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Auto-detect:│               │
+   │                │               │                │               │  │ • Late? → Rp│               │
+   │                │               │                │               │  │ • Damage? → │               │
+   │                │               │                │               │  │   manual    │               │
+   │                │               │                │               │  │ • Fuel? → Rp│               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ Staff review│               │
+   │                │               │                │               │  │ & confirm   │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /pen-  │               │
+   │                │               │                │               │  │ alties      │               │
+   │                │               │                │               │  │ (per item)  │               │
+   │                │               │                │               │  └──────┬──────┘               │
+   │                │               │                │               │         │                      │
+   │                │               │                │               │         ▼                      │
+   │                │               │                │               │  ┌─────────────┐               │
+   │                │               │                │               │  │ 9. DEPOSIT  │               │
+   │                │               │                │               │  │ SETTLEMENT  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /depo- │               │
+   │                │               │                │               │  │ sit/refund  │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ deductions: │               │
+   │                │               │                │               │  │ [penalties] │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ refund =    │               │
+   │                │               │                │               │  │ deposit -   │               │
+   │                │               │                │               │  │ deductions  │               │
+   │                │               │                │               │  └──────┬──────┘               │
+   │                │               │                │               │         │                      │
+   │◀─────────────────────────────────────────────── WA: "Deposit refund"               │
+   │                │               │                │               │         │                      │
+   │                │               │                │               │         ▼                      │
+   │                │               │                │               │  ┌─────────────┐               │
+   │                │               │                │               │  │ 10.COMPLETE │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ POST /book- │               │
+   │                │               │                │               │  │ ings/:id/   │               │
+   │                │               │                │               │  │ complete    │               │
+   │                │               │                │               │  │             │               │
+   │                │               │                │               │  │ → Completed │               │
+   │                │               │                │               │  └─────────────┘               │
+   │                │               │                │               │                │               │
+   │◀─────────────────────────────────────────────── WA: "Terima kasih!"                 │
 ```
+
+### 30.2 Sequence Diagram — Overdue Path
+
+```
+System/Cron         Booking          WhatsApp
+     │                  │                │
+     │  Daily check     │                │
+     │─────────────────▶│                │
+     │                  │                │
+     │  Find Active     │                │
+     │  bookings where  │                │
+     │  endDate < today │                │
+     │◀─────────────────│                │
+     │                  │                │
+     │  For each overdue booking:        │
+     │                  │                │
+     │  Send WA "overdue"                │
+     │─────────────────────────────────▶│
+     │                  │                │
+     │  Auto-create penalty:             │
+     │  type: late_return               │
+     │  amount: days × daily_rate × 1.5 │
+     │─────────────────▶│                │
+     │                  │                │
+     │  Repeat next day │                │
+     │  (if still Active)                │
+```
+
+### 30.3 Booking Status State Machine
+
+```
+                    ┌─────────────────────────────────────────────────────┐
+                    │                                                     │
+                    ▼                                                     │
+  ┌───────────┐  payment   ┌──────────────┐  webhook   ┌───────────┐    │
+  │  Pending  │───────────▶│ pending_pay- │──────────▶│ Confirmed │    │
+  └───────────┘            │    ment      │           └─────┬─────┘    │
+       │                   └──────┬───────┘                 │          │
+       │ cancel                   │ fail                    │ Guards:  │
+       ▼                          ▼                         │ ✅ KTP   │
+  ┌───────────┐           ┌──────────────┐                 │ ✅ Pre-  │
+  │ Cancelled │           │payment_failed│                 │   insp   │
+  └───────────┘           └──────────────┘                 │ ✅ Depo  │
+                                                           │ ✅ Contr │
+                                                           ▼          │
+                                                    ┌───────────┐    │
+                                                    │   Active  │◀───┘
+                                                    └─────┬─────┘
+                                                          │
+                                           ┌──────────────┼──────────────┐
+                                           │              │              │
+                                      on time      with penalty    cancel
+                                           │              │              │
+                                           ▼              ▼              ▼
+                                    ┌───────────┐  ┌───────────┐  ┌───────────┐
+                                    │ Completed │  │ Completed │  │ Cancelled │
+                                    └───────────┘  │ +penalties│  │ +refund  │
+                                                   └───────────┘  └───────────┘
+```
+
+### 30.4 Prerequisites per Transition
+
+| Transition | Required Conditions |
+|------------|-------------------|
+| `pending_payment` → `Confirmed` | Payment webhook received (auto) |
+| `Confirmed` → `Active` | KTP/SIM verified + Pre-inspection completed + Deposit collected + Contract signed |
+| `Active` → `Completed` | Post-inspection completed + Deposit settled |
 
 ---
 
