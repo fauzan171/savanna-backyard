@@ -11,9 +11,11 @@ import {
 	checkAvailabilityQuerySchema,
 	getVehicleTypesQuerySchema,
 	createPublicBookingSchema,
+	getPublicReviewsQuerySchema,
 	type SubmitLeadRequest,
 	type CheckAvailabilityQuery,
 	type CreatePublicBookingRequest,
+	type GetPublicReviewsQuery,
 } from './public-api.dto';
 
 type PublicApiVariables = { publicApiService: PublicApiService };
@@ -62,9 +64,18 @@ const getVehicleDetailsHandler = async (c: Context<PublicApiEnv>) => {
 const createBookingHandler = async (c: Context<PublicApiEnv>) => {
 	const service = c.get('publicApiService');
 	const body = getValidatedBody<CreatePublicBookingRequest>(c);
-	const midtransServerKey = c.env.MIDTRANS_SERVER_KEY ?? '';
 
-	const result = await service.createPublicBooking(body, midtransServerKey);
+	const ifortepayConfig = {
+		merchantId: c.env.IFORTEPAY_MERCHANT_ID ?? '',
+		secretUnboundId: c.env.IFORTEPAY_SECRET_UNBOUND_ID ?? '',
+		hashKey: c.env.IFORTEPAY_HASH_KEY ?? '',
+		isProduction: c.env.ENVIRONMENT === 'production',
+		callbackUrl: c.env.IFORTEPAY_CALLBACK_URL ?? '',
+		successRedirectUrl: c.env.IFORTEPAY_SUCCESS_REDIRECT_URL ?? '',
+		failedRedirectUrl: c.env.IFORTEPAY_FAILED_REDIRECT_URL ?? '',
+	};
+
+	const result = await service.createPublicBooking(body, ifortepayConfig);
 
 	return c.json({
 		success: true,
@@ -100,6 +111,73 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 
 	// New: public booking endpoint
 	router.post('/bookings', validateBody(createPublicBookingSchema), createBookingHandler);
+
+	// ===== FASE 2 ROUTES =====
+
+	// Get public vehicles
+	router.get('/vehicles', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicVehicles();
+		return c.json({ success: true, data: result });
+	});
+
+	// Get public packages
+	router.get('/packages', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicPackages();
+		return c.json({ success: true, data: result });
+	});
+
+	// Get public pricing
+	router.get('/pricing', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicPricing();
+		return c.json({ success: true, data: result });
+	});
+
+	// Get public reviews
+	router.get('/reviews', validateQuery(getPublicReviewsQuerySchema), async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const query = getValidatedQuery<GetPublicReviewsQuery>(c);
+		const result = await service.getPublicReviews(query);
+		return c.json({ success: true, data: result.data, meta: result.meta });
+	});
+
+	// Get public trails (list)
+	router.get('/trails', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicTrails();
+		return c.json({ success: true, data: result });
+	});
+
+	// Get single trail (detail)
+	router.get('/trails/:trailId', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const trailId = c.req.param('trailId');
+		const result = await service.getPublicTrailById(trailId);
+		if (!result) {
+			return c.json({ success: false, message: 'Trail not found', error: { code: 'NOT_FOUND', message: 'Trail not found' } }, 404);
+		}
+		return c.json({ success: true, data: result });
+	});
+
+	// Get public settings
+	router.get('/settings', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicSettings();
+		return c.json({ success: true, data: result });
+	});
+
+	// Get booking status
+	router.get('/bookings/:bookingNumber/status', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const bookingNumber = c.req.param('bookingNumber');
+		const result = await service.getBookingStatus(bookingNumber);
+		if (!result) {
+			return c.json({ success: false, message: 'Booking not found', error: { code: 'NOT_FOUND', message: 'Booking not found' } }, 404);
+		}
+		return c.json({ success: true, data: result });
+	});
 
 	return router;
 }

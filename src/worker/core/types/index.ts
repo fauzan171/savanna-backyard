@@ -1,7 +1,9 @@
 // API Response Types
 
 export interface ApiResponse<T> {
+	success: true;
 	data: T;
+	message?: string;
 	meta?: {
 		page?: number;
 		limit?: number;
@@ -10,6 +12,8 @@ export interface ApiResponse<T> {
 }
 
 export interface ApiError {
+	success: false;
+	message: string;
 	error: {
 		message: string;
 		code: string;

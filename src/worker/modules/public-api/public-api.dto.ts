@@ -41,3 +41,12 @@ export type SubmitLeadRequest = z.infer<typeof submitLeadSchema>;
 export type CheckAvailabilityQuery = z.infer<typeof checkAvailabilityQuerySchema>;
 export type GetVehicleTypesQuery = z.infer<typeof getVehicleTypesQuerySchema>;
 export type CreatePublicBookingRequest = z.infer<typeof createPublicBookingSchema>;
+
+// Fase 2: Reviews query schema
+export const getPublicReviewsQuerySchema = z.object({
+	limit: z.coerce.number().int().min(1).max(100).optional(),
+	offset: z.coerce.number().int().min(0).optional(),
+	rating: z.coerce.number().int().min(1).max(5).optional(),
+});
+
+export type GetPublicReviewsQuery = z.infer<typeof getPublicReviewsQuerySchema>;

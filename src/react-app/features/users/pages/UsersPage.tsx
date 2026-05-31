@@ -1,0 +1,85 @@
+import { useState } from 'react';
+import { Plus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/react-app/components/ui/button';
+import { Input } from '@/react-app/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
+import { PageHeader } from '@/react-app/components/layout/page-header';
+import { useUsers, useCreateUser, useToggleUser } from '../hooks/useUsers';
+import type { CreateUserRequest } from '../api/users';
+
+function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+	const createMutation = useCreateUser();
+	const { register, handleSubmit, reset } = useForm<CreateUserRequest>();
+
+	const onSubmit = async (data: CreateUserRequest) => {
+		await createMutation.mutateAsync(data);
+		reset();
+		onOpenChange(false);
+	};
+
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent>
+				<DialogHeader><DialogTitle>Create Staff User</DialogTitle></DialogHeader>
+				<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+					<div><label className="text-sm font-medium">Name</label><Input {...register('name', { required: true })} /></div>
+					<div><label className="text-sm font-medium">Email</label><Input type="email" {...register('email', { required: true })} /></div>
+					<div><label className="text-sm font-medium">Password</label><Input type="password" {...register('password', { required: true, minLength: 8 })} /></div>
+					<div><label className="text-sm font-medium">Role</label>
+						<select {...register('role')} className="w-full border rounded-md px-3 py-2 text-sm">
+							<option value="STAFF">Staff</option>
+							<option value="SUPER_ADMIN">Super Admin</option>
+						</select>
+					</div>
+					<div className="flex justify-end gap-2">
+						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+						<Button type="submit" disabled={createMutation.isPending}>{createMutation.isPending ? 'Creating...' : 'Create User'}</Button>
+					</div>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export default function UsersPage() {
+	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const { data: users, isLoading } = useUsers();
+	const toggleMutation = useToggleUser();
+
+	return (
+		<div className="space-y-6">
+			<PageHeader title="Users" description="Manage admin users" actions={
+				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Add User</Button>
+			} />
+
+			{isLoading ? <div className="text-center py-8 text-muted-foreground">Loading...</div> : (
+				<div className="border rounded-lg">
+					<table className="w-full">
+						<thead className="bg-muted/50">
+							<tr>
+								<th className="text-left p-3 text-sm font-medium">Name</th>
+								<th className="text-left p-3 text-sm font-medium">Email</th>
+								<th className="text-left p-3 text-sm font-medium">Role</th>
+								<th className="text-left p-3 text-sm font-medium">Status</th>
+								<th className="text-left p-3 text-sm font-medium">Toggle</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y">
+							{(users ?? []).map((user) => (
+								<tr key={user.id} className="hover:bg-muted/30">
+									<td className="p-3 font-medium">{user.name}</td>
+									<td className="p-3 text-sm">{user.email}</td>
+									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${user.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{user.role}</span></td>
+									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{user.isActive ? 'Active' : 'Inactive'}</span></td>
+									<td className="p-3"><Button variant="ghost" size="sm" onClick={() => toggleMutation.mutate(user.id)}>{user.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button></td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			)}
+			<CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+		</div>
+	);
+}

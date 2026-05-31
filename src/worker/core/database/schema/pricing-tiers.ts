@@ -1,0 +1,22 @@
+import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+
+// Pricing tiers table
+export const pricingTiers = sqliteTable('pricing_tiers', {
+	id: text('id').primaryKey(),
+	name: text('name').notNull(),
+	description: text('description'),
+	dailyPrice: integer('daily_price').notNull(),
+	multiDayPrice: integer('multi_day_price').notNull(),
+	features: text('features').notNull(),
+	notIncluded: text('not_included').notNull(),
+	highlighted: integer('highlighted', { mode: 'boolean' }).notNull().default(false),
+	icon: text('icon'),
+	sortOrder: integer('sort_order').default(0),
+	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+// Type exports
+export type PricingTier = typeof pricingTiers.$inferSelect;
+export type NewPricingTier = typeof pricingTiers.$inferInsert;

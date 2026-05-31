@@ -44,6 +44,14 @@ import {
 	CustomerReportPage,
 } from '@/react-app/features/reports';
 
+// Content Management Pages
+import { PackagesPage, PackageDetailPage } from '@/react-app/features/packages';
+import { PricingPage, PricingDetailPage } from '@/react-app/features/pricing';
+import { ReviewsPage, ReviewDetailPage } from '@/react-app/features/reviews';
+import { TrailsPage, TrailDetailPage } from '@/react-app/features/trails';
+import SettingsPage from '@/react-app/features/settings/pages/SettingsPage';
+import UsersPage from '@/react-app/features/users/pages/UsersPage';
+
 export const routes: RouteObject[] = [
 	{
 		path: '/',
@@ -100,6 +108,18 @@ export const routes: RouteObject[] = [
 							{ path: 'reports/leads', element: <LeadSourceReportPage /> },
 							{ path: 'reports/payments', element: <PaymentReportPage /> },
 							{ path: 'reports/customers', element: <CustomerReportPage /> },
+
+							// Content management routes
+							{ path: 'packages', element: <PackagesPage /> },
+							{ path: 'packages/:id', element: <PackageDetailPage /> },
+							{ path: 'pricing', element: <PricingPage /> },
+							{ path: 'pricing/:id', element: <PricingDetailPage /> },
+							{ path: 'reviews', element: <ReviewsPage /> },
+							{ path: 'reviews/:id', element: <ReviewDetailPage /> },
+							{ path: 'trails', element: <TrailsPage /> },
+							{ path: 'trails/:id', element: <TrailDetailPage /> },
+							{ path: 'settings', element: <SettingsPage /> },
+							{ path: 'users', element: <UsersPage /> },
 						],
 					},
 				],

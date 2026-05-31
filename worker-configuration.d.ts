@@ -16,6 +16,18 @@ declare namespace Cloudflare {
 		ALLOWED_PUBLIC_API_ORIGINS?: string;
 		/** Midtrans server key for payment processing */
 		MIDTRANS_SERVER_KEY?: string;
+		/** iFortePay merchant ID */
+		IFORTEPAY_MERCHANT_ID?: string;
+		/** iFortePay secret unbound ID for Basic auth */
+		IFORTEPAY_SECRET_UNBOUND_ID?: string;
+		/** iFortePay hash key for request signatures */
+		IFORTEPAY_HASH_KEY?: string;
+		/** iFortePay webhook callback URL */
+		IFORTEPAY_CALLBACK_URL?: string;
+		/** iFortePay success redirect URL */
+		IFORTEPAY_SUCCESS_REDIRECT_URL?: string;
+		/** iFortePay failed redirect URL */
+		IFORTEPAY_FAILED_REDIRECT_URL?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

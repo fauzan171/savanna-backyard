@@ -1,5 +1,5 @@
-import { eq, and, or, gte, lte } from 'drizzle-orm';
-import { leads, vehicles, bookings, customers, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer } from '@/worker/core/database/schema';
+import { eq, and, or, gte, lte, like, sql, asc } from 'drizzle-orm';
+import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
 export class PublicApiRepository {
@@ -41,10 +41,10 @@ export class PublicApiRepository {
 					eq(bookings.vehicleId, vehicleId),
 					or(
 						eq(bookings.status, 'Pending'),
+						eq(bookings.status, 'pending_payment'),
 						eq(bookings.status, 'Confirmed'),
 						eq(bookings.status, 'Active'),
 					),
-					// Overlapping date check: booking starts before endDate AND booking ends after startDate
 					lte(bookings.startDate, endDate),
 					gte(bookings.endDate, startDate),
 				)
@@ -66,12 +66,98 @@ export class PublicApiRepository {
 		return customer[0]!;
 	}
 
+	// Booking number generation: SVN-YYYY-NNNN
+	async generateBookingNumber(): Promise<string> {
+		const year = new Date().getFullYear().toString();
+		const prefix = `SVN-${year}-`;
+
+		const result = await this.db
+			.select({ bookingNumber: bookings.bookingNumber })
+			.from(bookings)
+			.where(like(bookings.bookingNumber, `${prefix}%`))
+			.orderBy(sql`${bookings.bookingNumber} DESC`)
+			.limit(1);
+
+		let next = 1;
+		if (result.length > 0) {
+			const lastNumber = result[0]!.bookingNumber;
+			const numPart = lastNumber.split('-')[2];
+			if (numPart) {
+				next = parseInt(numPart, 10) + 1;
+			}
+		}
+
+		return `${prefix}${next.toString().padStart(4, '0')}`;
+	}
+
 	// Booking operations
 	async createBooking(data: Omit<NewBooking, 'id' | 'bookingNumber'>): Promise<Booking> {
 		const id = crypto.randomUUID();
-		const bookingNumber = `BK${Date.now().toString(36).toUpperCase()}`;
+		const bookingNumber = await this.generateBookingNumber();
 		await this.db.insert(bookings).values({ id, bookingNumber, ...data });
 		const booking = await this.db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
 		return booking[0]!;
+	}
+
+	async updateBooking(id: string, data: Partial<NewBooking>): Promise<void> {
+		await this.db.update(bookings).set(data).where(eq(bookings.id, id));
+	}
+
+	async findBookingByNumber(bookingNumber: string): Promise<Booking | null> {
+		const result = await this.db.select().from(bookings).where(eq(bookings.bookingNumber, bookingNumber)).limit(1);
+		return result[0] ?? null;
+	}
+
+	// Fase 2: Content queries
+	async getPublicVehicles(): Promise<Vehicle[]> {
+		return this.db.select().from(vehicles).where(eq(vehicles.status, 'Available'));
+	}
+
+	async getActivePackages(): Promise<Package[]> {
+		return this.db.select().from(packages)
+			.where(eq(packages.isActive, true))
+			.orderBy(asc(packages.sortOrder));
+	}
+
+	async getActivePricingTiers(): Promise<PricingTier[]> {
+		return this.db.select().from(pricingTiers)
+			.where(eq(pricingTiers.isActive, true))
+			.orderBy(asc(pricingTiers.sortOrder));
+	}
+
+	async getPublishedReviews(limit: number = 10, offset: number = 0, rating?: number): Promise<{ reviews: Review[]; total: number; averageRating: number }> {
+		const conditions = [eq(reviews.isPublished, true)];
+		if (rating) {
+			conditions.push(eq(reviews.rating, rating));
+		}
+
+		const result = await this.db.select().from(reviews)
+			.where(and(...conditions))
+			.orderBy(sql`${reviews.createdAt} DESC`)
+			.limit(limit)
+			.offset(offset);
+
+		const countResult = await this.db.select({ count: sql<number>`count(*)` }).from(reviews)
+			.where(and(...conditions));
+
+		const avgResult = await this.db.select({ avg: sql<number>`COALESCE(AVG(CAST(${reviews.rating} AS REAL)), 0)` }).from(reviews)
+			.where(eq(reviews.isPublished, true));
+
+		return {
+			reviews: result,
+			total: countResult[0]?.count ?? 0,
+			averageRating: Math.round((avgResult[0]?.avg ?? 0) * 10) / 10,
+		};
+	}
+
+	async getActiveTrails(): Promise<Trail[]> {
+		return this.db.select().from(trails)
+			.where(eq(trails.isActive, true))
+			.orderBy(asc(trails.sortOrder));
+	}
+
+	async getTrailById(id: string): Promise<Trail | null> {
+		const result = await this.db.select().from(trails).where(eq(trails.id, id)).limit(1);
+		return result[0] ?? null;
 	}
 }

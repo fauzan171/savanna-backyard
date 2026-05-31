@@ -2,6 +2,7 @@ import type { PaymentGateway, GatewayVendor } from './types';
 import { ManualPaymentGateway } from './manual.gateway';
 import { MidtransGateway } from './midtrans.gateway';
 import { XenditGateway } from './xendit.gateway';
+import { iFortePayGateway } from './ifortepay.gateway';
 
 export type { GatewayVendor };
 
@@ -17,6 +18,14 @@ export class PaymentGatewayFactory {
 		config: Record<string, string>
 	): PaymentGateway {
 		switch (vendor) {
+			case 'ifortepay':
+				return new iFortePayGateway({
+					merchantId: config.merchantId ?? '',
+					secretUnboundId: config.secretUnboundId ?? '',
+					hashKey: config.hashKey ?? '',
+					isProduction: config.isProduction === 'true',
+				});
+
 			case 'midtrans':
 				return new MidtransGateway({
 					serverKey: config.serverKey ?? '',

@@ -17,6 +17,11 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Wrench,
+	Package,
+	Tag,
+	Star,
+	Map,
+	UserCog,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -100,6 +105,26 @@ const defaultNavItems: NavItem[] = [
 		icon: <Wrench className="size-5" />,
 	},
 	{
+		label: 'Packages',
+		href: '/packages',
+		icon: <Package className="size-5" />,
+	},
+	{
+		label: 'Pricing',
+		href: '/pricing',
+		icon: <Tag className="size-5" />,
+	},
+	{
+		label: 'Reviews',
+		href: '/reviews',
+		icon: <Star className="size-5" />,
+	},
+	{
+		label: 'Trails',
+		href: '/trails',
+		icon: <Map className="size-5" />,
+	},
+	{
 		label: 'Reports',
 		href: '/reports',
 		icon: <BarChart3 className="size-5" />,
@@ -111,6 +136,11 @@ const defaultFooterItems: NavItem[] = [
 		label: 'Settings',
 		href: '/settings',
 		icon: <Settings className="size-5" />,
+	},
+	{
+		label: 'Users',
+		href: '/users',
+		icon: <UserCog className="size-5" />,
 	},
 ];
 

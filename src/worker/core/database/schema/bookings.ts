@@ -14,8 +14,15 @@ export const bookings = sqliteTable('bookings', {
 	actualReturnDate: text('actual_return_date'),
 	startKm: real('start_km'),
 	endKm: real('end_km'),
-	status: text('status', { enum: ['Pending', 'Confirmed', 'Active', 'Completed', 'Cancelled'] }).notNull().default('Pending'),
+	status: text('status', {
+		enum: ['Pending', 'pending_payment', 'Confirmed', 'Active', 'Completed', 'Cancelled', 'payment_failed', 'expired', 'refunded']
+	}).notNull().default('Pending'),
 	paymentTerms: text('payment_terms', { enum: ['DP_Pickup', 'Full_Upfront', 'DP_After', 'Flexible'] }).notNull(),
+	paymentStatus: text('payment_status'),
+	paymentMethod: text('payment_method'),
+	snapToken: text('snap_token'),
+	paymentPageUrl: text('payment_page_url'),
+	paidAt: text('paid_at'),
 	baseAmount: real('base_amount').notNull(),
 	addonsAmount: real('addons_amount').default(0),
 	lateFee: real('late_fee').default(0),

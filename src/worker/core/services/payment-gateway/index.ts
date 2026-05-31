@@ -4,3 +4,4 @@ export * from './factory';
 export * from './manual.gateway';
 export * from './midtrans.gateway';
 export * from './xendit.gateway';
+export * from './ifortepay.gateway';

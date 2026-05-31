@@ -2,7 +2,7 @@
 
 export type PaymentMethod = 'QRIS' | 'Gateway' | 'BankTransfer' | 'Cash';
 export type PaymentStatus = 'Pending' | 'Verified' | 'Failed';
-export type GatewayVendor = 'midtrans' | 'xendit' | 'manual';
+export type GatewayVendor = 'midtrans' | 'xendit' | 'manual' | 'ifortepay';
 
 // Request to create a payment
 export interface CreatePaymentRequest {

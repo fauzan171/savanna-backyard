@@ -10,6 +10,8 @@ export async function errorHandler(c: Context, next: Next) {
 
 		if (error instanceof AppError) {
 			const response: ApiError = {
+				success: false,
+				message: error.message,
 				error: {
 					message: error.message,
 					code: error.code,
@@ -21,6 +23,8 @@ export async function errorHandler(c: Context, next: Next) {
 		// Zod validation error
 		if (error instanceof Error && error.name === 'ZodError') {
 			const response: ApiError = {
+				success: false,
+				message: 'Validation failed',
 				error: {
 					message: 'Validation failed',
 					code: 'VALIDATION_ERROR',
@@ -32,6 +36,8 @@ export async function errorHandler(c: Context, next: Next) {
 
 		// Generic error
 		const response: ApiError = {
+			success: false,
+			message: 'Internal server error',
 			error: {
 				message: 'Internal server error',
 				code: 'INTERNAL_ERROR',

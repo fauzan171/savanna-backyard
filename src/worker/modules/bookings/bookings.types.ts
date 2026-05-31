@@ -9,10 +9,14 @@ export type AddonType = BookingAddon['type'];
 // Valid status transitions
 export const BOOKING_STATUS_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
 	Pending: ['Confirmed', 'Cancelled'],
+	pending_payment: ['Confirmed', 'Cancelled', 'payment_failed', 'expired'],
 	Confirmed: ['Active', 'Cancelled'],
 	Active: ['Completed', 'Cancelled'],
 	Completed: [],
 	Cancelled: [],
+	payment_failed: ['pending_payment', 'Cancelled'],
+	expired: [],
+	refunded: [],
 };
 
 // Response types

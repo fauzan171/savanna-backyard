@@ -11,6 +11,13 @@ import { createMaintenanceRouter } from './modules/maintenance/maintenance.route
 import { createPublicApiRouter } from './modules/public-api/public-api.routes';
 import { createDashboardRouter } from './modules/dashboard/dashboard.routes';
 import { createReportsRouter } from './modules/reports/reports.routes';
+import { createWebhookRouter } from './modules/webhooks/webhooks.routes';
+import { createPackagesRouter } from './modules/packages/packages.routes';
+import { createPricingRouter } from './modules/pricing/pricing.routes';
+import { createReviewsRouter } from './modules/reviews/reviews.routes';
+import { createTrailsRouter } from './modules/trails/trails.routes';
+import { createSettingsRouter } from './modules/settings/settings.routes';
+import { createUsersRouter } from './modules/users/users.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -86,6 +93,17 @@ v1Routes.route('/dashboard', createDashboardRouter() as unknown as Hono<{ Bindin
 
 // Reports routes
 v1Routes.route('/reports', createReportsRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Webhook routes (no auth - signature verification)
+v1Routes.route('/webhooks', createWebhookRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// Content management routes (NEW)
+v1Routes.route('/packages', createPackagesRouter() as unknown as Hono<{ Bindings: Env }>);
+v1Routes.route('/pricing', createPricingRouter() as unknown as Hono<{ Bindings: Env }>);
+v1Routes.route('/reviews', createReviewsRouter() as unknown as Hono<{ Bindings: Env }>);
+v1Routes.route('/trails', createTrailsRouter() as unknown as Hono<{ Bindings: Env }>);
+v1Routes.route('/settings', createSettingsRouter() as unknown as Hono<{ Bindings: Env }>);
+v1Routes.route('/users', createUsersRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);

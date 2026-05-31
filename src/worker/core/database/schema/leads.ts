@@ -14,6 +14,9 @@ export const leads = sqliteTable('leads', {
 	assignedTo: text('assigned_to').references(() => users.id),
 	followUpDate: text('follow_up_date'),
 	convertedAt: text('converted_at'),
+	preferredStart: text('preferred_start'),
+	preferredEnd: text('preferred_end'),
+	vehicleInterest: text('vehicle_interest'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
 });

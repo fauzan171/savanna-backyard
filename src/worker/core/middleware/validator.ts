@@ -5,7 +5,13 @@ import { ValidationError } from '../types/errors';
 // Validate request body against a Zod schema
 export function validateBody<T>(schema: z.ZodSchema<T>) {
 	return async (c: Context, next: Next) => {
-		const body = await c.req.json().catch(() => ({}));
+		let body: unknown;
+		try {
+			const text = await c.req.text();
+			body = text ? JSON.parse(text) : {};
+		} catch {
+			throw new ValidationError('Invalid JSON body');
+		}
 
 		const result = schema.safeParse(body);
 		if (!result.success) {
