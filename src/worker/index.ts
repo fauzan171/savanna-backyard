@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { errorHandler } from './core/middleware/error-handler';
+import { errorHandler, handleError } from './core/middleware/error-handler';
 import { createAuthRouter } from './modules/auth/auth.routes';
 import { createCustomersRouter } from './modules/customers/customers.routes';
 import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
@@ -55,7 +55,8 @@ app.use('*', async (c, next) => {
 	}
 });
 
-// Error handler
+// Error handler (onError catches route handler errors, middleware catches everything else)
+app.onError(handleError);
 app.use('*', errorHandler);
 
 // API v1 routes
