@@ -5,28 +5,44 @@ import { cn } from '@/react-app/lib/utils';
 // BOOKING STATUS BADGE
 // ============================================
 
-type BookingStatus = 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled';
+type BookingStatus = 'pending' | 'pending_payment' | 'confirmed' | 'active' | 'completed' | 'cancelled' | 'payment_failed' | 'expired' | 'refunded';
 
-const bookingStatusConfig: Record<BookingStatus, { label: string; className: string }> = {
+const bookingStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
 		label: 'Pending',
-		className: 'bg-[hsl(var(--status-pending))]/10 text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending))]/30',
+		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+	},
+	pending_payment: {
+		label: 'Pending Payment',
+		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	confirmed: {
 		label: 'Confirmed',
-		className: 'bg-[hsl(var(--status-confirmed))]/10 text-[hsl(var(--status-confirmed))] border-[hsl(var(--status-confirmed))]/30',
+		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	active: {
 		label: 'Active',
-		className: 'bg-[hsl(var(--status-active))]/10 text-[hsl(var(--status-active))] border-[hsl(var(--status-active))]/30',
+		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	completed: {
 		label: 'Completed',
-		className: 'bg-[hsl(var(--status-completed))]/10 text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed))]/30',
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
 	},
 	cancelled: {
 		label: 'Cancelled',
-		className: 'bg-[hsl(var(--status-cancelled))]/10 text-[hsl(var(--status-cancelled))] border-[hsl(var(--status-cancelled))]/30',
+		className: 'bg-red-100 text-red-800 border-red-300',
+	},
+	payment_failed: {
+		label: 'Payment Failed',
+		className: 'bg-red-100 text-red-800 border-red-300',
+	},
+	expired: {
+		label: 'Expired',
+		className: 'bg-orange-100 text-orange-800 border-orange-300',
+	},
+	refunded: {
+		label: 'Refunded',
+		className: 'bg-purple-100 text-purple-800 border-purple-300',
 	},
 };
 
@@ -38,7 +54,11 @@ interface BookingStatusBadgeProps {
 }
 
 function BookingStatusBadge({ status, label, size = 'md', className }: BookingStatusBadgeProps) {
-	const config = bookingStatusConfig[status];
+	const normalized = status.toLowerCase();
+	const config = bookingStatusConfig[normalized] ?? {
+		label: status,
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
+	};
 	return (
 		<Badge
 			variant="outline"
@@ -56,26 +76,26 @@ function BookingStatusBadge({ status, label, size = 'md', className }: BookingSt
 
 type LeadStatus = 'new' | 'contacted' | 'negotiating' | 'converted' | 'lost';
 
-const leadStatusConfig: Record<LeadStatus, { label: string; className: string }> = {
+const leadStatusConfig: Record<string, { label: string; className: string }> = {
 	new: {
 		label: 'New',
-		className: 'bg-[hsl(var(--lead-new))]/10 text-[hsl(var(--lead-new))] border-[hsl(var(--lead-new))]/30',
+		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	contacted: {
 		label: 'Contacted',
-		className: 'bg-[hsl(var(--lead-contacted))]/10 text-[hsl(var(--lead-contacted))] border-[hsl(var(--lead-contacted))]/30',
+		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	negotiating: {
 		label: 'Negotiating',
-		className: 'bg-[hsl(var(--lead-negotiating))]/10 text-[hsl(var(--lead-negotiating))] border-[hsl(var(--lead-negotiating))]/30',
+		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	converted: {
 		label: 'Converted',
-		className: 'bg-[hsl(var(--lead-converted))]/10 text-[hsl(var(--lead-converted))] border-[hsl(var(--lead-converted))]/30',
+		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	lost: {
 		label: 'Lost',
-		className: 'bg-[hsl(var(--lead-lost))]/10 text-[hsl(var(--lead-lost))] border-[hsl(var(--lead-lost))]/30',
+		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 };
 
@@ -87,7 +107,11 @@ interface LeadStatusBadgeProps {
 }
 
 function LeadStatusBadge({ status, label, size = 'md', className }: LeadStatusBadgeProps) {
-	const config = leadStatusConfig[status];
+	const normalized = status.toLowerCase();
+	const config = leadStatusConfig[normalized] ?? {
+		label: status,
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
+	};
 	return (
 		<Badge
 			variant="outline"
@@ -105,21 +129,21 @@ function LeadStatusBadge({ status, label, size = 'md', className }: LeadStatusBa
 
 type LeadPriority = 'hot' | 'warm' | 'cold';
 
-const priorityConfig: Record<LeadPriority, { label: string; className: string; dot: string }> = {
+const priorityConfig: Record<string, { label: string; className: string; dot: string }> = {
 	hot: {
 		label: 'Hot',
-		className: 'bg-[hsl(var(--priority-hot))]/10 text-[hsl(var(--priority-hot))] border-[hsl(var(--priority-hot))]/30',
-		dot: 'bg-[hsl(var(--priority-hot))]',
+		className: 'bg-red-100 text-red-800 border-red-300',
+		dot: 'bg-red-500',
 	},
 	warm: {
 		label: 'Warm',
-		className: 'bg-[hsl(var(--priority-warm))]/10 text-[hsl(var(--priority-warm))] border-[hsl(var(--priority-warm))]/30',
-		dot: 'bg-[hsl(var(--priority-warm))]',
+		className: 'bg-orange-100 text-orange-800 border-orange-300',
+		dot: 'bg-orange-500',
 	},
 	cold: {
 		label: 'Cold',
-		className: 'bg-[hsl(var(--priority-cold))]/10 text-[hsl(var(--priority-cold))] border-[hsl(var(--priority-cold))]/30',
-		dot: 'bg-[hsl(var(--priority-cold))]',
+		className: 'bg-blue-100 text-blue-800 border-blue-300',
+		dot: 'bg-blue-500',
 	},
 };
 
@@ -132,7 +156,12 @@ interface PriorityBadgeProps {
 }
 
 function PriorityBadge({ level, label, size = 'md', showDot = true, className }: PriorityBadgeProps) {
-	const config = priorityConfig[level];
+	const normalized = level.toLowerCase();
+	const config = priorityConfig[normalized] ?? {
+		label: level,
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
+		dot: 'bg-gray-500',
+	};
 	return (
 		<Badge
 			variant="outline"
@@ -149,20 +178,40 @@ function PriorityBadge({ level, label, size = 'md', showDot = true, className }:
 // PAYMENT STATUS BADGE
 // ============================================
 
-type PaymentStatus = 'pending' | 'verified' | 'failed';
+type PaymentStatus = 'pending' | 'verified' | 'failed' | 'settlement' | 'deny' | 'expire' | 'cancel' | 'refund';
 
-const paymentStatusConfig: Record<PaymentStatus, { label: string; className: string }> = {
+const paymentStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
 		label: 'Pending',
-		className: 'bg-[hsl(var(--payment-pending))]/10 text-[hsl(var(--payment-pending))] border-[hsl(var(--payment-pending))]/30',
+		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	verified: {
 		label: 'Verified',
-		className: 'bg-[hsl(var(--payment-verified))]/10 text-[hsl(var(--payment-verified))] border-[hsl(var(--payment-verified))]/30',
+		className: 'bg-green-100 text-green-800 border-green-300',
+	},
+	settlement: {
+		label: 'Settled',
+		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	failed: {
 		label: 'Failed',
-		className: 'bg-[hsl(var(--payment-failed))]/10 text-[hsl(var(--payment-failed))] border-[hsl(var(--payment-failed))]/30',
+		className: 'bg-red-100 text-red-800 border-red-300',
+	},
+	deny: {
+		label: 'Denied',
+		className: 'bg-red-100 text-red-800 border-red-300',
+	},
+	expire: {
+		label: 'Expired',
+		className: 'bg-orange-100 text-orange-800 border-orange-300',
+	},
+	cancel: {
+		label: 'Cancelled',
+		className: 'bg-red-100 text-red-800 border-red-300',
+	},
+	refund: {
+		label: 'Refunded',
+		className: 'bg-purple-100 text-purple-800 border-purple-300',
 	},
 };
 
@@ -174,7 +223,11 @@ interface PaymentStatusBadgeProps {
 }
 
 function PaymentStatusBadge({ status, label, size = 'md', className }: PaymentStatusBadgeProps) {
-	const config = paymentStatusConfig[status];
+	const normalized = status.toLowerCase();
+	const config = paymentStatusConfig[normalized] ?? {
+		label: status,
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
+	};
 	return (
 		<Badge
 			variant="outline"
@@ -192,22 +245,22 @@ function PaymentStatusBadge({ status, label, size = 'md', className }: PaymentSt
 
 type VehicleStatus = 'available' | 'rented' | 'maintenance' | 'inactive';
 
-const vehicleStatusConfig: Record<VehicleStatus, { label: string; className: string }> = {
+const vehicleStatusConfig: Record<string, { label: string; className: string }> = {
 	available: {
 		label: 'Available',
-		className: 'bg-[hsl(var(--vehicle-available))]/10 text-[hsl(var(--vehicle-available))] border-[hsl(var(--vehicle-available))]/30',
+		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	rented: {
 		label: 'Rented',
-		className: 'bg-[hsl(var(--vehicle-rented))]/10 text-[hsl(var(--vehicle-rented))] border-[hsl(var(--vehicle-rented))]/30',
+		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	maintenance: {
 		label: 'Maintenance',
-		className: 'bg-[hsl(var(--vehicle-maintenance))]/10 text-[hsl(var(--vehicle-maintenance))] border-[hsl(var(--vehicle-maintenance))]/30',
+		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	inactive: {
 		label: 'Inactive',
-		className: 'bg-[hsl(var(--vehicle-inactive))]/10 text-[hsl(var(--vehicle-inactive))] border-[hsl(var(--vehicle-inactive))]/30',
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
 	},
 };
 
@@ -219,7 +272,11 @@ interface VehicleStatusBadgeProps {
 }
 
 function VehicleStatusBadge({ status, label, size = 'md', className }: VehicleStatusBadgeProps) {
-	const config = vehicleStatusConfig[status];
+	const normalized = status.toLowerCase();
+	const config = vehicleStatusConfig[normalized] ?? {
+		label: status,
+		className: 'bg-gray-100 text-gray-800 border-gray-300',
+	};
 	return (
 		<Badge
 			variant="outline"
