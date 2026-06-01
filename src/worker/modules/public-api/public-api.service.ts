@@ -215,7 +215,7 @@ export class PublicApiService {
         name: data.customerName,
         phone: data.customerPhone,
         email: data.customerEmail || null,
-        notes: data.notes || null,
+        notes: (data.notes && data.notes.trim()) || null,
         isBlacklisted: false,
       });
     }

@@ -32,8 +32,8 @@ export const createPublicBookingSchema = z.object({
 	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
 	customerName: z.string().min(2, 'Name must be at least 2 characters'),
 	customerPhone: z.string().min(10, 'Phone number must be at least 10 characters'),
-	customerEmail: z.string().email('Invalid email').optional().nullable(),
-	notes: z.string().max(1000).optional().nullable(),
+	customerEmail: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
+	notes: z.string().max(1000).optional().nullable().or(z.literal('')),
 });
 
 // Types
