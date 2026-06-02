@@ -415,6 +415,7 @@ function ActionDialog({
 	const [newEndDate, setNewEndDate] = useState('');
 	const [startKm, setStartKm] = useState('');
 	const [endKm, setEndKm] = useState('');
+	const [actionError, setActionError] = useState('');
 
 	const confirmBooking = useConfirmBooking();
 	const startRental = useStartRental();
@@ -423,6 +424,7 @@ function ActionDialog({
 	const extendBooking = useExtendBooking();
 
 	const handleAction = async () => {
+		setActionError('');
 		try {
 			switch (action.action) {
 				case 'confirm':
@@ -460,8 +462,9 @@ function ActionDialog({
 			setNewEndDate('');
 			setStartKm('');
 			setEndKm('');
-		} catch (e) {
-			console.error('Action failed:', e);
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : 'Action failed';
+			setActionError(msg);
 		}
 	};
 
@@ -474,7 +477,7 @@ function ActionDialog({
 
 	const isSubmitDisabled =
 		isLoading ||
-		(action.action === 'cancel' && reason.length < 10) ||
+		(action.action === 'cancel' && reason.trim().length < 3) ||
 		(action.action === 'start' && !startKm);
 
 	return (
@@ -502,14 +505,20 @@ function ActionDialog({
 
 					<div className="space-y-4">
 						{action.action === 'cancel' && (
-							<FormField label="Reason" required>
+							<FormField label="Alasan Cancel" required>
 								<Textarea
 									value={reason}
 									onChange={(e) => setReason(e.target.value)}
-									placeholder="Enter reason for cancellation..."
+									placeholder="Masukkan alasan pembatalan..."
 									rows={3}
 								/>
 							</FormField>
+						)}
+
+						{actionError && (
+							<div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+								{actionError}
+							</div>
 						)}
 
 						{action.action === 'start' && (
@@ -559,15 +568,15 @@ function ActionDialog({
 					</div>
 
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
-							Cancel
+						<Button variant="outline" onClick={() => { setOpen(false); setActionError(''); }} disabled={isLoading}>
+							Tutup
 						</Button>
 						<Button
 							variant={action.variant === 'destructive' ? 'destructive' : 'default'}
 							onClick={handleAction}
 							disabled={isSubmitDisabled}
 						>
-							{isLoading ? 'Processing...' : action.label}
+							{isLoading ? 'Memproses...' : action.label === 'Cancel' ? 'Batalkan Booking' : action.label}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
