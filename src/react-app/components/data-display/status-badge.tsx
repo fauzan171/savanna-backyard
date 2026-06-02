@@ -5,7 +5,7 @@ import { cn } from '@/react-app/lib/utils';
 // BOOKING STATUS BADGE
 // ============================================
 
-type BookingStatus = 'pending' | 'pending_payment' | 'confirmed' | 'active' | 'completed' | 'cancelled' | 'payment_failed' | 'expired' | 'refunded';
+type BookingStatus = string;
 
 const bookingStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
@@ -74,7 +74,7 @@ function BookingStatusBadge({ status, label, size = 'md', className }: BookingSt
 // LEAD STATUS BADGE
 // ============================================
 
-type LeadStatus = 'new' | 'contacted' | 'negotiating' | 'converted' | 'lost';
+type LeadStatus = string;
 
 const leadStatusConfig: Record<string, { label: string; className: string }> = {
 	new: {
@@ -127,7 +127,7 @@ function LeadStatusBadge({ status, label, size = 'md', className }: LeadStatusBa
 // LEAD PRIORITY BADGE
 // ============================================
 
-type LeadPriority = 'hot' | 'warm' | 'cold';
+type LeadPriority = string;
 
 const priorityConfig: Record<string, { label: string; className: string; dot: string }> = {
 	hot: {
@@ -178,7 +178,7 @@ function PriorityBadge({ level, label, size = 'md', showDot = true, className }:
 // PAYMENT STATUS BADGE
 // ============================================
 
-type PaymentStatus = 'pending' | 'verified' | 'failed' | 'settlement' | 'deny' | 'expire' | 'cancel' | 'refund';
+type PaymentStatus = string;
 
 const paymentStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
@@ -243,7 +243,7 @@ function PaymentStatusBadge({ status, label, size = 'md', className }: PaymentSt
 // VEHICLE STATUS BADGE
 // ============================================
 
-type VehicleStatus = 'available' | 'rented' | 'maintenance' | 'inactive';
+type VehicleStatus = string;
 
 const vehicleStatusConfig: Record<string, { label: string; className: string }> = {
 	available: {

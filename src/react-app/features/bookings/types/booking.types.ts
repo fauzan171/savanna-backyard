@@ -10,10 +10,13 @@ import { z } from "zod";
 
 export type BookingStatus =
   | "Pending"
+  | "pending_payment"
   | "Confirmed"
   | "Active"
   | "Completed"
-  | "Cancelled";
+  | "Cancelled"
+  | "payment_failed"
+  | "expired";
 export type PaymentTerms =
   | "DP_Pickup"
   | "Full_Upfront"
@@ -353,10 +356,13 @@ export const completeRentalSchema = z.object({
 
 export const statusTransitions: Record<BookingStatus, BookingStatus[]> = {
   Pending: ["Confirmed", "Cancelled"],
+  pending_payment: ["Confirmed", "Cancelled", "payment_failed", "expired"],
   Confirmed: ["Active", "Cancelled"],
   Active: ["Completed", "Cancelled"],
   Completed: [],
   Cancelled: [],
+  payment_failed: ["pending_payment", "Cancelled"],
+  expired: [],
 };
 
 export function canTransitionTo(
@@ -379,6 +385,14 @@ export function getAvailableActions(status: BookingStatus): Array<{
 
   switch (status) {
     case "Pending":
+      actions.push({ action: "confirm", label: "Confirm", variant: "default" });
+      actions.push({
+        action: "cancel",
+        label: "Cancel",
+        variant: "destructive",
+      });
+      break;
+    case "pending_payment":
       actions.push({ action: "confirm", label: "Confirm", variant: "default" });
       actions.push({
         action: "cancel",
@@ -413,7 +427,15 @@ export function getAvailableActions(status: BookingStatus): Array<{
       break;
     case "Completed":
     case "Cancelled":
+    case "expired":
       // No actions available
+      break;
+    case "payment_failed":
+      actions.push({
+        action: "cancel",
+        label: "Cancel",
+        variant: "destructive",
+      });
       break;
   }
 

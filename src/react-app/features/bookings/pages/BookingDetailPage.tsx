@@ -91,7 +91,7 @@ export function BookingDetailPage() {
 			{/* Status Banner */}
 			<div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
 				<StatusBadge.Booking
-					status={booking.status.toLowerCase() as 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'}
+					status={booking.status}
 					size="lg"
 				/>
 				<div className="text-sm text-muted-foreground">
@@ -260,22 +260,27 @@ export function BookingDetailPage() {
 				</TabsContent>
 
 				<TabsContent value="payments" className="space-y-6">
-					<PaymentsTab booking={booking} />
+					<PaymentsTab payments={booking.payments ?? []} paymentSummary={booking.paymentSummary} currency={booking.currency} totalAmount={booking.totalAmount} />
 				</TabsContent>
 
 				<TabsContent value="history" className="space-y-6">
-					<HistoryTab booking={booking} />
+					<HistoryTab history={booking.statusHistory ?? []} />
 				</TabsContent>
 			</Tabs>
 		</div>
 	);
 }
 
-function PaymentsTab({ booking }: { booking: NonNullable<ReturnType<typeof useBooking>['data']> }) {
-	const formatCurrency = (amount: number, currency: 'IDR' | 'USD' = 'IDR') => {
+function PaymentsTab({ payments, paymentSummary, currency, totalAmount }: {
+	payments: Array<{ id: string; amount: number; currency: 'IDR' | 'USD'; method: string; status: string; transactionReference?: string | null; createdAt: string }>;
+	paymentSummary: { totalPaid: number; pendingAmount: number; remaining: number };
+	currency: 'IDR' | 'USD';
+	totalAmount: number;
+}) {
+	const formatCurrency = (amount: number, cur: 'IDR' | 'USD' = 'IDR') => {
 		return new Intl.NumberFormat('id-ID', {
 			style: 'currency',
-			currency,
+			currency: cur,
 			minimumFractionDigits: 0,
 			maximumFractionDigits: 0,
 		}).format(amount);
@@ -288,25 +293,25 @@ function PaymentsTab({ booking }: { booking: NonNullable<ReturnType<typeof useBo
 				<div>
 					<div className="text-sm text-muted-foreground">Total Amount</div>
 					<div className="text-xl font-semibold">
-						{formatCurrency(booking.totalAmount, booking.currency)}
+						{formatCurrency(totalAmount, currency)}
 					</div>
 				</div>
 				<div>
 					<div className="text-sm text-muted-foreground">Paid</div>
 					<div className="text-xl font-semibold text-green-600">
-						{formatCurrency(booking.paymentSummary.totalPaid, booking.currency)}
+						{formatCurrency(paymentSummary?.totalPaid ?? 0, currency)}
 					</div>
 				</div>
 				<div>
 					<div className="text-sm text-muted-foreground">Pending</div>
 					<div className="text-xl font-semibold text-yellow-600">
-						{formatCurrency(booking.paymentSummary.pendingAmount, booking.currency)}
+						{formatCurrency(paymentSummary?.pendingAmount ?? 0, currency)}
 					</div>
 				</div>
 				<div>
 					<div className="text-sm text-muted-foreground">Remaining</div>
 					<div className="text-xl font-semibold text-red-600">
-						{formatCurrency(booking.paymentSummary.remaining, booking.currency)}
+						{formatCurrency(paymentSummary?.remaining ?? 0, currency)}
 					</div>
 				</div>
 			</div>
@@ -314,10 +319,10 @@ function PaymentsTab({ booking }: { booking: NonNullable<ReturnType<typeof useBo
 			{/* Payments List */}
 			<div className="border rounded-lg divide-y">
 				<div className="p-4 bg-muted/50 font-semibold">Payment Records</div>
-				{booking.payments.length === 0 ? (
+				{payments.length === 0 ? (
 					<div className="p-8 text-center text-muted-foreground">No payments recorded</div>
 				) : (
-					booking.payments.map((payment) => (
+					payments.map((payment) => (
 						<div key={payment.id} className="p-4 flex justify-between items-center">
 							<div>
 								<div className="font-medium">
@@ -352,14 +357,16 @@ function PaymentsTab({ booking }: { booking: NonNullable<ReturnType<typeof useBo
 	);
 }
 
-function HistoryTab({ booking }: { booking: NonNullable<ReturnType<typeof useBooking>['data']> }) {
+function HistoryTab({ history }: {
+	history: Array<{ id: string; fromStatus: string | null; toStatus: string; notes: string | null; changedBy: { name: string }; createdAt: string }>;
+}) {
 	return (
 		<div className="border rounded-lg divide-y">
 			<div className="p-4 bg-muted/50 font-semibold">Status History</div>
-			{booking.statusHistory.length === 0 ? (
+			{history.length === 0 ? (
 				<div className="p-8 text-center text-muted-foreground">No status changes recorded</div>
 			) : (
-				booking.statusHistory.map((entry) => (
+				history.map((entry) => (
 					<div key={entry.id} className="p-4 flex gap-4">
 						<div className="flex flex-col items-center">
 							<div className="size-3 rounded-full bg-primary" />
@@ -370,19 +377,19 @@ function HistoryTab({ booking }: { booking: NonNullable<ReturnType<typeof useBoo
 								{entry.fromStatus && (
 									<>
 										<StatusBadge.Booking
-											status={entry.fromStatus.toLowerCase() as 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'}
+											status={entry.fromStatus}
 											size="sm"
 										/>
 										<span className="text-muted-foreground">→</span>
 									</>
 								)}
 								<StatusBadge.Booking
-									status={entry.toStatus.toLowerCase() as 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'}
+									status={entry.toStatus}
 									size="sm"
 								/>
 							</div>
 							<div className="text-sm text-muted-foreground mt-1">
-								{format(new Date(entry.createdAt), 'PPP p')} by {entry.changedBy.name}
+								{format(new Date(entry.createdAt), 'PPP p')} by {entry.changedBy?.name ?? 'System'}
 							</div>
 							{entry.notes && (
 								<div className="text-sm mt-2 text-muted-foreground">{entry.notes}</div>

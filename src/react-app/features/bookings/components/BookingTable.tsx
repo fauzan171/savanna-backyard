@@ -115,7 +115,7 @@ export function BookingTable({ data, isLoading, onRowClick }: BookingTableProps)
 			header: 'Status',
 			cell: ({ row }) => (
 				<StatusBadge.Booking
-					status={row.original.status.toLowerCase() as 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'}
+					status={row.original.status}
 				/>
 			),
 		},
@@ -131,7 +131,7 @@ export function BookingTable({ data, isLoading, onRowClick }: BookingTableProps)
 					{booking.bookingNumber}
 				</Link>
 				<StatusBadge.Booking
-					status={booking.status.toLowerCase() as 'pending' | 'confirmed' | 'active' | 'completed' | 'cancelled'}
+					status={booking.status}
 					size="sm"
 				/>
 			</div>
