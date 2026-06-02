@@ -3,6 +3,7 @@ import { OverviewStats } from '../components/OverviewStats';
 import { RevenueChart } from '../components/RevenueChart';
 import { ActivityFeed } from '../components/ActivityFeed';
 import { PeriodFilter } from '../components/PeriodFilter';
+import { PageHeader } from '@/react-app/components/layout/page-header';
 import {
 	useDashboardOverview,
 	useDashboardRevenue,
@@ -19,15 +20,11 @@ export default function DashboardPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between">
-				<div>
-					<h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-					<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-						Overview of your vehicle rental business
-					</p>
-				</div>
-				<PeriodFilter value={period} onChange={setPeriod} />
-			</div>
+			<PageHeader
+				title="Dashboard"
+				description="Overview of your vehicle rental business"
+				actions={<PeriodFilter value={period} onChange={setPeriod} />}
+			/>
 
 			<OverviewStats data={overview} isLoading={overviewLoading} />
 

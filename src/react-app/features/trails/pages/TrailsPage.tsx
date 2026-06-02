@@ -33,8 +33,8 @@ export default function TrailsPage() {
 			<PageHeader title="Trails" description="Manage trail routes and blog content" actions={
 				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Add Trail</Button>
 			} />
-			{isLoading ? <div className="text-center py-8 text-muted-foreground">Loading...</div> : (
-				<div className="border rounded-lg">
+			{isLoading ? <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full size-8 border-b-2 border-primary" /></div> : (
+				<div className="border rounded-lg overflow-x-auto">
 					<table className="w-full">
 						<thead className="bg-muted/50">
 							<tr>
@@ -49,7 +49,7 @@ export default function TrailsPage() {
 						<tbody className="divide-y">
 							{(trails ?? []).map((trail) => (
 								<tr key={trail.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => navigate(`/trails/${trail.id}`)}>
-									<td className="p-3"><div className="font-medium">{trail.name}</div><div className="text-xs text-muted-foreground">{trail.id}</div></td>
+									<td className="p-3"><div className="font-medium">{trail.name}</div>{trail.terrain && <div className="text-xs text-muted-foreground">{trail.terrain}</div>}</td>
 									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${difficultyColor[trail.difficulty ?? ''] ?? 'bg-gray-100 text-gray-500'}`}>{trail.difficulty ?? '-'}</span></td>
 									<td className="p-3 text-sm">{trail.estimatedDuration ?? '-'}</td>
 									<td className="p-3 text-sm">{trail.distance ?? '-'}</td>

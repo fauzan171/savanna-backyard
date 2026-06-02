@@ -78,10 +78,12 @@ export function BookingsPage() {
 					<SelectContent>
 						<SelectItem value="all">All Statuses</SelectItem>
 						<SelectItem value="Pending">Pending</SelectItem>
+						<SelectItem value="pending_payment">Pending Payment</SelectItem>
 						<SelectItem value="Confirmed">Confirmed</SelectItem>
 						<SelectItem value="Active">Active</SelectItem>
 						<SelectItem value="Completed">Completed</SelectItem>
 						<SelectItem value="Cancelled">Cancelled</SelectItem>
+						<SelectItem value="payment_failed">Payment Failed</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>

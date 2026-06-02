@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { Plus, Wrench } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { EmptyState } from '@/react-app/components/ui/empty-state';
+import { PageHeader } from '@/react-app/components/layout/page-header';
 import {
 	Select,
 	SelectContent,
 	SelectItem,
-    SelectTrigger,
-    SelectValue,
+	SelectTrigger,
+	SelectValue,
 } from '@/react-app/components/ui/select';
 import { MaintenanceTable } from '../components/MaintenanceTable';
 import { MaintenanceForm } from '../components/MaintenanceForm';
 import {
-    useMaintenanceList,
-    useCreateMaintenance,
-    useStartMaintenance,
-    useCompleteMaintenance
+	useMaintenanceList,
+	useCreateMaintenance,
+	useStartMaintenance,
+	useCompleteMaintenance
 } from '../hooks/useMaintenance';
 import { useVehicles } from '@/react-app/features/vehicles/hooks/useVehicles';
 import type { MaintenanceFormData, MaintenanceStatus, MaintenanceType } from '../types/maintenance.types';
@@ -93,18 +94,16 @@ export default function MaintenancePage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Maintenance</h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Manage vehicle maintenance records
-                    </p>
-                </div>
-                <Button onClick={() => setIsFormOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Maintenance
-                </Button>
-            </div>
+            <PageHeader
+                title="Maintenance"
+                description="Manage vehicle maintenance records"
+                actions={
+                    <Button onClick={() => setIsFormOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Maintenance
+                    </Button>
+                }
+            />
 
             <div className="flex items-center gap-4">
                 <Select

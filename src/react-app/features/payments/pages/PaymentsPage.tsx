@@ -89,7 +89,7 @@ export function PaymentsPage() {
             })
           }
         >
-          <SelectTrigger className=".w-[180px]">
+          <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -112,7 +112,7 @@ export function PaymentsPage() {
             })
           }
         >
-          <SelectTrigger className=".w-[180px]">
+          <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Methods" />
           </SelectTrigger>
           <SelectContent>

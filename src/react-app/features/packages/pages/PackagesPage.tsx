@@ -38,9 +38,9 @@ export default function PackagesPage() {
 			} />
 
 			{isLoading ? (
-				<div className="text-center py-8 text-muted-foreground">Loading...</div>
+				<div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full size-8 border-b-2 border-primary" /></div>
 			) : (
-				<div className="border rounded-lg">
+				<div className="border rounded-lg overflow-x-auto">
 					<table className="w-full">
 						<thead className="bg-muted/50">
 							<tr>

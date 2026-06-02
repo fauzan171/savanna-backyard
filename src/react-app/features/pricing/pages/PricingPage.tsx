@@ -29,7 +29,7 @@ export default function PricingPage() {
 			{isLoading ? <div className="text-center py-8 text-muted-foreground">Loading...</div> : (
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 					{(tiers ?? []).map((tier) => (
-						<div key={tier.id} className={`border rounded-lg p-6 cursor-pointer hover:shadow-md transition ${tier.highlighted ? 'ring-2 ring-primary' : ''}`} onClick={() => navigate(`/pricing/${tier.id}`)}>
+						<div key={tier.id} className={`bg-card border rounded-lg p-6 cursor-pointer hover:shadow-md transition ${tier.highlighted ? 'ring-2 ring-primary' : ''}`} onClick={() => navigate(`/pricing/${tier.id}`)}>
 							<div className="flex items-center justify-between mb-2">
 								<h3 className="font-semibold text-lg">{tier.name}</h3>
 								{tier.highlighted && <Crown className="size-4 text-yellow-500" />}
