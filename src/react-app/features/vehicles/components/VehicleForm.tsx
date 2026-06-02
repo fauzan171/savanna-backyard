@@ -1,7 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import {
@@ -12,6 +13,8 @@ import {
 	SelectValue,
 } from '@/react-app/components/ui/select';
 import { FormField } from '@/react-app/components/ui/form-field';
+import { FileUpload } from '@/react-app/components/ui/file-upload';
+import { api } from '@/react-app/lib/api-client';
 import type { Vehicle, VehicleFormData, VehicleType } from '../types/vehicle.types';
 
 const vehicleFormSchema = z.object({
@@ -20,10 +23,10 @@ const vehicleFormSchema = z.object({
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']),
 	brand: z.string().optional(),
 	model: z.string().optional(),
-	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),	
+	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),
 	dailyRateIdr: z.coerce.number().min(0, 'Rate must be positive'),
 	dailyRateUsd: z.coerce.number().min(0).optional().or(z.literal('')),
-	photoUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+	photoUrl: z.string().optional().or(z.literal('')),
 });
 
 interface VehicleFormProps {
@@ -64,6 +67,10 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 		},
 	});
 
+	const [uploadFile, setUploadFile] = useState<File[]>([]);
+	const [uploading, setUploading] = useState(false);
+	const [uploadError, setUploadError] = useState('');
+
 	// Reset form when vehicle changes (for edit mode)
 	useEffect(() => {
 		if (vehicle) {
@@ -84,6 +91,21 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 	const vehicleType = watch('type');
 
 	const onFormSubmit = async (data: VehicleFormData) => {
+		// Upload file first if selected
+		if (uploadFile.length > 0) {
+			setUploading(true);
+			setUploadError('');
+			try {
+				const result = await api.upload('/v1/uploads', uploadFile[0]);
+				data.photoUrl = result.data.url;
+			} catch (err) {
+				setUploadError(err instanceof Error ? err.message : 'Upload failed');
+				setUploading(false);
+				return;
+			}
+			setUploading(false);
+		}
+
 		// Clean up empty strings to undefined
 		const cleanData = {
 			...data,
@@ -182,12 +204,25 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				</FormField>
 			</div>
 
-			<FormField label="Photo URL" error={errors.photoUrl?.message}>
-				<Input
-					{...register('photoUrl')}
-					placeholder="https://..."
-					disabled={isLoading || isSubmitting}
+			<FormField label="Photo">
+				<FileUpload
+					accept="image/jpeg,image/png,image/webp,image/gif"
+					maxSize={5 * 1024 * 1024}
+					value={uploadFile}
+					onChange={(files) => {
+						setUploadFile(files);
+						setUploadError('');
+					}}
+					disabled={isLoading || isSubmitting || uploading}
+					error={uploadError}
+					size="sm"
 				/>
+				{watch('photoUrl') && !uploadFile.length && (
+					<div className="mt-2 flex items-center gap-2">
+						<img src={watch('photoUrl')!} alt="Current" className="size-12 rounded object-cover border" />
+						<span className="text-xs text-muted-foreground">Current photo</span>
+					</div>
+				)}
 			</FormField>
 
 			<div className="flex justify-end gap-3 pt-4">
@@ -201,8 +236,9 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 						Cancel
 					</Button>
 				)}
-				<Button type="submit" disabled={isLoading || isSubmitting}>
-					{isSubmitting ? 'Saving...' : vehicle ? 'Update Vehicle' : 'Create Vehicle'}
+				<Button type="submit" disabled={isLoading || isSubmitting || uploading}>
+					{uploading ? <><Loader2 className="size-4 mr-2 animate-spin" />Uploading...</> :
+					 isSubmitting ? 'Saving...' : vehicle ? 'Update Vehicle' : 'Create Vehicle'}
 				</Button>
 			</div>
 		</form>

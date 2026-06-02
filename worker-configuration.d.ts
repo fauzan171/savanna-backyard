@@ -8,6 +8,7 @@ declare namespace Cloudflare {
 	}
 	interface Env {
 		DB: D1Database;
+		UPLOADS: R2Bucket;
 		JWT_SECRET: string;
 		ENVIRONMENT: string;
 		/** Comma-separated list of allowed origins for the main app CORS */

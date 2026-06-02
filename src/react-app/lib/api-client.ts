@@ -61,6 +61,31 @@ class ApiClient {
 	delete<T>(path: string) {
 		return this.request<T>(path, { method: 'DELETE' });
 	}
+
+	async upload(path: string, file: File): Promise<{ success: boolean; data: { key: string; url: string } }> {
+		const formData = new FormData();
+		formData.append('file', file);
+
+		const url = `${this.baseUrl}${path}`;
+		const response = await fetch(url, {
+			method: 'POST',
+			body: formData,
+			credentials: 'include',
+		});
+
+		if (response.status === 401) {
+			useAuthStore.getState().logout();
+			window.location.href = '/login';
+			throw new Error('Unauthorized');
+		}
+
+		if (!response.ok) {
+			const error = await response.json().catch(() => ({ error: { message: 'Upload failed' } }));
+			throw new Error(error.error?.message || 'Upload failed');
+		}
+
+		return response.json();
+	}
 }
 
 export const api = new ApiClient();

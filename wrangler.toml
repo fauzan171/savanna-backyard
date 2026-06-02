@@ -34,5 +34,10 @@ IFORTEPAY_CALLBACK_URL = ""
 IFORTEPAY_SUCCESS_REDIRECT_URL = ""
 IFORTEPAY_FAILED_REDIRECT_URL = ""
 
+# R2 Storage for file uploads
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "savanna-uploads"
+
 # Secrets (set via wrangler secret put)
 # JWT_SECRET

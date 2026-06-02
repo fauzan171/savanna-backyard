@@ -18,6 +18,7 @@ import { createReviewsRouter } from './modules/reviews/reviews.routes';
 import { createTrailsRouter } from './modules/trails/trails.routes';
 import { createSettingsRouter } from './modules/settings/settings.routes';
 import { createUsersRouter } from './modules/users/users.routes';
+import { createUploadRouter } from './modules/uploads/uploads.routes';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -105,6 +106,9 @@ v1Routes.route('/reviews', createReviewsRouter() as unknown as Hono<{ Bindings: 
 v1Routes.route('/trails', createTrailsRouter() as unknown as Hono<{ Bindings: Env }>);
 v1Routes.route('/settings', createSettingsRouter() as unknown as Hono<{ Bindings: Env }>);
 v1Routes.route('/users', createUsersRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// File uploads (auth required for upload/delete, public read)
+v1Routes.route('/uploads', createUploadRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
