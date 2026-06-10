@@ -37,8 +37,16 @@ export const useAuthStore = create<AuthState>()(
 
 			fetchUser: async () => {
 				try {
-					const response = await api.get<{ data: User }>('/v1/auth/me');
-					set({ user: response.data, isAuthenticated: true, isLoading: false });
+					// Use raw fetch to bypass api-client's 401 redirect logic,
+					// which would cause an infinite reload loop on expired sessions.
+					const response = await fetch('/api/v1/auth/me', {
+						credentials: 'include',
+					});
+					if (!response.ok) {
+						throw new Error('Not authenticated');
+					}
+					const json = await response.json();
+					set({ user: json.data, isAuthenticated: true, isLoading: false });
 				} catch {
 					set({ user: null, isAuthenticated: false, isLoading: false });
 				}

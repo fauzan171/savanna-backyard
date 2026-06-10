@@ -28,9 +28,8 @@ class ApiClient {
 		});
 
 		if (response.status === 401) {
-			// Auto logout on 401
+			// Clear auth state — React Router guards will handle redirect to /login
 			useAuthStore.getState().logout();
-			window.location.href = '/login';
 			throw new Error('Unauthorized');
 		}
 
@@ -75,7 +74,6 @@ class ApiClient {
 
 		if (response.status === 401) {
 			useAuthStore.getState().logout();
-			window.location.href = '/login';
 			throw new Error('Unauthorized');
 		}
 
