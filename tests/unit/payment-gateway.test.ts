@@ -211,10 +211,10 @@ describe('Payment Gateway Module', () => {
 
 		describe('createPayment', () => {
 			// ============================================
-			// P0: Not Implemented
+			// P0: Snap Token Guidance
 			// ============================================
 
-			it('[P0] should return not implemented error', async () => {
+			it('[P0] should return not implemented error directing to Snap flow', async () => {
 				const request: CreatePaymentRequest = {
 					amount: 500000,
 					currency: 'IDR',
@@ -226,31 +226,32 @@ describe('Payment Gateway Module', () => {
 
 				expect(result.success).toBe(false);
 				expect(result.error?.code).toBe('NOT_IMPLEMENTED');
-				expect(result.error?.message).toContain('Midtrans integration not yet implemented');
+				expect(result.error?.message).toContain('snapToken');
 			});
 		});
 
 		describe('checkStatus', () => {
-			it('[P0] should throw not implemented error', async () => {
+			it('[P0] should call Midtrans status API and throw on network failure', async () => {
+				// Without a valid server key and network, checkStatus throws
 				await expect(
-					gateway.checkStatus('txn-123')
-				).rejects.toThrow('Midtrans integration not yet implemented');
+					gateway.checkStatus('SVN-2026-0001')
+				).rejects.toThrow();
 			});
 		});
 
 		describe('handleWebhook', () => {
-			it('[P0] should throw not implemented error', async () => {
+			it('[P0] should throw invalid signature error for unsigned payload', async () => {
 				await expect(
 					gateway.handleWebhook({}, {})
-				).rejects.toThrow('Midtrans integration not yet implemented');
+				).rejects.toThrow('Invalid signature');
 			});
 		});
 
 		describe('validateWebhookSignature', () => {
-			it('[P0] should throw not implemented error', () => {
-				expect(() =>
-					gateway.validateWebhookSignature({}, 'signature')
-				).toThrow('Midtrans integration not yet implemented');
+			it('[P0] should return false for payload missing required fields', () => {
+				const result = gateway.validateWebhookSignature({}, 'signature');
+
+				expect(result).toBe(false);
 			});
 		});
 

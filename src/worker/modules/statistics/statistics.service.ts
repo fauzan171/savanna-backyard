@@ -397,11 +397,13 @@ export class StatisticsService {
 		const daysInPeriod = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
 		const totalAvailableDays = vehicleCounts.total * daysInPeriod;
 
+		const maintenanceDaysByVehicle = await this.repo.getMaintenanceDaysByVehicle(startDate, endDate);
+
 		const byVehicle = utilization.byVehicle.map((v) => ({
 			...v,
 			availableDays: daysInPeriod,
 			utilizationRate: daysInPeriod > 0 ? Math.round((v.rentalDays / daysInPeriod) * 10000) / 100 : 0,
-			maintenanceDays: 0, // TODO: Calculate from maintenance records
+			maintenanceDays: maintenanceDaysByVehicle[v.vehicleId] ?? 0,
 		}));
 
 		const byType = vehiclesByType.map((t) => ({
@@ -439,25 +441,34 @@ export class StatisticsService {
 		const startDate = query.startDate ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 		const endDate = query.endDate ?? new Date().toISOString().split('T')[0];
 
-		const [leadCounts, bySource, byPriority] = await Promise.all([
+		const [leadCounts, bySource, bySourceDetailed, byPriorityDetailed, revenueBySource, trend] = await Promise.all([
 			this.repo.getLeadCountsByStatus(startDate, endDate),
 			this.repo.getLeadsBySource(startDate, endDate),
-			this.repo.getLeadsByPriority(startDate, endDate),
+			this.repo.getLeadsBySourceDetailed(startDate, endDate),
+			this.repo.getLeadsByPriorityDetailed(startDate, endDate),
+			this.repo.getRevenueByLeadSource(startDate, endDate),
+			this.repo.getLeadWeeklyTrend(startDate, endDate),
 		]);
 
 		const inProgress = (leadCounts.byStatus['New'] ?? 0) + (leadCounts.byStatus['Contacted'] ?? 0) + (leadCounts.byStatus['Negotiating'] ?? 0);
 
-		// Extend bySource with additional fields
-		const bySourceExtended = bySource.map((s) => ({
-			source: s.source,
-			total: s.count,
-			converted: s.converted,
-			lost: 0, // TODO: Calculate
-			inProgress: Math.round(s.count * 0.5), // Placeholder
-			conversionRate: s.conversionRate,
-			avgDaysToConvert: 0, // Deferred
-			revenue: 0, // TODO: Calculate from converted bookings
-		}));
+		// Build a lookup from the detailed source data
+		const sourceDetailMap = new Map(bySourceDetailed.map(s => [s.source, s]));
+
+		// Extend bySource with additional fields from detailed data
+		const bySourceExtended = bySource.map((s) => {
+			const detail = sourceDetailMap.get(s.source);
+			return {
+				source: s.source,
+				total: s.count,
+				converted: s.converted,
+				lost: detail?.lost ?? 0,
+				inProgress: detail?.inProgress ?? 0,
+				conversionRate: s.conversionRate,
+				avgDaysToConvert: 0, // Deferred - requires converted_at timestamp analysis
+				revenue: revenueBySource[s.source] ?? 0,
+			};
+		});
 
 		return {
 			reportInfo: this.getReportInfo('Lead Source Analysis Report', startDate, endDate),
@@ -469,13 +480,13 @@ export class StatisticsService {
 				overallConversionRate: leadCounts.total > 0 ? Math.round((leadCounts.converted / leadCounts.total) * 10000) / 100 : 0,
 			},
 			bySource: bySourceExtended,
-			byPriority: Object.entries(byPriority).map(([priority, total]) => ({
-				priority,
-				total,
-				converted: Math.round(total * 0.3), // Placeholder
-				conversionRate: 30, // Placeholder
+			byPriority: byPriorityDetailed.map(p => ({
+				priority: p.priority,
+				total: p.total,
+				converted: p.converted,
+				conversionRate: p.conversionRate,
 			})),
-			trend: [], // TODO: Implement weekly trend
+			trend,
 		};
 	}
 
@@ -486,10 +497,12 @@ export class StatisticsService {
 		const startDate = query.startDate ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 		const endDate = query.endDate ?? new Date().toISOString().split('T')[0];
 
-		const [paymentAmounts, byMethod, overduePayments] = await Promise.all([
+		const [paymentAmounts, byMethod, overduePayments, dailyBreakdown, methodCounts] = await Promise.all([
 			this.repo.getPaymentAmountsByStatus(startDate, endDate),
 			this.repo.getPaymentsByMethod(startDate, endDate),
 			this.repo.getOverduePayments(),
+			this.repo.getPaymentDailyBreakdown(startDate, endDate),
+			this.repo.getRevenueByPaymentMethod(startDate, endDate),
 		]);
 
 		const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -500,12 +513,18 @@ export class StatisticsService {
 		const totalExpected = paymentAmounts.totalReceived + paymentAmounts.totalPending;
 		const collectionRate = totalExpected > 0 ? Math.round((paymentAmounts.totalReceived / totalExpected) * 10000) / 100 : 0;
 
-		const byMethodExtended = Object.entries(byMethod).map(([method, total]) => ({
-			method,
-			total,
-			count: Math.round(total / 1000000), // Placeholder
-			avgAmount: total > 0 ? Math.round(total / Math.max(1, Math.round(total / 1000000))) : 0,
-		}));
+		// Build a lookup for payment counts by method
+		const methodCountMap = new Map(methodCounts.map(m => [m.method, m.count]));
+
+		const byMethodExtended = Object.entries(byMethod).map(([method, total]) => {
+			const count = methodCountMap.get(method as keyof typeof byMethod) ?? 0;
+			return {
+				method,
+				total,
+				count,
+				avgAmount: count > 0 ? Math.round(total / count) : 0,
+			};
+		});
 
 		return {
 			reportInfo: this.getReportInfo('Payment Report', startDate, endDate),
@@ -518,7 +537,7 @@ export class StatisticsService {
 			},
 			byStatus: paymentAmounts.byStatus,
 			byMethod: byMethodExtended,
-			dailyBreakdown: [], // TODO: Implement daily breakdown
+			dailyBreakdown,
 		};
 	}
 

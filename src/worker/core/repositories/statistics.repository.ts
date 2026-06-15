@@ -63,7 +63,7 @@ export class StatisticsRepository {
 				)
 			)
 			.groupBy(sql`strftime('${sql.raw(dateFormat)}', ${bookings.startDate})`)
-			.orderBy(asc(sql`date`));
+			.orderBy(asc(sql`strftime('${sql.raw(dateFormat)}', ${bookings.startDate})`));
 
 		return result.map((r) => ({
 			date: r.date,
@@ -797,7 +797,7 @@ export class StatisticsRepository {
 				plateNumber: vehicles.plateNumber,
 				type: vehicles.type,
 				rentalDays:
-					sql<number>`SUM(CASE WHEN ${bookings.status} IN ('Confirmed', 'Active', 'Completed') THEN julianday(MIN(${bookings.endDate}, '${sql.raw(endDate)}') - MAX(${bookings.startDate}, '${sql.raw(startDate)}') + 1 ELSE 0 END)`,
+					sql<number>`SUM(CASE WHEN ${bookings.status} IN ('Confirmed', 'Active', 'Completed') THEN MAX(0, CAST(julianday(MIN(${bookings.endDate}, '${sql.raw(endDate)}')) AS REAL) - CAST(julianday(MAX(${bookings.startDate}, '${sql.raw(startDate)}')) AS REAL) + 1) ELSE 0 END)`,
 				revenue: sum(bookings.totalAmount),
 			})
 			.from(vehicles)
@@ -819,5 +819,246 @@ export class StatisticsRepository {
 		});
 
 		return { totalRentalDays, byVehicle };
+	}
+
+	/**
+	 * Get maintenance days per vehicle within a date range
+	 */
+	async getMaintenanceDaysByVehicle(
+		startDate: string,
+		endDate: string
+	): Promise<Record<string, number>> {
+		// Calculate maintenance days per vehicle, clamped to the report date range
+		const result = await this.db
+			.select({
+				vehicleId: maintenanceRecords.vehicleId,
+				maintenanceDays: sql<number>`SUM(
+					MAX(0,
+						CAST(julianday(MIN(${maintenanceRecords.endDate}, '${sql.raw(endDate)}')) AS REAL) -
+						CAST(julianday(MAX(${maintenanceRecords.startDate}, '${sql.raw(startDate)}')) AS REAL) + 1
+					)
+				)`,
+			})
+			.from(maintenanceRecords)
+			.where(
+				and(
+					lte(maintenanceRecords.startDate, endDate),
+					gte(maintenanceRecords.endDate, startDate)
+				)
+			)
+			.groupBy(maintenanceRecords.vehicleId);
+
+		const byVehicle: Record<string, number> = {};
+		for (const r of result) {
+			byVehicle[r.vehicleId] = Math.max(0, Math.round(Number(r.maintenanceDays) ?? 0));
+		}
+		return byVehicle;
+	}
+
+	/**
+	 * Get leads grouped by source with detailed status breakdown
+	 */
+	async getLeadsBySourceDetailed(
+		startDate?: string,
+		endDate?: string
+	): Promise<Array<{ source: string; total: number; converted: number; lost: number; inProgress: number; conversionRate: number }>> {
+		const conditions = [];
+		if (startDate) conditions.push(gte(leads.createdAt, startDate));
+		if (endDate) conditions.push(lte(leads.createdAt, `${endDate}T23:59:59`));
+
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+		const result = await this.db
+			.select({
+				source: leads.source,
+				status: leads.status,
+				count: count(),
+			})
+			.from(leads)
+			.where(whereClause)
+			.groupBy(leads.source, leads.status);
+
+		const bySource: Record<string, { total: number; converted: number; lost: number; inProgress: number }> = {};
+		for (const r of result) {
+			if (!bySource[r.source]) {
+				bySource[r.source] = { total: 0, converted: 0, lost: 0, inProgress: 0 };
+			}
+			bySource[r.source].total += Number(r.count);
+			if (r.status === 'Converted') {
+				bySource[r.source].converted += Number(r.count);
+			} else if (r.status === 'Lost') {
+				bySource[r.source].lost += Number(r.count);
+			} else if (['New', 'Contacted', 'Negotiating'].includes(r.status)) {
+				bySource[r.source].inProgress += Number(r.count);
+			}
+		}
+
+		return Object.entries(bySource).map(([source, data]) => ({
+			source,
+			total: data.total,
+			converted: data.converted,
+			lost: data.lost,
+			inProgress: data.inProgress,
+			conversionRate: data.total > 0 ? Math.round((data.converted / data.total) * 10000) / 100 : 0,
+		}));
+	}
+
+	/**
+	 * Get leads grouped by priority with converted counts
+	 */
+	async getLeadsByPriorityDetailed(
+		startDate?: string,
+		endDate?: string
+	): Promise<Array<{ priority: string; total: number; converted: number; conversionRate: number }>> {
+		const conditions = [];
+		if (startDate) conditions.push(gte(leads.createdAt, startDate));
+		if (endDate) conditions.push(lte(leads.createdAt, `${endDate}T23:59:59`));
+
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+		const result = await this.db
+			.select({
+				priority: leads.priority,
+				status: leads.status,
+				count: count(),
+			})
+			.from(leads)
+			.where(whereClause)
+			.groupBy(leads.priority, leads.status);
+
+		const byPriority: Record<string, { total: number; converted: number }> = {};
+		for (const r of result) {
+			if (!byPriority[r.priority]) {
+				byPriority[r.priority] = { total: 0, converted: 0 };
+			}
+			byPriority[r.priority].total += Number(r.count);
+			if (r.status === 'Converted') {
+				byPriority[r.priority].converted += Number(r.count);
+			}
+		}
+
+		return Object.entries(byPriority).map(([priority, data]) => ({
+			priority,
+			total: data.total,
+			converted: data.converted,
+			conversionRate: data.total > 0 ? Math.round((data.converted / data.total) * 10000) / 100 : 0,
+		}));
+	}
+
+	/**
+	 * Get revenue from converted leads grouped by source
+	 */
+	async getRevenueByLeadSource(
+		startDate?: string,
+		endDate?: string
+	): Promise<Record<string, number>> {
+		const conditions = [
+			eq(leads.status, 'Converted'),
+			inArray(bookings.status, ['Confirmed', 'Active', 'Completed']),
+		];
+		if (startDate) conditions.push(gte(bookings.startDate, startDate));
+		if (endDate) conditions.push(lte(bookings.endDate, endDate));
+
+		const result = await this.db
+			.select({
+				source: leads.source,
+				revenue: sum(bookings.totalAmount),
+			})
+			.from(leads)
+			.innerJoin(customers, eq(leads.phone, customers.phone))
+			.innerJoin(bookings, eq(customers.id, bookings.customerId))
+			.where(and(...conditions))
+			.groupBy(leads.source);
+
+		const bySource: Record<string, number> = {};
+		for (const r of result) {
+			bySource[r.source] = Number(r.revenue ?? 0);
+		}
+		return bySource;
+	}
+
+	/**
+	 * Get weekly lead trend (new leads and conversions per week)
+	 */
+	async getLeadWeeklyTrend(
+		startDate?: string,
+		endDate?: string
+	): Promise<Array<{ week: string; newLeads: number; converted: number; conversionRate: number }>> {
+		const conditions = [];
+		if (startDate) conditions.push(gte(leads.createdAt, startDate));
+		if (endDate) conditions.push(lte(leads.createdAt, `${endDate}T23:59:59`));
+
+		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+		const result = await this.db
+			.select({
+				week: sql<string>`strftime('%Y-W%W', ${leads.createdAt})`,
+				status: leads.status,
+				count: count(),
+			})
+			.from(leads)
+			.where(whereClause)
+			.groupBy(sql`strftime('%Y-W%W', ${leads.createdAt})`, leads.status)
+			.orderBy(asc(sql`strftime('%Y-W%W', ${leads.createdAt})`));
+
+		const byWeek: Record<string, { newLeads: number; converted: number }> = {};
+		for (const r of result) {
+			if (!byWeek[r.week]) {
+				byWeek[r.week] = { newLeads: 0, converted: 0 };
+			}
+			byWeek[r.week].newLeads += Number(r.count);
+			if (r.status === 'Converted') {
+				byWeek[r.week].converted += Number(r.count);
+			}
+		}
+
+		return Object.entries(byWeek).map(([week, data]) => ({
+			week,
+			newLeads: data.newLeads,
+			converted: data.converted,
+			conversionRate: data.newLeads > 0 ? Math.round((data.converted / data.newLeads) * 10000) / 100 : 0,
+		}));
+	}
+
+	/**
+	 * Get payment daily breakdown (received vs pending per day)
+	 */
+	async getPaymentDailyBreakdown(
+		startDate: string,
+		endDate: string
+	): Promise<Array<{ date: string; received: number; pending: number }>> {
+		const result = await this.db
+			.select({
+				date: sql<string>`strftime('%Y-%m-%d', ${payments.createdAt})`,
+				status: payments.status,
+				amount: sum(payments.amount),
+			})
+			.from(payments)
+			.where(
+				and(
+					gte(payments.createdAt, startDate),
+					lte(payments.createdAt, `${endDate}T23:59:59`)
+				)
+			)
+			.groupBy(sql`strftime('%Y-%m-%d', ${payments.createdAt})`, payments.status)
+			.orderBy(asc(sql`strftime('%Y-%m-%d', ${payments.createdAt})`));
+
+		const byDate: Record<string, { received: number; pending: number }> = {};
+		for (const r of result) {
+			if (!byDate[r.date]) {
+				byDate[r.date] = { received: 0, pending: 0 };
+			}
+			if (r.status === 'Verified') {
+				byDate[r.date].received += Number(r.amount ?? 0);
+			} else if (r.status === 'Pending') {
+				byDate[r.date].pending += Number(r.amount ?? 0);
+			}
+		}
+
+		return Object.entries(byDate).map(([date, data]) => ({
+			date,
+			received: data.received,
+			pending: data.pending,
+		}));
 	}
 }

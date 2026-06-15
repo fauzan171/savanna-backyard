@@ -200,6 +200,17 @@ export class VehiclesService {
       // Skip inactive vehicles
       if (vehicle.status === "Inactive") continue;
 
+      // If vehicle is already in maintenance status, mark as maintenance
+      if (vehicle.status === "Maintenance") {
+        maintenanceVehicles.push({
+          id: vehicle.id,
+          name: vehicle.name,
+          reason: "Vehicle is under maintenance",
+          maintenanceEndDate: null,
+        });
+        continue;
+      }
+
       // Check maintenance conflicts
       let maintenanceConflict = null;
       if (this.maintenanceRepo) {

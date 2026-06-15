@@ -7,6 +7,25 @@ import type {
   CreatePublicBookingRequest,
 } from "./public-api.dto";
 
+/**
+ * Safely parse a JSON string column that may contain plain text.
+ * Returns the fallback if parsing fails.
+ */
+function safeJsonParse<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Safely parse a JSON string column into a string array. */
+function safeJsonParseStringArray(value: string | null | undefined): string[] {
+  const parsed = safeJsonParse<unknown>(value, []);
+  return Array.isArray(parsed) ? parsed.map((v) => String(v)) : [];
+}
+
 export class PublicApiService {
   constructor(
     private repo: PublicApiRepository,
@@ -342,17 +361,23 @@ export class PublicApiService {
     description: string | null; available: boolean;
   }>> {
     const vehicles = await this.repo.getPublicVehicles();
-    return vehicles.map(v => ({
-      id: v.id,
-      name: v.name,
-      type: v.type,
-      category: v.category,
-      image: v.photoUrl,
-      dailyRateIdr: v.dailyRateIdr,
-      specs: v.specs ? JSON.parse(v.specs) : null,
-      description: v.description,
-      available: v.status === 'Available',
-    }));
+    return vehicles.map((v) => {
+      const parsedSpecs = safeJsonParse<Record<string, string> | null>(
+        typeof v.specs === "string" ? v.specs : null,
+        v.specs ? { details: String(v.specs) } : null,
+      );
+      return {
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        category: v.category,
+        image: v.photoUrl,
+        dailyRateIdr: v.dailyRateIdr,
+        specs: parsedSpecs,
+        description: v.description,
+        available: v.status === "Available",
+      };
+    });
   }
 
   // 7. Get public packages
@@ -391,8 +416,8 @@ export class PublicApiService {
       description: t.description,
       dailyPrice: t.dailyPrice,
       multiDayPrice: t.multiDayPrice,
-      features: JSON.parse(t.features),
-      notIncluded: JSON.parse(t.notIncluded),
+      features: safeJsonParseStringArray(t.features),
+      notIncluded: safeJsonParseStringArray(t.notIncluded),
       highlighted: t.highlighted,
       icon: t.icon,
     }));
@@ -474,7 +499,7 @@ export class PublicApiService {
       blogContent: {
         overview: trail.blogOverview,
         tips: trail.blogTips,
-        gallery: trail.blogGallery ? JSON.parse(trail.blogGallery) : [],
+        gallery: safeJsonParse<string[]>(trail.blogGallery, []),
         gpxUrl: trail.gpxUrl,
         estimatedDuration: trail.estimatedDuration,
         distance: trail.distance,

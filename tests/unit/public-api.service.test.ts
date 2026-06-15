@@ -18,6 +18,7 @@ describe('PublicApiService', () => {
 			getActiveVehicles: vi.fn(),
 			getVehicleById: vi.fn(),
 			getVehicleTypes: vi.fn(),
+			isVehicleAvailableForDates: vi.fn().mockResolvedValue(true),
 		} as unknown as PublicApiRepository;
 
 		mockConfigRepo = {
@@ -253,11 +254,11 @@ describe('PublicApiService', () => {
 			expect(vehicle).toHaveProperty('id');
 			expect(vehicle).toHaveProperty('name');
 			expect(vehicle).toHaveProperty('type');
-			expect(vehicle).toHaveProperty('dailyRate');
+			expect(vehicle).toHaveProperty('dailyRateIdr');
 			expect(vehicle).not.toHaveProperty('plateNumber');
 			expect(vehicle).not.toHaveProperty('totalKm');
 			expect(vehicle).not.toHaveProperty('status');
-		});
+			});
 
 		// ============================================
 		// P0: Error Cases

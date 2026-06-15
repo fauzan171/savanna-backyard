@@ -31,6 +31,12 @@ const mockRepo = {
 	getTopCustomers: vi.fn(),
 	getCustomersByBookingCount: vi.fn(),
 	getFleetUtilization: vi.fn(),
+	getMaintenanceDaysByVehicle: vi.fn().mockResolvedValue({}),
+	getLeadsBySourceDetailed: vi.fn().mockResolvedValue([]),
+	getLeadsByPriorityDetailed: vi.fn().mockResolvedValue([]),
+	getRevenueByLeadSource: vi.fn().mockResolvedValue({}),
+	getLeadWeeklyTrend: vi.fn().mockResolvedValue([]),
+	getPaymentDailyBreakdown: vi.fn().mockResolvedValue([]),
 };
 
 describe('StatisticsService', () => {
