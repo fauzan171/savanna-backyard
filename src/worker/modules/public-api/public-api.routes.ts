@@ -25,7 +25,10 @@ export const publicApiServicesMiddleware = () => async (c: Context<PublicApiEnv>
 	const db = createDb(c.env.DB);
 	const publicApiRepository = new PublicApiRepository(db);
 	const configRepository = new ConfigRepository(db);
-	const publicApiService = new PublicApiService(publicApiRepository, configRepository);
+	// Derive the API origin (scheme + host) so the service can resolve relative
+	// upload paths into absolute URLs for cross-origin clients (landing page).
+	const baseUrl = new URL(c.req.url).origin;
+	const publicApiService = new PublicApiService(publicApiRepository, configRepository, baseUrl);
 	c.set('publicApiService', publicApiService);
 	await next();
 };

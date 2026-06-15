@@ -26,11 +26,32 @@ function safeJsonParseStringArray(value: string | null | undefined): string[] {
   return Array.isArray(parsed) ? parsed.map((v) => String(v)) : [];
 }
 
+/**
+ * Resolve a stored URL into an absolute URL consumable by external clients.
+ *
+ * Stored values may be relative paths (e.g. `/api/v1/uploads/...`) or already
+ * absolute URLs. For the public API, relative paths must be prefixed with the
+ * API origin so cross-origin clients (landing page) can load the assets.
+ */
+function resolveUrl(value: string | null | undefined, baseUrl: string): string | null {
+  if (!value) return null;
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  // Relative path -> prefix with API origin
+  return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`;
+}
+
 export class PublicApiService {
+  /** Base URL of the API origin, e.g. "https://api.example.com". Used to resolve relative upload paths. */
+  private readonly baseUrl: string;
+
   constructor(
     private repo: PublicApiRepository,
     private configRepo: ConfigRepository,
-  ) {}
+    baseUrl = '',
+  ) {
+    // Strip trailing slash so resolveUrl can always prepend cleanly
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
+  }
 
   // 1. Submit Lead
   async submitLead(
@@ -96,7 +117,7 @@ export class PublicApiService {
         name: v.name,
         type: v.type,
         dailyRateIdr: v.dailyRateIdr,
-        photoUrl: v.photoUrl,
+        photoUrl: resolveUrl(v.photoUrl, this.baseUrl),
       }));
 
     const unavailable = [
@@ -182,7 +203,7 @@ export class PublicApiService {
       model: vehicle.model,
       year: vehicle.year,
       dailyRate: vehicle.dailyRateIdr,
-      photoUrl: vehicle.photoUrl,
+      photoUrl: resolveUrl(vehicle.photoUrl, this.baseUrl),
       specifications: { description: null },
     };
   }
@@ -371,7 +392,7 @@ export class PublicApiService {
         name: v.name,
         type: v.type,
         category: v.category,
-        image: v.photoUrl,
+        image: resolveUrl(v.photoUrl, this.baseUrl),
         dailyRateIdr: v.dailyRateIdr,
         specs: parsedSpecs,
         description: v.description,
@@ -393,7 +414,7 @@ export class PublicApiService {
       name: p.name,
       tagline: p.tagline,
       description: p.description,
-      image: p.image,
+      image: resolveUrl(p.image, this.baseUrl),
       duration: p.duration,
       distance: p.distance,
       groupSize: p.groupSize,
@@ -442,7 +463,7 @@ export class PublicApiService {
         location: r.location,
         rating: r.rating,
         text: r.text,
-        avatar: r.avatar,
+        avatar: resolveUrl(r.avatar, this.baseUrl),
         createdAt: r.createdAt,
       })),
       meta: { total: result.total, averageRating: result.averageRating },
@@ -465,8 +486,8 @@ export class PublicApiService {
       elevation: t.elevation,
       difficulty: t.difficulty,
       recommended: t.recommended,
-      image: t.image,
-      mapImage: t.mapImage,
+      image: resolveUrl(t.image, this.baseUrl),
+      mapImage: resolveUrl(t.mapImage, this.baseUrl),
     }));
   }
 
@@ -494,13 +515,13 @@ export class PublicApiService {
       elevation: trail.elevation,
       difficulty: trail.difficulty,
       recommended: trail.recommended,
-      image: trail.image,
-      mapImage: trail.mapImage,
+      image: resolveUrl(trail.image, this.baseUrl),
+      mapImage: resolveUrl(trail.mapImage, this.baseUrl),
       blogContent: {
         overview: trail.blogOverview,
         tips: trail.blogTips,
-        gallery: safeJsonParse<string[]>(trail.blogGallery, []),
-        gpxUrl: trail.gpxUrl,
+        gallery: safeJsonParse<string[]>(trail.blogGallery, []).map((g) => resolveUrl(g, this.baseUrl)).filter((g): g is string => g !== null),
+        gpxUrl: resolveUrl(trail.gpxUrl, this.baseUrl),
         estimatedDuration: trail.estimatedDuration,
         distance: trail.distance,
         bestTime: trail.bestTime,
