@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlOrPath } from '@/worker/core/schemas/url';
 
 // Create customer schema
 export const createCustomerSchema = z.object({
@@ -8,7 +9,7 @@ export const createCustomerSchema = z.object({
 	address: z.string().max(500).optional().nullable(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
 	identityNumber: z.string().max(50).optional().nullable(),
-	identityPhotoUrl: z.string().url().optional().nullable(),
+	identityPhotoUrl: urlOrPath.optional().nullable(),
 	notes: z.string().max(2000).optional().nullable(),
 });
 
@@ -20,7 +21,7 @@ export const updateCustomerSchema = z.object({
 	address: z.string().max(500).optional().nullable(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
 	identityNumber: z.string().max(50).optional().nullable(),
-	identityPhotoUrl: z.string().url().optional().nullable(),
+	identityPhotoUrl: urlOrPath.optional().nullable(),
 	notes: z.string().max(2000).optional().nullable(),
 });
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { urlOrPath } from '@/worker/core/schemas/url';
 
 // Create vehicle schema
 export const createVehicleSchema = z.object({
@@ -10,7 +11,7 @@ export const createVehicleSchema = z.object({
 	year: z.number().int().min(1990).max(2030).optional().nullable(),
 	dailyRateIdr: z.number().positive('Daily rate must be positive'),
 	dailyRateUsd: z.number().positive().optional().nullable(),
-	photoUrl: z.string().url().optional().nullable(),
+	photoUrl: urlOrPath.optional().nullable(),
 });
 
 // Update vehicle schema (all fields optional except plateNumber and dailyRateIdr which have defaults)
@@ -24,7 +25,7 @@ export const updateVehicleSchema = z.object({
 	dailyRateIdr: z.number().positive().optional(),
 	dailyRateUsd: z.number().positive().optional().nullable(),
 	totalKm: z.number().optional().nullable(),
-	photoUrl: z.string().url().optional().nullable(),
+	photoUrl: urlOrPath.optional().nullable(),
 });
 
 // Update status schema

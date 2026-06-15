@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { urlOrPath } from '@/worker/core/schemas/url';
 
 // Photo schema
 const maintenancePhotoSchema = z.object({
-	url: z.string().url('Invalid photo URL'),
+	url: urlOrPath,
 	caption: z.string().max(200).optional(),
 	uploadedAt: z.string().optional(),
 });
