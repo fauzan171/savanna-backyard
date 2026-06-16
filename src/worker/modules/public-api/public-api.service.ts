@@ -335,14 +335,6 @@ export class PublicApiService {
       totalAmount,
       paymentError: paymentError ?? (paymentPageUrl ? null : 'paymentPageUrl is null — gateway may not have been called'),
     };
-
-    return {
-      bookingId: booking.id,
-      bookingNumber: booking.bookingNumber,
-      paymentPageUrl,
-      qrString,
-      totalAmount,
-    };
   }
 
   async isPublicApiEnabled(): Promise<boolean> {
