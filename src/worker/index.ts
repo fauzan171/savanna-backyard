@@ -123,4 +123,25 @@ app.get('/api/*', (c) => {
 	return c.redirect(path);
 });
 
+// Serve images from R2 (legacy /images/* paths from seed data)
+app.get('/images/:key{.+}', async (c) => {
+	const bucket = c.env.UPLOADS;
+	if (!bucket) {
+		return c.json({ success: false, error: { code: 'NO_BUCKET', message: 'R2 bucket not configured' } }, 500);
+	}
+
+	const key = c.req.param('key');
+	const object = await bucket.get(key);
+
+	if (!object) {
+		return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Image not found' } }, 404);
+	}
+
+	const headers = new Headers();
+	headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+	headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+	return new Response(object.body, { headers });
+});
+
 export default app;
