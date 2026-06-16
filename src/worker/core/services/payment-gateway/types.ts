@@ -20,7 +20,8 @@ export interface CreatePaymentResponse {
 	success: boolean;
 	transactionId?: string;
 	paymentUrl?: string;        // For gateway redirects
-	qrCodeUrl?: string;         // For QRIS
+	qrCodeUrl?: string;         // For QRIS QR code image URL
+	qrString?: string;          // For QRIS inline QR (raw string to render QR code)
 	vaNumber?: string;          // For virtual account
 	expiresAt?: string;
 	error?: {

@@ -117,10 +117,15 @@ export class XenditGateway implements PaymentGateway {
 				(actions?.find((a) => a.url?.includes('invoice'))?.url) ??
 				null;
 
+			// Extract QR string for inline QRIS rendering
+			const qrCode = data.qr_code as { qr_string?: string } | undefined;
+			const qrString = qrCode?.qr_string ?? undefined;
+
 			return {
 				success: true,
 				transactionId: (data.id as string) ?? externalId,
 				paymentUrl: invoiceUrl ?? undefined,
+				qrString,
 				expiresAt: (data.expiry_date as string) ?? undefined,
 			};
 		} catch (error) {

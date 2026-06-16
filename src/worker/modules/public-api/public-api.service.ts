@@ -221,6 +221,7 @@ export class PublicApiService {
     bookingId: string;
     bookingNumber: string;
     paymentPageUrl: string | null;
+    qrString: string | null;
     totalAmount: number;
   }> {
     // Validate dates
@@ -285,6 +286,7 @@ export class PublicApiService {
 
     // Request payment page via the configured gateway
     let paymentPageUrl: string | null = null;
+    let qrString: string | null = null;
 
     const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor, gatewayConfig.config);
 
@@ -303,13 +305,16 @@ export class PublicApiService {
           description: `Rental ${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
         });
 
-        if (result.success && result.paymentUrl) {
-          paymentPageUrl = result.paymentUrl;
+        if (result.success) {
+          paymentPageUrl = result.paymentUrl ?? null;
+          qrString = result.qrString ?? null;
 
           // Save payment page URL to booking
-          await this.repo.updateBooking(booking.id, {
-            paymentPageUrl,
-          });
+          if (paymentPageUrl) {
+            await this.repo.updateBooking(booking.id, {
+              paymentPageUrl,
+            });
+          }
         } else if (!result.success) {
           console.error(`${gateway.name} createPayment error:`, result.error?.message);
         }
@@ -322,6 +327,7 @@ export class PublicApiService {
       bookingId: booking.id,
       bookingNumber: booking.bookingNumber,
       paymentPageUrl,
+      qrString,
       totalAmount,
     };
   }
