@@ -1,6 +1,7 @@
 import { Hono, Context } from 'hono';
 import { createDb } from '@/worker/core/database';
 import { WebhooksService } from './webhooks.service';
+import { EmailService } from '@/worker/core/services/email.service';
 
 type WebhookEnv = { Bindings: Env };
 
@@ -81,7 +82,16 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 		return c.json({ success: false, message: 'Invalid signature' }, 401);
 	}
 
-	const service = new WebhooksService(createDb(c.env.DB));
+	// Initialize email service if Resend API key is configured
+	let emailService: EmailService | undefined;
+	if (c.env.RESEND_API_KEY) {
+		emailService = new EmailService({
+			apiKey: c.env.RESEND_API_KEY,
+			fromEmail: c.env.EMAIL_FROM ?? 'Savanna Bromo <noreply@savannabromo.com>',
+		});
+	}
+
+	const service = new WebhooksService(createDb(c.env.DB), emailService);
 	await service.handleXenditNotification(data);
 
 	return c.json({ success: true, message: 'OK' });

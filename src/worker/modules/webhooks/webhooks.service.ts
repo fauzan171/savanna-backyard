@@ -1,6 +1,7 @@
-import { bookings, payments } from '@/worker/core/database/schema';
+import { bookings, payments, customers, vehicles } from '@/worker/core/database/schema';
 import { eq } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
+import type { EmailService } from '@/worker/core/services/email.service';
 
 // Status mapping from Midtrans transaction_status to booking status + payment_status
 const MIDTRANS_STATUS_MAP: Record<string, { bookingStatus: string; paymentStatus: string }> = {
@@ -30,7 +31,10 @@ const XENDIT_STATUS_MAP: Record<string, { bookingStatus: string; paymentStatus: 
 };
 
 export class WebhooksService {
-	constructor(private db: Database) {}
+	constructor(
+		private db: Database,
+		private emailService?: EmailService,
+	) {}
 
 	async verifySignature(data: Record<string, string>, serverKey: string): Promise<boolean> {
 		const raw = `${data.order_id}${data.status_code}${data.gross_amount}${serverKey}`;
@@ -212,7 +216,7 @@ export class WebhooksService {
 			})
 			.where(eq(bookings.id, booking.id));
 
-		// If payment successful, create payment record
+		// If payment successful, create payment record and send email
 		if (['PAID', 'SETTLED'].includes(invoiceStatus)) {
 			try {
 				const paymentId = crypto.randomUUID();
@@ -232,6 +236,52 @@ export class WebhooksService {
 				});
 			} catch (e) {
 				console.log('Payment record may already exist, skipping:', e);
+			}
+
+			// Send payment confirmation email
+			if (this.emailService) {
+				try {
+					// Fetch customer and vehicle details for email
+					const customerResult = await this.db
+						.select()
+						.from(customers)
+						.where(eq(customers.id, booking.customerId))
+						.limit(1);
+
+					const vehicleResult = await this.db
+						.select()
+						.from(vehicles)
+						.where(eq(vehicles.id, booking.vehicleId))
+						.limit(1);
+
+					const customer = customerResult[0];
+					const vehicle = vehicleResult[0];
+
+					if (customer?.email) {
+						const emailSent = await this.emailService.sendPaymentConfirmation({
+							customerName: customer.name,
+							customerEmail: customer.email,
+							bookingNumber: booking.bookingNumber,
+							vehicleName: vehicle?.name ?? 'Unknown Vehicle',
+							startDate: booking.startDate,
+							endDate: booking.endDate,
+							totalAmount: amount,
+							paymentMethod: paymentMethod === 'QRIS' ? 'QRIS' : 'Virtual Account',
+							paidAt: paidAt ?? now,
+						});
+
+						if (emailSent) {
+							console.log(`Payment confirmation email sent to ${customer.email}`);
+						} else {
+							console.error(`Failed to send payment confirmation email to ${customer.email}`);
+						}
+					} else {
+						console.log(`Customer email not available for booking ${booking.bookingNumber}`);
+					}
+				} catch (emailError) {
+					// Don't fail the webhook if email fails
+					console.error('Error sending payment confirmation email:', emailError);
+				}
 			}
 		}
 	}

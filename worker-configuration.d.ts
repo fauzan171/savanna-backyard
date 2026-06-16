@@ -35,6 +35,10 @@ declare namespace Cloudflare {
 		XENDIT_API_KEY?: string;
 		/** Xendit webhook verification token (Settings > Callbacks) */
 		XENDIT_WEBHOOK_TOKEN?: string;
+		/** Resend API key for sending emails */
+		RESEND_API_KEY?: string;
+		/** Sender email address for transactional emails */
+		EMAIL_FROM?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}
