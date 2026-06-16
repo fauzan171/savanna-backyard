@@ -223,6 +223,7 @@ export class PublicApiService {
     paymentPageUrl: string | null;
     qrString: string | null;
     totalAmount: number;
+    paymentError: string | null;
   }> {
     // Validate dates
     if (data.startDate >= data.endDate) {
@@ -289,6 +290,7 @@ export class PublicApiService {
     let qrString: string | null = null;
 
     const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor, gatewayConfig.config);
+    let paymentError: string | null = null;
 
     if (gateway.name !== 'manual') {
       try {
@@ -315,13 +317,24 @@ export class PublicApiService {
               paymentPageUrl,
             });
           }
-        } else if (!result.success) {
-          console.error(`${gateway.name} createPayment error:`, result.error?.message);
+        } else {
+          paymentError = result.error?.message ?? 'Unknown payment error';
+          console.error('[PublicAPI] Payment failed:', result.error);
         }
       } catch (error) {
-        console.error(`${gateway.name} createPayment exception:`, error);
+        paymentError = error instanceof Error ? error.message : String(error);
+        console.error('[PublicAPI] Payment exception:', error);
       }
     }
+
+    return {
+      bookingId: booking.id,
+      bookingNumber: booking.bookingNumber,
+      paymentPageUrl,
+      qrString,
+      totalAmount,
+      paymentError: paymentError ?? (paymentPageUrl ? null : 'paymentPageUrl is null — gateway may not have been called'),
+    };
 
     return {
       bookingId: booking.id,

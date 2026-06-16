@@ -66,9 +66,13 @@ export class XenditGateway implements PaymentGateway {
 	/**
 	 * Create a Xendit Invoice.
 	 * Returns invoice_url which the customer is redirected to for payment.
+	 *
+	 * API: POST https://api.xendit.co/v2/invoices
+	 * Docs: https://developers.xendit.co/api-reference/#create-invoice
 	 */
 	async createPayment(request: CreatePaymentRequest): Promise<CreatePaymentResponse> {
 		if (!this.apiKey) {
+			console.error('[Xendit] API key not configured');
 			return {
 				success: false,
 				error: { code: 'CONFIG_ERROR', message: 'Xendit API key not configured' },
@@ -91,8 +95,10 @@ export class XenditGateway implements PaymentGateway {
 			payment_methods: this.resolvePaymentMethods(request.method),
 		};
 
+		console.log('[Xendit] Creating invoice:', { externalId, amount: request.amount, method: request.method });
+
 		try {
-			const response = await fetch(`${this.baseUrl}/payment_requests`, {
+			const response = await fetch(`${this.baseUrl}/v2/invoices`, {
 				method: 'POST',
 				headers: {
 					'Authorization': this.getAuthHeader(),
@@ -103,19 +109,17 @@ export class XenditGateway implements PaymentGateway {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error('Xendit create invoice error:', response.status, errorText);
+				console.error('[Xendit] Create invoice failed:', response.status, errorText);
 				return {
 					success: false,
-					error: { code: 'GATEWAY_ERROR', message: `Xendit error: ${response.status}` },
+					error: { code: 'GATEWAY_ERROR', message: `Xendit error: ${response.status} - ${errorText}` },
 				};
 			}
 
 			const data = (await response.json()) as Record<string, unknown>;
-			const actions = data.actions as Array<{ url: string }> | undefined;
-			const invoiceUrl =
-				(data.invoice_url as string) ??
-				(actions?.find((a) => a.url?.includes('invoice'))?.url) ??
-				null;
+			console.log('[Xendit] Invoice created:', { id: data.id, invoice_url: data.invoice_url, status: data.status });
+
+			const invoiceUrl = (data.invoice_url as string) ?? null;
 
 			// Extract QR string for inline QRIS rendering
 			const qrCode = data.qr_code as { qr_string?: string } | undefined;
@@ -129,17 +133,17 @@ export class XenditGateway implements PaymentGateway {
 				expiresAt: (data.expiry_date as string) ?? undefined,
 			};
 		} catch (error) {
-			console.error('Xendit create invoice exception:', error);
+			console.error('[Xendit] Create invoice exception:', error);
 			return {
 				success: false,
-				error: { code: 'NETWORK_ERROR', message: 'Failed to connect to Xendit' },
+				error: { code: 'NETWORK_ERROR', message: `Failed to connect to Xendit: ${error}` },
 			};
 		}
 	}
 
 	/**
 	 * Check invoice status via Xendit API.
-	 * GET /payment_requests/{id}
+	 * GET /v2/invoices/{invoice_id}
 	 */
 	async checkStatus(invoiceId: string): Promise<CheckStatusResponse> {
 		if (!this.apiKey) {
@@ -147,7 +151,7 @@ export class XenditGateway implements PaymentGateway {
 		}
 
 		try {
-			const response = await fetch(`${this.baseUrl}/payment_requests/${invoiceId}`, {
+			const response = await fetch(`${this.baseUrl}/v2/invoices/${invoiceId}`, {
 				headers: {
 					'Authorization': this.getAuthHeader(),
 					'Content-Type': 'application/json',
@@ -156,7 +160,7 @@ export class XenditGateway implements PaymentGateway {
 
 			if (!response.ok) {
 				const errorText = await response.text();
-				console.error('Xendit status check error:', response.status, errorText);
+				console.error('[Xendit] Status check error:', response.status, errorText);
 				throw new Error(`Xendit status check failed: ${response.status}`);
 			}
 
