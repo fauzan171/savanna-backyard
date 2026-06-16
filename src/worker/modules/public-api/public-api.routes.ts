@@ -68,17 +68,46 @@ const createBookingHandler = async (c: Context<PublicApiEnv>) => {
 	const service = c.get('publicApiService');
 	const body = getValidatedBody<CreatePublicBookingRequest>(c);
 
-	const ifortepayConfig = {
-		merchantId: c.env.IFORTEPAY_MERCHANT_ID ?? '',
-		secretUnboundId: c.env.IFORTEPAY_SECRET_UNBOUND_ID ?? '',
-		hashKey: c.env.IFORTEPAY_HASH_KEY ?? '',
-		isProduction: c.env.ENVIRONMENT === 'production',
-		callbackUrl: c.env.IFORTEPAY_CALLBACK_URL ?? '',
-		successRedirectUrl: c.env.IFORTEPAY_SUCCESS_REDIRECT_URL ?? '',
-		failedRedirectUrl: c.env.IFORTEPAY_FAILED_REDIRECT_URL ?? '',
-	};
+	// Build gateway config based on PAYMENT_GATEWAY_VENDOR env var.
+	// Supports: 'xendit' (default), 'ifortepay', 'midtrans', 'manual'
+	const vendor = (c.env.PAYMENT_GATEWAY_VENDOR ?? 'xendit') as 'xendit' | 'ifortepay' | 'midtrans' | 'manual';
+	const isProduction = c.env.ENVIRONMENT === 'production';
 
-	const result = await service.createPublicBooking(body, ifortepayConfig);
+	let config: Record<string, string>;
+
+	switch (vendor) {
+		case 'ifortepay':
+			config = {
+				merchantId: c.env.IFORTEPAY_MERCHANT_ID ?? '',
+				secretUnboundId: c.env.IFORTEPAY_SECRET_UNBOUND_ID ?? '',
+				hashKey: c.env.IFORTEPAY_HASH_KEY ?? '',
+				isProduction: String(isProduction),
+				callbackUrl: c.env.IFORTEPAY_CALLBACK_URL ?? '',
+				successRedirectUrl: c.env.IFORTEPAY_SUCCESS_REDIRECT_URL ?? '',
+				failedRedirectUrl: c.env.IFORTEPAY_FAILED_REDIRECT_URL ?? '',
+			};
+			break;
+		case 'midtrans':
+			config = {
+				serverKey: c.env.MIDTRANS_SERVER_KEY ?? '',
+				clientKey: '',
+				isProduction: String(isProduction),
+			};
+			break;
+		case 'xendit':
+			config = {
+				apiKey: c.env.XENDIT_API_KEY ?? '',
+				webhookToken: c.env.XENDIT_WEBHOOK_TOKEN ?? '',
+				isProduction: String(isProduction),
+			};
+			break;
+		case 'manual':
+		default:
+			config = {};
+			break;
+	}
+
+	const result = await service.createPublicBooking(body, { vendor, config });
 
 	return c.json({
 		success: true,
@@ -180,6 +209,46 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 			return c.json({ success: false, message: 'Booking not found', error: { code: 'NOT_FOUND', message: 'Booking not found' } }, 404);
 		}
 		return c.json({ success: true, data: result });
+	});
+
+	// Get available payment methods and bank list
+	router.get('/payment-methods', async (c: Context<PublicApiEnv>) => {
+		const vendor = (c.env.PAYMENT_GATEWAY_VENDOR ?? 'xendit') as string;
+
+		const paymentMethods = {
+			qris: {
+				id: 'QRIS',
+				name: 'QRIS',
+				description: 'Scan QR code to pay with any e-wallet or bank app',
+				icon: 'qris',
+			},
+			bankTransfer: {
+				id: 'BankTransfer',
+				name: 'Virtual Account',
+				description: 'Pay via bank transfer to virtual account number',
+				icon: 'bank',
+				banks: [
+					{ code: 'BCA', name: 'Bank Central Asia', icon: 'bca' },
+					{ code: 'BNI', name: 'Bank Negara Indonesia', icon: 'bni' },
+					{ code: 'BRI', name: 'Bank Rakyat Indonesia', icon: 'bri' },
+					{ code: 'MANDIRI', name: 'Bank Mandiri', icon: 'mandiri' },
+				],
+			},
+			gateway: {
+				id: 'Gateway',
+				name: 'All Methods',
+				description: 'Choose from all available payment methods',
+				icon: 'gateway',
+			},
+		};
+
+		return c.json({
+			success: true,
+			data: {
+				gateway: vendor,
+				methods: paymentMethods,
+			},
+		});
 	});
 
 	return router;

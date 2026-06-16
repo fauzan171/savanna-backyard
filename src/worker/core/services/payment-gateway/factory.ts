@@ -36,6 +36,7 @@ export class PaymentGatewayFactory {
 			case 'xendit':
 				return new XenditGateway({
 					apiKey: config.apiKey ?? '',
+					webhookToken: config.webhookToken ?? '',
 					isProduction: config.isProduction === 'true',
 				});
 

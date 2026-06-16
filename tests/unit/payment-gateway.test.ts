@@ -286,6 +286,7 @@ describe('Payment Gateway Module', () => {
 		beforeEach(() => {
 			gateway = new XenditGateway({
 				apiKey: 'test-api-key',
+				webhookToken: 'test-webhook-token',
 				isProduction: false,
 			});
 		});
@@ -298,10 +299,31 @@ describe('Payment Gateway Module', () => {
 
 		describe('createPayment', () => {
 			// ============================================
-			// P0: Not Implemented
+			// P0: Config Error
 			// ============================================
 
-			it('[P0] should return not implemented error', async () => {
+			it('[P0] should return config error when API key not set', async () => {
+				const emptyGateway = new XenditGateway({
+					apiKey: '',
+					webhookToken: 'test-token',
+					isProduction: false,
+				});
+				const request: CreatePaymentRequest = {
+					amount: 500000,
+					currency: 'IDR',
+					method: 'QRIS',
+					bookingId: 'booking-123',
+				};
+
+				const result = await emptyGateway.createPayment(request);
+
+				expect(result.success).toBe(false);
+				expect(result.error?.code).toBe('CONFIG_ERROR');
+				expect(result.error?.message).toContain('API key not configured');
+			});
+
+			it('[P0] should return network error when API call fails', async () => {
+				// Without a real API endpoint, fetch will fail -> NETWORK_ERROR
 				const request: CreatePaymentRequest = {
 					amount: 500000,
 					currency: 'IDR',
@@ -311,33 +333,82 @@ describe('Payment Gateway Module', () => {
 
 				const result = await gateway.createPayment(request);
 
+				// Will fail since there's no real Xendit API to connect to
 				expect(result.success).toBe(false);
-				expect(result.error?.code).toBe('NOT_IMPLEMENTED');
-				expect(result.error?.message).toContain('Xendit integration not yet implemented');
+				expect(['NETWORK_ERROR', 'GATEWAY_ERROR']).toContain(result.error?.code);
 			});
 		});
 
 		describe('checkStatus', () => {
-			it('[P0] should throw not implemented error', async () => {
+			it('[P0] should throw error when API key not configured', async () => {
+				const emptyGateway = new XenditGateway({
+					apiKey: '',
+					webhookToken: 'test-token',
+					isProduction: false,
+				});
+
 				await expect(
-					gateway.checkStatus('txn-123')
-				).rejects.toThrow('Xendit integration not yet implemented');
+					emptyGateway.checkStatus('invoice-123')
+				).rejects.toThrow('Xendit API key not configured');
+			});
+
+			it('[P0] should throw on network failure', async () => {
+				// Without a valid API key and network, checkStatus throws
+				await expect(
+					gateway.checkStatus('invoice-123')
+				).rejects.toThrow();
 			});
 		});
 
 		describe('handleWebhook', () => {
-			it('[P0] should throw not implemented error', async () => {
+			it('[P0] should throw invalid signature error for unsigned payload', async () => {
 				await expect(
 					gateway.handleWebhook({}, {})
-				).rejects.toThrow('Xendit integration not yet implemented');
+				).rejects.toThrow('Invalid Xendit webhook signature');
+			});
+
+			it('[P0] should accept valid webhook with correct token', async () => {
+				const payload = {
+					id: 'invoice-123',
+					external_id: 'SVN-2026-0001',
+					status: 'PAID',
+					amount: 500000,
+					paid_amount: 500000,
+					paid_at: '2026-06-15T10:00:00Z',
+				};
+
+				const result = await gateway.handleWebhook(payload, {
+					'x-callback-token': 'test-webhook-token',
+				});
+
+				expect(result.success).toBe(true);
+				expect(result.status).toBe('Verified');
+				expect(result.amount).toBe(500000);
 			});
 		});
 
 		describe('validateWebhookSignature', () => {
-			it('[P0] should throw not implemented error', () => {
-				expect(() =>
-					gateway.validateWebhookSignature({}, 'signature')
-				).toThrow('Xendit integration not yet implemented');
+			it('[P0] should return false for incorrect signature', () => {
+				const result = gateway.validateWebhookSignature({}, 'wrong-signature');
+
+				expect(result).toBe(false);
+			});
+
+			it('[P0] should return true for correct signature', () => {
+				const result = gateway.validateWebhookSignature({}, 'test-webhook-token');
+
+				expect(result).toBe(true);
+			});
+
+			it('[P0] should return false when webhook token not configured', () => {
+				const emptyGateway = new XenditGateway({
+					apiKey: 'test-key',
+					webhookToken: '',
+					isProduction: false,
+				});
+				const result = emptyGateway.validateWebhookSignature({}, 'any-token');
+
+				expect(result).toBe(false);
 			});
 		});
 
@@ -348,6 +419,7 @@ describe('Payment Gateway Module', () => {
 		it('[P1] should accept production config', () => {
 			const prodGateway = new XenditGateway({
 				apiKey: 'prod-api-key',
+				webhookToken: 'prod-token',
 				isProduction: true,
 			});
 

@@ -1,6 +1,8 @@
 import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
 import { ValidationError } from "@/worker/core/types/errors";
+import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
+import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
 import type {
   SubmitLeadRequest,
   CheckAvailabilityQuery,
@@ -211,14 +213,9 @@ export class PublicApiService {
   // 5. Create Booking (public — no auth required, only API key)
   async createPublicBooking(
     data: CreatePublicBookingRequest,
-    ifortepayConfig: {
-      merchantId: string;
-      secretUnboundId: string;
-      hashKey: string;
-      isProduction: boolean;
-      callbackUrl: string;
-      successRedirectUrl: string;
-      failedRedirectUrl: string;
+    gatewayConfig: {
+      vendor: GatewayVendor;
+      config: Record<string, string>;
     },
   ): Promise<{
     bookingId: string;
@@ -286,78 +283,38 @@ export class PublicApiService {
       createdBy: null,
     });
 
-    // Request iFortePay Payment Page
+    // Request payment page via the configured gateway
     let paymentPageUrl: string | null = null;
 
-    if (ifortepayConfig.merchantId && ifortepayConfig.secretUnboundId) {
+    const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor, gatewayConfig.config);
+
+    if (gateway.name !== 'manual') {
       try {
-        const baseUrl = ifortepayConfig.isProduction
-          ? "https://api.ifortepay.id"
-          : "https://api-stage.ifortepay.id";
+        // Use the payment method from request, default to 'Gateway' (all methods)
+        const paymentMethod = data.paymentMethod ?? 'Gateway';
 
-        const externalId = `ext-${booking.id}`;
-        const signatureRaw = `${ifortepayConfig.hashKey}${externalId}${booking.bookingNumber}`;
-        const signatureEncoded = new TextEncoder().encode(signatureRaw);
-        const signatureBuffer = await crypto.subtle.digest("SHA-256", signatureEncoded);
-        const signature = Array.from(new Uint8Array(signatureBuffer))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-
-        const authHeader = `Basic ${btoa(`${ifortepayConfig.merchantId}:${ifortepayConfig.secretUnboundId}`)}`;
-
-        const requestBody = {
-          order_id: booking.bookingNumber,
-          external_id: externalId,
+        const result = await gateway.createPayment({
           amount: totalAmount,
+          currency: 'IDR',
+          method: paymentMethod,
+          bookingId: booking.bookingNumber,
+          customerEmail: customer.email ?? undefined,
+          customerPhone: customer.phone,
           description: `Rental ${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
-          customer_details: {
-            full_name: customer.name,
-            email: customer.email ?? "",
-            phone: customer.phone,
-          },
-          item_details: [
-            {
-              item_id: vehicle.id,
-              name: `${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
-              amount: vehicle.dailyRateIdr,
-              qty: days,
-            },
-          ],
-          callback_url: ifortepayConfig.callbackUrl,
-          success_redirect_url: ifortepayConfig.successRedirectUrl,
-          failed_redirect_url: ifortepayConfig.failedRedirectUrl,
-        };
-
-        const ifortepayResponse = await fetch(`${baseUrl}/payment-page/payment`, {
-          method: "POST",
-          headers: {
-            "Authorization": authHeader,
-            "Content-Type": "application/json",
-            "x-req-signature": signature,
-            "x-version": "v3",
-          },
-          body: JSON.stringify(requestBody),
         });
 
-        if (ifortepayResponse.ok) {
-          const ifortepayData = (await ifortepayResponse.json()) as Record<string, unknown>;
-          paymentPageUrl = (ifortepayData.payment_page_url as string)
-            ?? (ifortepayData.paymentPageUrl as string)
-            ?? (ifortepayData.url as string)
-            ?? null;
+        if (result.success && result.paymentUrl) {
+          paymentPageUrl = result.paymentUrl;
 
           // Save payment page URL to booking
-          if (paymentPageUrl) {
-            await this.repo.updateBooking(booking.id, {
-              paymentPageUrl,
-            });
-          }
-        } else {
-          const errorText = await ifortepayResponse.text();
-          console.error("iFortePay error:", ifortepayResponse.status, errorText);
+          await this.repo.updateBooking(booking.id, {
+            paymentPageUrl,
+          });
+        } else if (!result.success) {
+          console.error(`${gateway.name} createPayment error:`, result.error?.message);
         }
       } catch (error) {
-        console.error("iFortePay exception:", error);
+        console.error(`${gateway.name} createPayment exception:`, error);
       }
     }
 

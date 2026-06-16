@@ -29,6 +29,12 @@ declare namespace Cloudflare {
 		IFORTEPAY_SUCCESS_REDIRECT_URL?: string;
 		/** iFortePay failed redirect URL */
 		IFORTEPAY_FAILED_REDIRECT_URL?: string;
+		/** Active payment gateway vendor: xendit | ifortepay | midtrans | manual */
+		PAYMENT_GATEWAY_VENDOR?: string;
+		/** Xendit API key (xnd_development_... or xnd_production_...) */
+		XENDIT_API_KEY?: string;
+		/** Xendit webhook verification token (Settings > Callbacks) */
+		XENDIT_WEBHOOK_TOKEN?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

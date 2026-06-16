@@ -1,3 +1,23 @@
 # Local development secrets
 # Copy this file to .dev.vars and update values
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
+# Payment Gateway Configuration
+# Active vendor: xendit | ifortepay | midtrans | manual
+PAYMENT_GATEWAY_VENDOR=xendit
+
+# Xendit (staging/development mode)
+# Get these from https://dashboard.xendit.co > Settings > API Keys
+XENDIT_API_KEY=xnd_development_YOUR_KEY_HERE
+XENDIT_WEBHOOK_TOKEN=YOUR_WEBHOOK_VERIFICATION_TOKEN
+
+# iFortePay (legacy)
+IFORTEPAY_MERCHANT_ID=
+IFORTEPAY_SECRET_UNBOUND_ID=
+IFORTEPAY_HASH_KEY=
+IFORTEPAY_CALLBACK_URL=
+IFORTEPAY_SUCCESS_REDIRECT_URL=
+IFORTEPAY_FAILED_REDIRECT_URL=
+
+# Midtrans (legacy)
+MIDTRANS_SERVER_KEY=

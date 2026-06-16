@@ -34,6 +34,8 @@ export const createPublicBookingSchema = z.object({
 	customerPhone: z.string().min(8, 'Phone number must be at least 8 characters'),
 	customerEmail: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
 	notes: z.string().max(1000).optional().nullable().or(z.literal('')),
+	/** Payment method: 'QRIS' | 'BankTransfer' | 'Gateway' (all methods). Default: 'Gateway' */
+	paymentMethod: z.enum(['QRIS', 'BankTransfer', 'Gateway']).optional(),
 });
 
 // Types
