@@ -21,20 +21,20 @@ export default function FleetReportPage() {
 
 	const { data: report, isLoading } = useFleetUtilizationReport(params);
 
-	const trendData = report?.trend.map((item) => ({
+	const trendData = (report?.trend ?? []).map((item) => ({
 		date: item.date,
 		utilization: item.utilizationRate,
 		bookings: item.bookings,
 	}));
 
-	const vehicleData = report?.byVehicle.slice(0, 10).map((item) => ({
+	const vehicleData = (report?.byVehicle ?? []).slice(0, 10).map((item) => ({
 		name: item.name,
 		utilization: item.utilizationRate,
 		bookings: item.bookingCount,
 		revenue: item.revenue,
 	}));
 
-	const typeData = report?.byType.map((item) => ({
+	const typeData = (report?.byType ?? []).map((item) => ({
 		type: item.type,
 		utilization: item.averageUtilization,
 		bookings: item.bookingCount,

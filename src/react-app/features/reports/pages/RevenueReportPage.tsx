@@ -23,13 +23,13 @@ export default function RevenueReportPage() {
 
 	const { data: report, isLoading } = useRevenueReport(params);
 
-	const chartData = report?.byPeriod.map((item) => ({
+	const chartData = (report?.byPeriod ?? []).map((item) => ({
 		period: item.period,
 		revenue: item.revenue,
 		bookings: item.bookings,
 	}));
 
-	const paymentMethodData = report?.byPaymentMethod.map((item) => ({
+	const paymentMethodData = (report?.byPaymentMethod ?? []).map((item) => ({
 		name: item.method,
 		value: item.amount,
 	}));

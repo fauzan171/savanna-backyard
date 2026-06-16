@@ -16,7 +16,7 @@ interface RevenueChartProps {
 }
 
 export function RevenueChart({ data, isLoading }: RevenueChartProps) {
-	const chartData = data?.trend.map((item) => ({
+	const chartData = (data?.trend ?? []).map((item) => ({
 		date: new Date(item.date).toLocaleDateString('en-US', {
 			month: 'short',
 			day: 'numeric',
