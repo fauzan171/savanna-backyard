@@ -1,7 +1,32 @@
 import { Hono } from 'hono';
-import { authMiddleware } from '@/worker/core/middleware/auth';
+import { authMiddleware, requireRole } from '@/worker/core/middleware/auth';
 
 type UploadEnv = { Bindings: Env };
+
+// Magic bytes for image type validation
+const MAGIC_BYTES: Record<string, number[]> = {
+  'image/jpeg': [0xFF, 0xD8, 0xFF],
+  'image/png': [0x89, 0x50, 0x4E, 0x47],
+  'image/gif': [0x47, 0x49, 0x46],
+  'image/webp': [0x52, 0x49, 0x46, 0x46], // RIFF header (first 4 bytes of WebP)
+};
+
+function validateMagicBytes(buffer: ArrayBuffer, declaredType: string): boolean {
+  const bytes = new Uint8Array(buffer.slice(0, 4));
+  const expected = MAGIC_BYTES[declaredType];
+  if (!expected) return false;
+  return expected.every((byte, i) => bytes[i] === byte);
+}
+
+function getExtensionFromMimeType(mimeType: string): string {
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+  };
+  return map[mimeType] || 'jpg';
+}
 
 export function createUploadRouter(): Hono<UploadEnv> {
 	const router = new Hono<UploadEnv>();
@@ -30,7 +55,7 @@ export function createUploadRouter(): Hono<UploadEnv> {
 	// All write operations require auth
 	router.use('*', authMiddleware());
 
-	// Upload file
+	// Upload file (SUPER_ADMIN or STAFF)
 	router.post('/', async (c) => {
 		const bucket = c.env.UPLOADS;
 		if (!bucket) {
@@ -49,7 +74,7 @@ export function createUploadRouter(): Hono<UploadEnv> {
 			return c.json({ success: false, error: { code: 'NO_FILE', message: 'No file provided' } }, 400);
 		}
 
-		// Validate file type
+		// Validate file type by MIME type
 		const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 		if (!allowedTypes.includes(file.type)) {
 			return c.json({ success: false, error: { code: 'INVALID_TYPE', message: 'Only JPEG, PNG, WebP, and GIF images are allowed' } }, 400);
@@ -60,11 +85,17 @@ export function createUploadRouter(): Hono<UploadEnv> {
 			return c.json({ success: false, error: { code: 'FILE_TOO_LARGE', message: 'File must be under 5MB' } }, 400);
 		}
 
-		// Generate unique key: date-uuid.ext
-		const ext = file.name.split('.').pop() || 'jpg';
+		// Validate magic bytes (actual file content matches declared type)
+		const buffer = await file.arrayBuffer();
+		if (!validateMagicBytes(buffer, file.type)) {
+			return c.json({ success: false, error: { code: 'INVALID_FILE', message: 'File content does not match declared type' } }, 400);
+		}
+
+		// Generate key with correct extension from validated MIME type
+		const ext = getExtensionFromMimeType(file.type);
 		const key = `${new Date().toISOString().split('T')[0]}-${crypto.randomUUID()}.${ext}`;
 
-		await bucket.put(key, file.stream(), {
+		await bucket.put(key, buffer, {
 			httpMetadata: { contentType: file.type },
 		});
 
@@ -74,14 +105,21 @@ export function createUploadRouter(): Hono<UploadEnv> {
 		return c.json({ success: true, data: { key, url } }, 201);
 	});
 
-	// Delete file
-	router.delete('/:key{.+}', async (c) => {
+	// Delete file (SUPER_ADMIN only)
+	router.delete('/:key{.+}', requireRole('SUPER_ADMIN'), async (c) => {
 		const bucket = c.env.UPLOADS;
 		if (!bucket) {
 			return c.json({ success: false, error: { code: 'NO_BUCKET', message: 'R2 bucket not configured' } }, 500);
 		}
 
 		const key = c.req.param('key');
+
+		// Check if file exists before deleting
+		const object = await bucket.get(key);
+		if (!object) {
+			return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } }, 404);
+		}
+
 		await bucket.delete(key);
 
 		return c.json({ success: true, data: { deleted: true } });

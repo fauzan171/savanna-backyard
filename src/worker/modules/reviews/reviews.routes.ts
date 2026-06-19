@@ -43,6 +43,8 @@ const getByIdHandler = async (c: Context<ReviewsEnv>) => {
 };
 
 const createHandler = async (c: Context<ReviewsEnv>) => {
+	const forbidden = requireSuperAdmin(c);
+	if (forbidden) return forbidden;
 	const service = c.get('reviewsService');
 	const body = getValidatedBody<CreateReviewRequest>(c);
 	const result = await service.create(body);
@@ -50,6 +52,8 @@ const createHandler = async (c: Context<ReviewsEnv>) => {
 };
 
 const updateHandler = async (c: Context<ReviewsEnv>) => {
+	const forbidden = requireSuperAdmin(c);
+	if (forbidden) return forbidden;
 	const service = c.get('reviewsService');
 	const id = c.req.param('id');
 	const body = getValidatedBody<UpdateReviewRequest>(c);
@@ -67,6 +71,8 @@ const deleteHandler = async (c: Context<ReviewsEnv>) => {
 };
 
 const toggleHandler = async (c: Context<ReviewsEnv>) => {
+	const forbidden = requireSuperAdmin(c);
+	if (forbidden) return forbidden;
 	const service = c.get('reviewsService');
 	const id = c.req.param('id');
 	const result = await service.toggle(id);

@@ -1,5 +1,6 @@
 import { Hono, Context } from 'hono';
 import { authMiddleware } from '@/worker/core/middleware/auth';
+import { loginRateLimit } from '@/worker/core/middleware/rate-limit';
 import { createDb } from '@/worker/core/database';
 import { UserRepository } from './auth.repository';
 import { AuthService } from './auth.service';
@@ -112,8 +113,8 @@ export function createAuthRouter(): Hono<AuthEnv> {
 	// Apply services middleware to all auth routes
 	router.use('*', authServicesMiddleware());
 
-	// Public routes
-	router.post('/login', validateBody(loginSchema), loginHandler);
+	// Public routes (rate limited: 5 attempts per 15 min)
+	router.post('/login', loginRateLimit(), validateBody(loginSchema), loginHandler);
 
 	// Protected routes
 	router.get('/me', authMiddleware(), meHandler);

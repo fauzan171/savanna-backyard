@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
 import { users } from './users';
 
 // Leads table
@@ -19,7 +19,12 @@ export const leads = sqliteTable('leads', {
 	vehicleInterest: text('vehicle_interest'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	statusIdx: index('leads_status_idx').on(table.status),
+	sourceIdx: index('leads_source_idx').on(table.source),
+	assignedIdx: index('leads_assigned_idx').on(table.assignedTo),
+	followUpIdx: index('leads_followup_idx').on(table.followUpDate),
+}));
 
 // Type exports
 export type Lead = typeof leads.$inferSelect;

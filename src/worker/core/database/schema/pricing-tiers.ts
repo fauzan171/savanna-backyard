@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 // Pricing tiers table
 export const pricingTiers = sqliteTable('pricing_tiers', {
@@ -15,7 +15,9 @@ export const pricingTiers = sqliteTable('pricing_tiers', {
 	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	activeIdx: index('pricing_tiers_active_idx').on(table.isActive),
+}));
 
 // Type exports
 export type PricingTier = typeof pricingTiers.$inferSelect;

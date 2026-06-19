@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 // Customers table
 export const customers = sqliteTable('customers', {
@@ -15,7 +15,11 @@ export const customers = sqliteTable('customers', {
 	blacklistReason: text('blacklist_reason'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	phoneIdx: index('customers_phone_idx').on(table.phone),
+	emailIdx: index('customers_email_idx').on(table.email),
+	blacklistedIdx: index('customers_blacklisted_idx').on(table.isBlacklisted),
+}));
 
 // Type exports
 export type Customer = typeof customers.$inferSelect;

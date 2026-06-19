@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
 
 // Token blacklist table - stores revoked JWT tokens
 export const tokenBlacklist = sqliteTable('token_blacklist', {
@@ -13,7 +13,10 @@ export const tokenBlacklist = sqliteTable('token_blacklist', {
 	expiresAt: text('expires_at').notNull(),
 	// When the token was blacklisted
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	expiresIdx: index('token_blacklist_expires_idx').on(table.expiresAt),
+	userIdx: index('token_blacklist_user_idx').on(table.userId),
+}));
 
 // Type exports
 export type TokenBlacklistEntry = typeof tokenBlacklist.$inferSelect;

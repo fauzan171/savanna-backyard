@@ -4,6 +4,7 @@ import { PublicApiRepository } from './public-api.repository';
 import { PublicApiService } from './public-api.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { apiKeyMiddleware } from '@/worker/core/middleware/api-key';
+import { publicApiRateLimit } from '@/worker/core/middleware/rate-limit';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import { cors } from 'hono/cors';
 import {
@@ -120,6 +121,7 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	const router = new Hono<PublicApiEnv>();
 
 	router.use('*', publicApiServicesMiddleware());
+	router.use('*', publicApiRateLimit());
 
 	router.use('*', cors({
 		origin: (origin, c) => {

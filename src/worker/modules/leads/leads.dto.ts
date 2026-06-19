@@ -34,6 +34,11 @@ export const addNoteSchema = z.object({
 	note: z.string().min(1, 'Note cannot be empty').max(1000),
 });
 
+// Assign lead schema
+export const assignLeadSchema = z.object({
+	userId: z.string().min(1, 'User ID is required'),
+});
+
 // Convert to booking schema
 export const convertToBookingSchema = z.object({
 	vehicleId: z.string().min(1, 'Vehicle is required'),

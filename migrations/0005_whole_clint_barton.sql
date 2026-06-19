@@ -1,0 +1,20 @@
+CREATE INDEX `users_role_idx` ON `users` (`role`);--> statement-breakpoint
+CREATE INDEX `users_active_idx` ON `users` (`is_active`);--> statement-breakpoint
+CREATE INDEX `customers_phone_idx` ON `customers` (`phone`);--> statement-breakpoint
+CREATE INDEX `customers_email_idx` ON `customers` (`email`);--> statement-breakpoint
+CREATE INDEX `customers_blacklisted_idx` ON `customers` (`is_blacklisted`);--> statement-breakpoint
+CREATE INDEX `leads_status_idx` ON `leads` (`status`);--> statement-breakpoint
+CREATE INDEX `leads_source_idx` ON `leads` (`source`);--> statement-breakpoint
+CREATE INDEX `leads_assigned_idx` ON `leads` (`assigned_to`);--> statement-breakpoint
+CREATE INDEX `leads_followup_idx` ON `leads` (`follow_up_date`);--> statement-breakpoint
+CREATE INDEX `vehicle_status_logs_vehicle_idx` ON `vehicle_status_logs` (`vehicle_id`);--> statement-breakpoint
+CREATE INDEX `vehicle_status_logs_created_idx` ON `vehicle_status_logs` (`created_at`);--> statement-breakpoint
+CREATE INDEX `booking_addons_booking_idx` ON `booking_addons` (`booking_id`);--> statement-breakpoint
+CREATE INDEX `token_blacklist_expires_idx` ON `token_blacklist` (`expires_at`);--> statement-breakpoint
+CREATE INDEX `token_blacklist_user_idx` ON `token_blacklist` (`user_id`);--> statement-breakpoint
+CREATE INDEX `packages_active_idx` ON `packages` (`is_active`);--> statement-breakpoint
+CREATE INDEX `packages_trail_idx` ON `packages` (`trail_id`);--> statement-breakpoint
+CREATE INDEX `pricing_tiers_active_idx` ON `pricing_tiers` (`is_active`);--> statement-breakpoint
+CREATE INDEX `reviews_published_idx` ON `reviews` (`is_published`);--> statement-breakpoint
+CREATE INDEX `reviews_rating_idx` ON `reviews` (`rating`);--> statement-breakpoint
+CREATE INDEX `trails_active_idx` ON `trails` (`is_active`);

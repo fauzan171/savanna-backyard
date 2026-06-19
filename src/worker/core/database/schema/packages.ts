@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 // Packages table (tour packages)
 export const packages = sqliteTable('packages', {
@@ -16,7 +16,10 @@ export const packages = sqliteTable('packages', {
 	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	activeIdx: index('packages_active_idx').on(table.isActive),
+	trailIdx: index('packages_trail_idx').on(table.trailId),
+}));
 
 // Type exports
 export type Package = typeof packages.$inferSelect;

@@ -34,8 +34,12 @@ app.use(
 		origin: (origin, c) => {
 			const defaultOrigins = ['http://localhost:5173'];
 			const allowedOrigins = c.env.CORS_ALLOWED_ORIGINS?.split(',').map((o: string) => o.trim()) ?? defaultOrigins;
-			// Also allow localhost for development
-			if (origin && (allowedOrigins.includes(origin) || origin.includes('localhost'))) {
+			// Allow exact match from allowed list
+			if (origin && allowedOrigins.includes(origin)) {
+				return origin;
+			}
+			// Only allow localhost in development
+			if (origin && c.env.ENVIRONMENT !== 'production' && origin.includes('localhost')) {
 				return origin;
 			}
 			return allowedOrigins[0] ?? defaultOrigins[0];

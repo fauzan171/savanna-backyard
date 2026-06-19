@@ -12,6 +12,7 @@ import {
 	updateLeadSchema,
 	updateLeadStatusSchema,
 	addNoteSchema,
+	assignLeadSchema,
 	convertToBookingSchema,
 	listLeadsQuerySchema,
 	type CreateLeadRequest,
@@ -99,8 +100,8 @@ const addNoteHandler = async (c: Context<LeadsEnv>) => {
 const assignLeadHandler = async (c: Context<LeadsEnv>) => {
 	const service = c.get('leadsService');
 	const id = c.req.param('id');
-	const { userId } = await c.req.json();
-	const result = await service.assignToUser(id, userId ?? null);
+	const body = getValidatedBody<{ userId: string }>(c);
+	const result = await service.assignToUser(id, body.userId ?? null);
 	return c.json({ success: true, data: result });
 };
 
@@ -132,7 +133,7 @@ export function createLeadsRouter(): Hono<LeadsEnv> {
 	router.patch('/:id', validateBody(updateLeadSchema), updateLeadHandler);
 	router.patch('/:id/status', validateBody(updateLeadStatusSchema), updateStatusHandler);
 	router.post('/:id/notes', validateBody(addNoteSchema), addNoteHandler);
-	router.post('/:id/assign', assignLeadHandler);
+	router.post('/:id/assign', validateBody(assignLeadSchema), assignLeadHandler);
 	router.post('/:id/convert', validateBody(convertToBookingSchema), convertToBookingHandler);
 
 	return router;

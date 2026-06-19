@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, index } from 'drizzle-orm/sqlite-core';
 import { users } from './users';
 import { vehicles } from './vehicles';
 
@@ -11,7 +11,10 @@ export const vehicleStatusLogs = sqliteTable('vehicle_status_logs', {
 	notes: text('notes'),
 	recordedBy: text('recorded_by').references(() => users.id),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	vehicleIdx: index('vehicle_status_logs_vehicle_idx').on(table.vehicleId),
+	createdAtIdx: index('vehicle_status_logs_created_idx').on(table.createdAt),
+}));
 
 // Type exports
 export type VehicleStatusLog = typeof vehicleStatusLogs.$inferSelect;

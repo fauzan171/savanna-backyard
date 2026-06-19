@@ -1,4 +1,4 @@
-import { sqliteTable, text, real, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, real, integer, index } from 'drizzle-orm/sqlite-core';
 import { bookings } from './bookings';
 
 // Booking add-ons table
@@ -10,7 +10,9 @@ export const bookingAddons = sqliteTable('booking_addons', {
 	amount: real('amount').notNull(),
 	isMandatory: integer('is_mandatory', { mode: 'boolean' }).default(false),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
-});
+}, (table) => ({
+	bookingIdx: index('booking_addons_booking_idx').on(table.bookingId),
+}));
 
 // Type exports
 export type BookingAddon = typeof bookingAddons.$inferSelect;

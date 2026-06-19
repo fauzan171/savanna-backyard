@@ -36,6 +36,13 @@
       "when": 1781902714462,
       "tag": "0004_famous_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1781906850570,
+      "tag": "0005_whole_clint_barton",
+      "breakpoints": true
     }
   ]
 }
