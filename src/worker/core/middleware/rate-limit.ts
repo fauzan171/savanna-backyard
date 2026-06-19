@@ -1,6 +1,4 @@
 import { Context, Next } from 'hono';
-import { createDb } from '../database';
-import { sql } from 'drizzle-orm';
 
 /**
  * Simple in-memory rate limiter for Cloudflare Workers.
