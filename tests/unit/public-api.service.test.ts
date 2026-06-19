@@ -561,7 +561,7 @@ describe('PublicApiService', () => {
 			expect(result?.brand).toBe('Honda');
 			expect(result?.model).toBe('CRF 250L');
 			expect(result?.year).toBe(2023);
-			expect(result?.photoUrl).toBe('https://example.com/photo.jpg');
+			expect(result?.image).toBe('https://example.com/photo.jpg');
 		});
 
 		it('[P1] should handle null optional fields', async () => {
@@ -579,27 +579,27 @@ describe('PublicApiService', () => {
 			expect(result?.brand).toBeNull();
 			expect(result?.model).toBeNull();
 			expect(result?.year).toBeNull();
-			expect(result?.photoUrl).toBeNull();
+			expect(result?.image).toBeNull();
 		});
 
-		it('[P1] should include specifications object', async () => {
+		it('[P1] should include specs object', async () => {
 			const mockVehicle = createTestVehicle();
 
 			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(mockVehicle);
 
 			const result = await publicApiService.getVehicleDetails('vehicle-123');
 
-			expect(result?.specifications).toBeDefined();
+			expect(result?.specs).toBeDefined();
 		});
 
-		it('[P1] should return dailyRate as dailyRateIdr value', async () => {
+		it('[P1] should return dailyRateIdr field', async () => {
 			const mockVehicle = createTestVehicle({ dailyRateIdr: 450000 });
 
 			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(mockVehicle);
 
 			const result = await publicApiService.getVehicleDetails('vehicle-123');
 
-			expect(result?.dailyRate).toBe(450000);
+			expect(result?.dailyRateIdr).toBe(450000);
 		});
 	});
 

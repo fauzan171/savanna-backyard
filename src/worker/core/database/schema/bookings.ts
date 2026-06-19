@@ -31,6 +31,10 @@ export const bookings = sqliteTable('bookings', {
 	notes: text('notes'),
 	createdBy: text('created_by').references(() => users.id),
 	cancelledAt: text('cancelled_at'),
+	reminderDaySentAt: text('reminder_day_sent_at'),
+	reminderHourSentAt: text('reminder_hour_sent_at'),
+	followupSentAt: text('followup_sent_at'),
+	reviewRequestSentAt: text('review_request_sent_at'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => ({

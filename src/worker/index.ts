@@ -20,6 +20,10 @@ import { createSettingsRouter } from './modules/settings/settings.routes';
 import { createUsersRouter } from './modules/users/users.routes';
 import { createUploadRouter } from './modules/uploads/uploads.routes';
 import { createEmailsRouter } from './modules/emails/emails.routes';
+import { createDb } from './core/database';
+import { ConfigRepository } from './core/repositories/config.repository';
+import { EmailService } from './core/services/email.service';
+import { NotificationService } from './core/services/notification.service';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -144,4 +148,40 @@ app.get('/images/:key{.+}', async (c) => {
 	return new Response(object.body, { headers });
 });
 
-export default app;
+// Scheduled handler for Cloudflare Cron Triggers
+async function handleScheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  console.log('[Scheduled] Running notification jobs...');
+
+  if (!env.RESEND_API_KEY) {
+    console.log('[Scheduled] RESEND_API_KEY not configured, skipping email notifications');
+    return;
+  }
+
+  const db = createDb(env.DB);
+  const configRepo = new ConfigRepository(db);
+  const emailService = new EmailService({
+    apiKey: env.RESEND_API_KEY,
+    fromEmail: env.EMAIL_FROM || 'Savanna Bromo <noreply@savannabromo.com>',
+  });
+  const notificationService = new NotificationService(db, emailService, configRepo);
+
+  try {
+    // Run all notification jobs
+    const dailyReminders = await notificationService.runDailyReminders();
+    const hourlyReminders = await notificationService.runHourlyReminders();
+    const followups = await notificationService.runFollowups();
+
+    console.log('[Scheduled] All jobs completed:', {
+      dailyReminders,
+      hourlyReminders,
+      followups,
+    });
+  } catch (error) {
+    console.error('[Scheduled] Error running notification jobs:', error);
+  }
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled: handleScheduled,
+};

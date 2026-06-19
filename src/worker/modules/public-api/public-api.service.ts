@@ -190,12 +190,20 @@ export class PublicApiService {
     brand: string | null;
     model: string | null;
     year: number | null;
-    dailyRate: number;
-    photoUrl: string | null;
-    specifications: { description: string | null };
+    category: string | null;
+    dailyRateIdr: number;
+    image: string | null;
+    specs: Record<string, string> | null;
+    description: string | null;
+    available: boolean;
   } | null> {
     const vehicle = await this.repo.getVehicleById(id);
     if (!vehicle) return null;
+
+    const parsedSpecs = safeJsonParse<Record<string, string> | null>(
+      typeof vehicle.specs === "string" ? vehicle.specs : null,
+      vehicle.specs ? { details: String(vehicle.specs) } : null,
+    );
 
     return {
       id: vehicle.id,
@@ -204,9 +212,12 @@ export class PublicApiService {
       brand: vehicle.brand,
       model: vehicle.model,
       year: vehicle.year,
-      dailyRate: vehicle.dailyRateIdr,
-      photoUrl: resolveUrl(vehicle.photoUrl, this.baseUrl),
-      specifications: { description: null },
+      category: vehicle.category,
+      dailyRateIdr: vehicle.dailyRateIdr,
+      image: resolveUrl(vehicle.photoUrl, this.baseUrl),
+      specs: parsedSpecs,
+      description: vehicle.description,
+      available: vehicle.status === "Available",
     };
   }
 
@@ -431,7 +442,7 @@ export class PublicApiService {
         location: r.location,
         rating: r.rating,
         text: r.text,
-        avatar: resolveUrl(r.avatar, this.baseUrl),
+        avatar: this.getInitials(r.name),
         createdAt: r.createdAt,
       })),
       meta: { total: result.total, averageRating: result.averageRating },
@@ -470,6 +481,11 @@ export class PublicApiService {
       gallery: string[]; gpxUrl: string | null;
       estimatedDuration: string | null; distance: string | null;
       bestTime: string | null;
+      subtitle: string | null;
+      stages: Array<{ name: string; desc: string }> | null;
+      checklist: string[] | null;
+      culture: string | null;
+      warning: string | null;
     };
   } | null> {
     const trail = await this.repo.getTrailById(trailId);
@@ -493,6 +509,11 @@ export class PublicApiService {
         estimatedDuration: trail.estimatedDuration,
         distance: trail.distance,
         bestTime: trail.bestTime,
+        subtitle: trail.blogSubtitle ?? null,
+        stages: safeJsonParse<Array<{ name: string; desc: string }> | null>(trail.blogStages, null),
+        checklist: safeJsonParseStringArray(trail.blogChecklist).length > 0 ? safeJsonParseStringArray(trail.blogChecklist) : null,
+        culture: trail.blogCulture ?? null,
+        warning: trail.blogWarning ?? null,
       },
     };
   }
@@ -560,5 +581,14 @@ export class PublicApiService {
       Other: "Other",
     };
     return displayNames[type] || type;
+  }
+
+  /** Extract 2-letter initials from a name (e.g. "Ahmad Rizki" -> "AR") */
+  private getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return (name.slice(0, 2)).toUpperCase();
   }
 }

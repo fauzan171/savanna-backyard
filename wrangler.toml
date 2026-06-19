@@ -49,3 +49,11 @@ bucket_name = "savanna-uploads"
 
 # Secrets (set via wrangler secret put)
 # JWT_SECRET
+
+# Scheduled email notifications (Cloudflare Cron Triggers)
+# Timezone: UTC (WIB = UTC+7)
+[triggers]
+crons = [
+  "0 22 * * *",   # 05:00 WIB daily → H-1 booking reminders
+  "0 * * * *"     # Every hour → H-1 jam reminders + follow-ups
+]

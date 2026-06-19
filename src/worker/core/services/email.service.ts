@@ -26,6 +26,16 @@ interface BookingReminderData {
   pickupLocation: string;
 }
 
+interface FollowupEmailData {
+  customerName: string;
+  customerEmail: string;
+  bookingNumber: string;
+  vehicleName: string;
+  startDate: string;
+  endDate: string;
+  reviewUrl: string;
+}
+
 /**
  * Email service using Resend API.
  *
@@ -75,6 +85,28 @@ export class EmailService {
     const html = this.buildCustomMessageHTML(message);
 
     return this.sendEmail(to, subject, html);
+  }
+
+  /**
+   * Send 1-hour reminder email to customer.
+   * Called from scheduled job when booking starts within ~1 hour.
+   */
+  async sendReminderOneHour(data: BookingReminderData): Promise<boolean> {
+    const subject = `⏰ Booking Anda Dimulai 1 Jam Lagi! - ${data.bookingNumber}`;
+    const html = this.buildOneHourReminderHTML(data);
+
+    return this.sendEmail(data.customerEmail, subject, html);
+  }
+
+  /**
+   * Send follow-up and review request email after rental ends.
+   * Called from scheduled job when booking endDate has passed.
+   */
+  async sendFollowupAndReview(data: FollowupEmailData): Promise<boolean> {
+    const subject = `🌟 Terima Kasih! Bagaimana Pengalaman Anda? - ${data.bookingNumber}`;
+    const html = this.buildFollowupAndReviewHTML(data);
+
+    return this.sendEmail(data.customerEmail, subject, html);
   }
 
   /**
@@ -291,6 +323,157 @@ export class EmailService {
 
       <div class="footer">
         <p>Salam,<br><strong>Tim Savanna Bromo Rental</strong></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Build HTML for 1-hour reminder email.
+   */
+  private buildOneHourReminderHTML(data: BookingReminderData): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #dc2626; margin: 0; font-size: 28px; }
+    .reminder-icon { font-size: 48px; margin-bottom: 10px; }
+    .details { background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .details table { width: 100%; border-collapse: collapse; }
+    .details td { padding: 8px 0; border-bottom: 1px solid #eee; }
+    .details td:first-child { color: #666; width: 140px; }
+    .details td:last-child { font-weight: 600; }
+    .info-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="reminder-icon">🚨</div>
+        <h1>Booking Dimulai 1 Jam Lagi!</h1>
+      </div>
+
+      <p>Halo <strong>${data.customerName}</strong>,</p>
+      <p>Booking Anda akan segera dimulai. Pastikan Anda sudah siap!</p>
+
+      <div class="details">
+        <table>
+          <tr>
+            <td>📋 Booking Number</td>
+            <td><strong>${data.bookingNumber}</strong></td>
+          </tr>
+          <tr>
+            <td>🏍️ Kendaraan</td>
+            <td>${data.vehicleName}</td>
+          </tr>
+          <tr>
+            <td>📅 Tanggal Sewa</td>
+            <td>${data.startDate} s/d ${data.endDate}</td>
+          </tr>
+          <tr>
+            <td>🕐 Jam Pengambilan</td>
+            <td><strong>${data.pickupTime}</strong></td>
+          </tr>
+          <tr>
+            <td>📍 Lokasi</td>
+            <td>${data.pickupLocation}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="info-box">
+        <p style="margin: 0;"><strong>📌 Jangan lupa bawa:</strong> KTP asli dan bukti booking</p>
+      </div>
+
+      <p>Sampai jumpa sebentar lagi! 🏍️</p>
+
+      <div class="footer">
+        <p>Salam,<br><strong>Tim Savanna Bromo Rental</strong></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  /**
+   * Build HTML for follow-up and review request email.
+   */
+  private buildFollowupAndReviewHTML(data: FollowupEmailData): string {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #16a34a; margin: 0; font-size: 28px; }
+    .success-icon { font-size: 48px; margin-bottom: 10px; }
+    .details { background: #f8f9fa; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .details table { width: 100%; border-collapse: collapse; }
+    .details td { padding: 8px 0; border-bottom: 1px solid #eee; }
+    .details td:first-child { color: #666; width: 140px; }
+    .details td:last-child { font-weight: 600; }
+    .review-box { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0; text-align: center; }
+    .btn { display: inline-block; background: #16a34a; color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin-top: 10px; }
+    .btn:hover { background: #15803d; }
+    .footer { text-align: center; margin-top: 30px; color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="success-icon">🌟</div>
+        <h1>Terima Kasih!</h1>
+      </div>
+
+      <p>Halo <strong>${data.customerName}</strong>,</p>
+      <p>Terima kasih telah menggunakan jasa Savanna Bromo Rental! Kami harap pengalaman Anda menyenangkan.</p>
+
+      <div class="details">
+        <table>
+          <tr>
+            <td>📋 Booking Number</td>
+            <td><strong>${data.bookingNumber}</strong></td>
+          </tr>
+          <tr>
+            <td>🏍️ Kendaraan</td>
+            <td>${data.vehicleName}</td>
+          </tr>
+          <tr>
+            <td>📅 Periode Sewa</td>
+            <td>${data.startDate} s/d ${data.endDate}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="review-box">
+        <h3 style="margin: 0 0 10px 0; color: #1e40af;">💬 Bagaimana pengalaman Anda?</h3>
+        <p style="margin: 0 0 15px 0;">Review Anda sangat berharga untuk membantu wisatawan lain!</p>
+        <a href="${data.reviewUrl}" class="btn">⭐ Berikan Review</a>
+      </div>
+
+      <p>Kami tunggu kunjungan Anda berikutnya! 🏍️</p>
+
+      <div class="footer">
+        <p>Salam,<br><strong>Tim Savanna Bromo Rental</strong></p>
+        <p>🏍️ Sewa Motor Trail Terpercaya di Bromo</p>
       </div>
     </div>
   </div>
