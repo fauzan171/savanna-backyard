@@ -149,7 +149,7 @@ app.get('/images/:key{.+}', async (c) => {
 });
 
 // Scheduled handler for Cloudflare Cron Triggers
-async function handleScheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
   console.log('[Scheduled] Running notification jobs...');
 
   if (!env.RESEND_API_KEY) {

@@ -1,4 +1,4 @@
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { bookings, customers, vehicles } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 import type { EmailService } from './email.service';
