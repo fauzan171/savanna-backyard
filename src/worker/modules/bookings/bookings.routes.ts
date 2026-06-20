@@ -5,6 +5,7 @@ import { BookingsRepository } from './bookings.repository';
 import { BookingsService } from './bookings.service';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
+import { ChecklistsRepository } from '../checklists/checklists.repository';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import {
 	createBookingSchema,
@@ -41,10 +42,12 @@ export const bookingsServicesMiddleware = () => async (c: Context<BookingsEnv>, 
 	const bookingsRepository = new BookingsRepository(db);
 	const vehiclesRepository = new VehiclesRepository(db);
 	const customersRepository = new CustomersRepository(db);
+	const checklistsRepository = new ChecklistsRepository(db);
 	const bookingsService = new BookingsService(
 		bookingsRepository,
 		vehiclesRepository,
-		customersRepository
+		customersRepository,
+		checklistsRepository
 	);
 
 	c.set('bookingsService', bookingsService);

@@ -14,3 +14,4 @@ export * from './packages';
 export * from './pricing-tiers';
 export * from './reviews';
 export * from './trails';
+export * from './vehicle-checklists';

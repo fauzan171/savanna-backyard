@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, User, Car, Calendar, CreditCard, FileText, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, User, Car, Calendar, CreditCard, FileText, Phone, Mail, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Spinner } from '@/react-app/components/ui/spinner';
@@ -28,6 +28,9 @@ import {
 	useCancelBooking,
 	useExtendBooking,
 } from '../hooks/useBookings';
+import { useChecklistsByBooking } from '@/react-app/features/checklists/hooks/useChecklists';
+import { ChecklistForm } from '@/react-app/features/checklists/components/ChecklistForm';
+import { ChecklistDisplay, ChecklistComparison } from '@/react-app/features/checklists/components/ChecklistDisplay';
 
 const formatCurrency = (amount: number, currency: 'IDR' | 'USD' = 'IDR') => {
 	return new Intl.NumberFormat('id-ID', {
@@ -102,6 +105,7 @@ export function BookingDetailPage() {
 			<Tabs defaultValue="details" className="space-y-6">
 				<TabsList>
 					<TabsTrigger value="details">Details</TabsTrigger>
+					<TabsTrigger value="condition">Condition</TabsTrigger>
 					<TabsTrigger value="payments">Payments</TabsTrigger>
 					<TabsTrigger value="history">History</TabsTrigger>
 				</TabsList>
@@ -259,6 +263,15 @@ export function BookingDetailPage() {
 					)}
 				</TabsContent>
 
+				<TabsContent value="condition" className="space-y-6">
+					<ConditionTab
+						bookingId={booking.id}
+						vehicleName={booking.vehicle.name}
+						plateNumber={booking.vehicle.plateNumber}
+						bookingStatus={booking.status}
+					/>
+				</TabsContent>
+
 				<TabsContent value="payments" className="space-y-6">
 					<PaymentsTab payments={booking.payments ?? []} paymentSummary={booking.paymentSummary} currency={booking.currency} totalAmount={booking.totalAmount} />
 				</TabsContent>
@@ -267,6 +280,106 @@ export function BookingDetailPage() {
 					<HistoryTab history={booking.statusHistory ?? []} />
 				</TabsContent>
 			</Tabs>
+		</div>
+	);
+}
+
+function ConditionTab({
+	bookingId,
+	vehicleName,
+	plateNumber,
+	bookingStatus,
+}: {
+	bookingId: string;
+	vehicleName: string;
+	plateNumber: string;
+	bookingStatus: string;
+}) {
+	const { data: checklists, isLoading } = useChecklistsByBooking(bookingId);
+	const [showPickupForm, setShowPickupForm] = useState(false);
+	const [showReturnForm, setShowReturnForm] = useState(false);
+
+	if (isLoading) {
+		return (
+			<div className="flex items-center justify-center py-12">
+				<Spinner size="lg" />
+			</div>
+		);
+	}
+
+	const hasPickup = !!checklists?.pickup;
+	const hasReturn = !!checklists?.return;
+	const bothComplete = hasPickup && hasReturn;
+
+	// Show buttons based on booking status
+	const canAddPickup = !hasPickup && (bookingStatus === 'Confirmed' || bookingStatus === 'Active');
+	const canAddReturn = hasPickup && !hasReturn && bookingStatus === 'Active';
+
+	return (
+		<div className="space-y-6">
+			{/* Action Buttons */}
+			<div className="flex gap-3">
+				{canAddPickup && (
+					<Button onClick={() => setShowPickupForm(true)}>
+						<ClipboardCheck className="mr-2 size-4" />
+						Isi Checklist Pickup
+					</Button>
+				)}
+				{canAddReturn && (
+					<Button onClick={() => setShowReturnForm(true)}>
+						<ClipboardCheck className="mr-2 size-4" />
+						Isi Checklist Return
+					</Button>
+				)}
+				{!canAddPickup && !canAddReturn && !bothComplete && bookingStatus !== 'Completed' && bookingStatus !== 'Cancelled' && (
+					<div className="text-sm text-muted-foreground p-4 border rounded-lg bg-muted/30">
+						{!hasPickup
+							? 'Checklist pickup bisa diisi setelah booking dikonfirmasi.'
+							: 'Checklist return bisa diisi saat rental aktif.'}
+					</div>
+				)}
+			</div>
+
+			{/* Display Checklists */}
+			{bothComplete ? (
+				<ChecklistComparison
+					pickup={checklists!.pickup!}
+					returnChecklist={checklists!.return!}
+				/>
+			) : (
+				<div className="grid gap-6 md:grid-cols-2">
+					{hasPickup && checklists?.pickup && (
+						<ChecklistDisplay checklist={checklists.pickup} />
+					)}
+					{hasReturn && checklists?.return && (
+						<ChecklistDisplay checklist={checklists.return} />
+					)}
+					{!hasPickup && !hasReturn && (
+						<div className="col-span-2 text-center py-12 text-muted-foreground border rounded-lg">
+							<ClipboardCheck className="mx-auto size-12 mb-3 opacity-50" />
+							<p>Belum ada checklist untuk booking ini.</p>
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* Checklist Forms */}
+			<ChecklistForm
+				open={showPickupForm}
+				onOpenChange={setShowPickupForm}
+				bookingId={bookingId}
+				vehicleName={vehicleName}
+				plateNumber={plateNumber}
+				type="pickup"
+			/>
+			<ChecklistForm
+				open={showReturnForm}
+				onOpenChange={setShowReturnForm}
+				bookingId={bookingId}
+				vehicleName={vehicleName}
+				plateNumber={plateNumber}
+				type="return"
+			/>
 		</div>
 	);
 }

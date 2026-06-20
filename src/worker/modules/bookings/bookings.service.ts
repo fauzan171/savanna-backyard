@@ -1,6 +1,7 @@
 import { BookingsRepository } from './bookings.repository';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
+import { ChecklistsRepository } from '../checklists/checklists.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import {
 	generateBookingNumber,
@@ -41,7 +42,8 @@ export class BookingsService {
 	constructor(
 		private bookingRepo: BookingsRepository,
 		private vehicleRepo: VehiclesRepository,
-		private customerRepo: CustomersRepository
+		private customerRepo: CustomersRepository,
+		private checklistRepo?: ChecklistsRepository
 	) {}
 
 	// Transform addon to response format
@@ -383,6 +385,14 @@ export class BookingsService {
 			throw new NotFoundError('Booking');
 		}
 
+		// Validate pickup checklist exists
+		if (this.checklistRepo) {
+			const pickupChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'pickup');
+			if (!pickupChecklist) {
+				throw new ValidationError('Checklist pickup wajib diisi sebelum memulai rental');
+			}
+		}
+
 		this.validateStatusTransition(booking.status, 'Active');
 
 		// Validate start km
@@ -411,6 +421,14 @@ export class BookingsService {
 		// Check if already completed
 		if (booking.status === 'Completed') {
 			throw new ValidationError('Rental is already completed');
+		}
+
+		// Validate return checklist exists
+		if (this.checklistRepo) {
+			const returnChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'return');
+			if (!returnChecklist) {
+				throw new ValidationError('Checklist return wajib diisi sebelum menyelesaikan rental');
+			}
 		}
 
 		this.validateStatusTransition(booking.status, 'Completed');
