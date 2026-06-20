@@ -4,7 +4,7 @@ import { EmailService } from '@/worker/core/services/email.service';
 import { bookings, customers, vehicles } from '@/worker/core/database/schema';
 import { eq } from 'drizzle-orm';
 import { authMiddleware } from '@/worker/core/middleware/auth';
-import { validateBody } from '@/worker/core/middleware/validator';
+import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { sendEmailSchema, sendReminderSchema, type SendEmailRequest, type SendReminderRequest } from './emails.dto';
 import { NotFoundError, ValidationError } from '@/worker/core/types/errors';
 
@@ -168,9 +168,4 @@ export function createEmailsRouter(): Hono<EmailsEnv> {
 	});
 
 	return router;
-}
-
-// Helper function to get validated body from context
-function getValidatedBody<T>(c: Context): T {
-	return c.get('validatedBody') as T;
 }
