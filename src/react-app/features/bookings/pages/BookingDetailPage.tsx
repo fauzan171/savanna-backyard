@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, User, Car, Calendar, CreditCard, FileText, Phone, Mail, ClipboardCheck } from 'lucide-react';
+import { ArrowLeft, User, Car, Calendar, CreditCard, FileText, Phone, Mail, ClipboardCheck, Send, Bell } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Spinner } from '@/react-app/components/ui/spinner';
@@ -31,6 +31,9 @@ import {
 import { useChecklistsByBooking } from '@/react-app/features/checklists/hooks/useChecklists';
 import { ChecklistForm } from '@/react-app/features/checklists/components/ChecklistForm';
 import { ChecklistDisplay, ChecklistComparison } from '@/react-app/features/checklists/components/ChecklistDisplay';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { api } from '@/react-app/lib/api-client';
+import type { ApiSuccessResponse } from '@/react-app/features/shared/types/api.types';
 
 const formatCurrency = (amount: number, currency: 'IDR' | 'USD' = 'IDR') => {
 	return new Intl.NumberFormat('id-ID', {
@@ -107,6 +110,7 @@ export function BookingDetailPage() {
 					<TabsTrigger value="details">Details</TabsTrigger>
 					<TabsTrigger value="condition">Condition</TabsTrigger>
 					<TabsTrigger value="payments">Payments</TabsTrigger>
+					<TabsTrigger value="email">Email</TabsTrigger>
 					<TabsTrigger value="history">History</TabsTrigger>
 				</TabsList>
 
@@ -276,6 +280,20 @@ export function BookingDetailPage() {
 					<PaymentsTab payments={booking.payments ?? []} paymentSummary={booking.paymentSummary} currency={booking.currency} totalAmount={booking.totalAmount} />
 				</TabsContent>
 
+				<TabsContent value="email" className="space-y-6">
+					<EmailTab
+						bookingId={booking.id}
+						bookingNumber={booking.bookingNumber}
+						customerName={booking.customer.name}
+						customerEmail={booking.customer.email}
+						vehicleName={booking.vehicle.name}
+						startDate={booking.startDate}
+						endDate={booking.endDate}
+						totalAmount={booking.totalAmount}
+						currency={booking.currency}
+					/>
+				</TabsContent>
+
 				<TabsContent value="history" className="space-y-6">
 					<HistoryTab history={booking.statusHistory ?? []} />
 				</TabsContent>
@@ -380,6 +398,246 @@ function ConditionTab({
 				plateNumber={plateNumber}
 				type="return"
 			/>
+		</div>
+	);
+}
+
+function EmailTab({
+	bookingId,
+	bookingNumber,
+	customerName,
+	customerEmail,
+	vehicleName,
+	startDate,
+	endDate,
+	totalAmount,
+	currency,
+}: {
+	bookingId: string;
+	bookingNumber: string;
+	customerName: string;
+	customerEmail: string | null;
+	vehicleName: string;
+	startDate: string;
+	endDate: string;
+	totalAmount: number;
+	currency: 'IDR' | 'USD';
+}) {
+	const [subject, setSubject] = useState('');
+	const [message, setMessage] = useState('');
+	const [success, setSuccess] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	const formatCurrency = (amount: number, cur: 'IDR' | 'USD' = 'IDR') => {
+		return new Intl.NumberFormat('id-ID', {
+			style: 'currency',
+			currency: cur,
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0,
+		}).format(amount);
+	};
+
+	// Check email service status
+	const { data: emailStatus } = useQuery({
+		queryKey: ['email-status'],
+		queryFn: () => api.get<ApiSuccessResponse<{ configured: boolean; provider: string; fromEmail: string }>>('/v1/emails/status'),
+		select: (data) => data.data,
+	});
+
+	// Send custom email
+	const sendEmail = useMutation({
+		mutationFn: (data: { to: string; subject: string; message: string; bookingId?: string }) =>
+			api.post<ApiSuccessResponse<{ success: boolean }>>('/v1/emails/send', data),
+	});
+
+	// Send booking reminder
+	const sendReminder = useMutation({
+		mutationFn: (data: { bookingId: string }) =>
+			api.post<ApiSuccessResponse<{ success: boolean }>>('/v1/emails/send-reminder', data),
+	});
+
+	const handleSendEmail = async () => {
+		try {
+			setError(null);
+			setSuccess(null);
+
+			if (!customerEmail) {
+				setError('Customer tidak punya email');
+				return;
+			}
+			if (!subject.trim()) {
+				setError('Subject wajib diisi');
+				return;
+			}
+			if (!message.trim()) {
+				setError('Pesan wajib diisi');
+				return;
+			}
+
+			await sendEmail.mutateAsync({
+				to: customerEmail,
+				subject: subject.trim(),
+				message: message.trim(),
+				bookingId,
+			});
+
+			setSuccess(`Email berhasil dikirim ke ${customerEmail}`);
+			setSubject('');
+			setMessage('');
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Gagal mengirim email');
+		}
+	};
+
+	const handleSendReminder = async () => {
+		try {
+			setError(null);
+			setSuccess(null);
+
+			if (!customerEmail) {
+				setError('Customer tidak punya email');
+				return;
+			}
+
+			await sendReminder.mutateAsync({ bookingId });
+
+			setSuccess(`Reminder berhasil dikirim ke ${customerEmail}`);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Gagal mengirim reminder');
+		}
+	};
+
+	const isSending = sendEmail.isPending || sendReminder.isPending;
+
+	return (
+		<div className="space-y-6">
+			{/* Email Status */}
+			{emailStatus && !emailStatus.configured && (
+				<div className="p-4 rounded-lg bg-warning/10 border border-warning/20 text-warning text-sm">
+					⚠️ Email service belum dikonfigurasi. Set RESEND_API_KEY di Cloudflare Workers.
+				</div>
+			)}
+
+			{/* Customer Email Info */}
+			<div className="p-4 border rounded-lg">
+				<h3 className="font-semibold flex items-center gap-2 mb-3">
+					<Mail className="size-4" />
+					Email Customer
+				</h3>
+				{customerEmail ? (
+					<div className="flex items-center gap-2">
+						<span className="text-sm">{customerName}</span>
+						<span className="text-muted-foreground">•</span>
+						<a href={`mailto:${customerEmail}`} className="text-sm text-primary hover:underline">
+							{customerEmail}
+						</a>
+					</div>
+				) : (
+					<p className="text-sm text-muted-foreground">Customer belum punya email</p>
+				)}
+			</div>
+
+			{/* Quick Actions */}
+			<div className="flex gap-3">
+				<Button
+					variant="outline"
+					onClick={handleSendReminder}
+					disabled={isSending || !customerEmail}
+				>
+					<Bell className="mr-2 size-4" />
+					{sendReminder.isPending ? 'Mengirim...' : 'Kirim Reminder'}
+				</Button>
+			</div>
+
+			{/* Compose Email */}
+			<div className="space-y-4 p-4 border rounded-lg">
+				<h3 className="font-semibold flex items-center gap-2">
+					<Send className="size-4" />
+					Kirim Email Custom
+				</h3>
+
+				<FormField label="Subject" required>
+					<Input
+						value={subject}
+						onChange={(e) => setSubject(e.target.value)}
+						placeholder={`Re: Booking ${bookingNumber}`}
+						disabled={isSending}
+					/>
+				</FormField>
+
+				<FormField label="Pesan" required>
+					<Textarea
+						value={message}
+						onChange={(e) => setMessage(e.target.value)}
+						placeholder="Tulis pesan untuk customer..."
+						rows={8}
+						disabled={isSending}
+					/>
+				</FormField>
+
+				{/* Quick Templates */}
+				<div className="space-y-2">
+					<p className="text-sm text-muted-foreground">Template cepat:</p>
+					<div className="flex flex-wrap gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSubject(`Konfirmasi Booking ${bookingNumber}`);
+								setMessage(`Halo ${customerName},\n\nTerima kasih telah melakukan booking di Savanna Bromo Rental.\n\nDetail Booking:\n- No. Booking: ${bookingNumber}\n- Kendaraan: ${vehicleName}\n- Tanggal: ${format(new Date(startDate), 'dd MMM yyyy')} - ${format(new Date(endDate), 'dd MMM yyyy')}\n- Total: ${formatCurrency(totalAmount, currency)}\n\nSilakan hubungi kami jika ada pertanyaan.\n\nSalam,\nSavanna Bromo Rental`);
+							}}
+							disabled={isSending}
+						>
+							Konfirmasi Booking
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSubject(`Informasi Pickup ${bookingNumber}`);
+								setMessage(`Halo ${customerName},\n\nMengingatkan bahwa jadwal pickup Anda:\n- No. Booking: ${bookingNumber}\n- Kendaraan: ${vehicleName}\n- Tanggal: ${format(new Date(startDate), 'dd MMM yyyy')}\n- Waktu: 08:00 - 10:00 WIB\n- Lokasi: Kantor Savanna Bromo Rental\n\nHarap datang tepat waktu dan bawa identitas (KTP/SIM).\n\nSalam,\nSavanna Bromo Rental`);
+							}}
+							disabled={isSending}
+						>
+							Info Pickup
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => {
+								setSubject(`Pengingat Return ${bookingNumber}`);
+								setMessage(`Halo ${customerName},\n\nMengingatkan bahwa jadwal return Anda:\n- No. Booking: ${bookingNumber}\n- Kendaraan: ${vehicleName}\n- Tanggal: ${format(new Date(endDate), 'dd MMM yyyy')}\n\nMohon kembalikan kendaraan sesuai jadwal.\n\nSalam,\nSavanna Bromo Rental`);
+							}}
+							disabled={isSending}
+						>
+							Pengingat Return
+						</Button>
+					</div>
+				</div>
+
+				{/* Status Messages */}
+				{success && (
+					<div className="p-3 rounded-md bg-green-50 border border-green-200 text-green-700 text-sm">
+						✅ {success}
+					</div>
+				)}
+				{error && (
+					<div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+						❌ {error}
+					</div>
+				)}
+
+				{/* Send Button */}
+				<div className="flex justify-end">
+					<Button
+						onClick={handleSendEmail}
+						disabled={isSending || !customerEmail || !subject.trim() || !message.trim()}
+					>
+						<Send className="mr-2 size-4" />
+						{sendEmail.isPending ? 'Mengirim...' : 'Kirim Email'}
+					</Button>
+				</div>
+			</div>
 		</div>
 	);
 }
