@@ -257,6 +257,28 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 		});
 	});
 
+	// Equipment catalog (public read)
+	router.get('/equipment', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicEquipment();
+		return c.json({ success: true, data: result });
+	});
+	router.get('/equipment/:id', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getPublicEquipmentById(c.req.param('id'));
+		if (!result) {
+			return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Equipment not found' } }, 404);
+		}
+		return c.json({ success: true, data: result });
+	});
+
+	// Per-vehicle availability calendar (booked vs available dates for a month)
+	router.get('/vehicles/:id/availability', async (c: Context<PublicApiEnv>) => {
+		const service = c.get('publicApiService');
+		const result = await service.getVehicleAvailabilityForMonth(c.req.param('id'), c.req.query('month') ?? '');
+		return c.json({ success: true, data: result });
+	});
+
 	// Public end-user auth (Google OAuth + WhatsApp OTP). Inherits X-API-Key + CORS
 	// (credentials:true) from this router; account routes add publicUserAuthMiddleware.
 	router.route('/auth', createPublicAuthRouter() as unknown as Hono<PublicApiEnv>);

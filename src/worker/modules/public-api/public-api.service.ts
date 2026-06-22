@@ -28,6 +28,17 @@ function safeJsonParseStringArray(value: string | null | undefined): string[] {
   return Array.isArray(parsed) ? parsed.map((v) => String(v)) : [];
 }
 
+/** Parse a 'YYYY-MM-DD' string into a UTC Date (timezone-safe). */
+function parseDateStr(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(Date.UTC(y!, m! - 1, d!));
+}
+
+/** Format a UTC Date back to a 'YYYY-MM-DD' string (timezone-safe). */
+function formatDateStr(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
 /**
  * Resolve a stored URL into an absolute URL consumable by external clients.
  *
@@ -570,6 +581,74 @@ export class PublicApiService {
       totalAmount: booking.totalAmount,
       paidAt: booking.paidAt,
     };
+  }
+
+  // ---- Equipment (public catalog) ----
+  async getPublicEquipment(): Promise<Array<{
+    id: string; name: string; category: string; description: string | null;
+    dailyRateIdr: number; image: string | null; stock: number; minRentalDays: number;
+  }>> {
+    const items = await this.repo.getActiveEquipment();
+    return items.map((e) => ({
+      id: e.id,
+      name: e.name,
+      category: e.category,
+      description: e.description,
+      dailyRateIdr: e.dailyRateIdr,
+      image: e.image,
+      stock: e.stock,
+      minRentalDays: e.minRentalDays,
+    }));
+  }
+
+  async getPublicEquipmentById(id: string): Promise<{
+    id: string; name: string; category: string; description: string | null;
+    dailyRateIdr: number; image: string | null; stock: number; minRentalDays: number;
+  } | null> {
+    const e = await this.repo.getEquipmentById(id);
+    if (!e) return null;
+    return {
+      id: e.id, name: e.name, category: e.category, description: e.description,
+      dailyRateIdr: e.dailyRateIdr, image: e.image, stock: e.stock, minRentalDays: e.minRentalDays,
+    };
+  }
+
+  // ---- Per-vehicle availability calendar (for the motor detail page) ----
+  async getVehicleAvailabilityForMonth(vehicleId: string, month: string): Promise<{
+    vehicleId: string; month: string; availableDates: string[]; bookedDates: string[];
+  }> {
+    const match = /^(\d{4})-(\d{2})$/.exec(month);
+    if (!match) throw new ValidationError('Invalid month format (YYYY-MM)');
+    const year = Number(match[1]);
+    const mon = Number(match[2]);
+    const mm = String(mon).padStart(2, '0');
+    const monthStart = `${year}-${mm}-01`;
+    const lastDay = new Date(Date.UTC(year, mon, 0)).getUTCDate(); // day 0 of next month
+    const monthEnd = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+
+    const vehicle = await this.repo.getVehicleById(vehicleId);
+    if (!vehicle) throw new ValidationError('Vehicle not found');
+
+    const bkgs = await this.repo.getVehicleBookingsInRange(vehicleId, monthStart, monthEnd);
+    const bookedSet = new Set<string>();
+    for (const b of bkgs) {
+      // A booking occupies [startDate, endDate) — endDate is the return day (free again),
+      // consistent with the back-to-back availability check.
+      const start = parseDateStr(b.startDate);
+      const end = parseDateStr(b.endDate);
+      for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
+        const ds = formatDateStr(d);
+        if (ds >= monthStart && ds <= monthEnd) bookedSet.add(ds);
+      }
+    }
+
+    const availableDates: string[] = [];
+    const bookedDates: string[] = [];
+    for (let day = 1; day <= lastDay; day++) {
+      const ds = `${year}-${mm}-${String(day).padStart(2, '0')}`;
+      (bookedSet.has(ds) ? bookedDates : availableDates).push(ds);
+    }
+    return { vehicleId, month, availableDates, bookedDates };
   }
 
   private getDisplayName(type: string): string {

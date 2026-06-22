@@ -1,5 +1,5 @@
-import { eq, and, or, gte, lte, like, sql, asc } from 'drizzle-orm';
-import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail } from '@/worker/core/database/schema';
+import { eq, and, or, gte, lte, like, sql, asc, inArray } from 'drizzle-orm';
+import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
 export class PublicApiRepository {
@@ -159,5 +159,35 @@ export class PublicApiRepository {
 	async getTrailById(id: string): Promise<Trail | null> {
 		const result = await this.db.select().from(trails).where(eq(trails.id, id)).limit(1);
 		return result[0] ?? null;
+	}
+
+	// ---- Equipment ----
+	async getActiveEquipment(): Promise<Equipment[]> {
+		return this.db.select().from(equipment).where(eq(equipment.isActive, true)).orderBy(asc(equipment.sortOrder), asc(equipment.name));
+	}
+
+	async getEquipmentById(id: string): Promise<Equipment | null> {
+		const [row] = await this.db.select().from(equipment).where(eq(equipment.id, id)).limit(1);
+		return row ?? null;
+	}
+
+	/** Active bookings for a vehicle overlapping [startDate, endDate] (used for the availability calendar). */
+	async getVehicleBookingsInRange(vehicleId: string, startDate: string, endDate: string): Promise<Booking[]> {
+		return this.db
+			.select()
+			.from(bookings)
+			.where(
+				and(
+					eq(bookings.vehicleId, vehicleId),
+					or(
+						eq(bookings.status, 'Pending'),
+						eq(bookings.status, 'pending_payment'),
+						eq(bookings.status, 'Confirmed'),
+						eq(bookings.status, 'Active'),
+					),
+					lte(bookings.startDate, endDate),
+					gte(bookings.endDate, startDate),
+				),
+			);
 	}
 }
