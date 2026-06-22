@@ -4,6 +4,7 @@ import { PublicApiRepository } from './public-api.repository';
 import { PublicApiService } from './public-api.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { apiKeyMiddleware } from '@/worker/core/middleware/api-key';
+import { optionalPublicUserAuth } from '@/worker/core/middleware/public-auth';
 import { publicApiRateLimit } from '@/worker/core/middleware/rate-limit';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import { cors } from 'hono/cors';
@@ -18,7 +19,7 @@ import {
 	type CreatePublicBookingRequest,
 	type GetPublicReviewsQuery,
 } from './public-api.dto';
-import { createPublicAuthRouter } from '@/worker/modules/public-users/public-users.routes';
+import { createPublicAuthRouter, createPublicMeRouter } from '@/worker/modules/public-users/public-users.routes';
 
 type PublicApiVariables = { publicApiService: PublicApiService };
 type PublicApiEnv = { Bindings: Env; Variables: PublicApiVariables };
@@ -109,7 +110,10 @@ const createBookingHandler = async (c: Context<PublicApiEnv>) => {
 			break;
 	}
 
-	const result = await service.createPublicBooking(body, { vendor, config });
+	// Link the booking to the logged-in public user's account when a valid cookie is
+	// present; guests (no cookie) still work unchanged.
+	const publicUserId = c.get('publicUser')?.publicUserId;
+	const result = await service.createPublicBooking(body, { vendor, config }, { publicUserId });
 
 	return c.json({
 		success: true,
@@ -148,7 +152,7 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	router.get('/vehicles/:id', getVehicleDetailsHandler);
 
 	// New: public booking endpoint
-	router.post('/bookings', validateBody(createPublicBookingSchema), createBookingHandler);
+	router.post('/bookings', optionalPublicUserAuth(), validateBody(createPublicBookingSchema), createBookingHandler);
 
 	// ===== FASE 2 ROUTES =====
 
@@ -282,6 +286,9 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	// Public end-user auth (Google OAuth + WhatsApp OTP). Inherits X-API-Key + CORS
 	// (credentials:true) from this router; account routes add publicUserAuthMiddleware.
 	router.route('/auth', createPublicAuthRouter() as unknown as Hono<PublicApiEnv>);
+
+	// Account-scoped booking access (My Bookings, pay remaining). Cookie-authenticated.
+	router.route('/me', createPublicMeRouter() as unknown as Hono<PublicApiEnv>);
 
 	return router;
 }

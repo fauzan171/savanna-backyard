@@ -36,6 +36,13 @@ export const createPublicBookingSchema = z.object({
 	notes: z.string().max(1000).optional().nullable().or(z.literal('')),
 	/** Payment method: 'QRIS' | 'BankTransfer' | 'Gateway' (all methods). Default: 'Gateway' */
 	paymentMethod: z.enum(['QRIS', 'BankTransfer', 'Gateway']).optional(),
+	/** Equipment line items to rent alongside the vehicle (per-day, same duration). */
+	equipment: z.array(z.object({
+		equipmentId: z.string().min(1),
+		quantity: z.number().int().min(1),
+	})).optional(),
+	/** 'full' (pay everything) or 'dp' (down-payment via Xendit allow_partial). Default: 'full' */
+	paymentType: z.enum(['full', 'dp']).optional(),
 });
 
 // Types

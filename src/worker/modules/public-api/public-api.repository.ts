@@ -1,5 +1,5 @@
 import { eq, and, or, gte, lte, like, sql, asc, inArray } from 'drizzle-orm';
-import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment } from '@/worker/core/database/schema';
+import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
 export class PublicApiRepository {
@@ -169,6 +169,20 @@ export class PublicApiRepository {
 	async getEquipmentById(id: string): Promise<Equipment | null> {
 		const [row] = await this.db.select().from(equipment).where(eq(equipment.id, id)).limit(1);
 		return row ?? null;
+	}
+
+	/** Fetch multiple active equipment items by id (for booking line items). */
+	async getActiveEquipmentByIds(ids: string[]): Promise<Equipment[]> {
+		if (ids.length === 0) return [];
+		return this.db.select().from(equipment).where(and(inArray(equipment.id, ids), eq(equipment.isActive, true)));
+	}
+
+	/** Insert equipment line items for a booking (unit price snapshotted at booking time). */
+	async createBookingEquipment(rows: Array<Omit<NewBookingEquipment, 'id' | 'createdAt'>>): Promise<void> {
+		if (rows.length === 0) return;
+		const now = new Date().toISOString();
+		const withIds = rows.map((r) => ({ id: crypto.randomUUID(), createdAt: now, ...r }));
+		await this.db.insert(bookingEquipment).values(withIds);
 	}
 
 	/** Active bookings for a vehicle overlapping [startDate, endDate] (used for the availability calendar). */

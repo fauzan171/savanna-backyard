@@ -6,7 +6,7 @@ import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
 import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
-import { publicUserAuthMiddleware } from '@/worker/core/middleware/public-auth';
+import { publicUserAuthMiddleware, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { PublicUsersRepository } from './public-users.repository';
 import { PublicUsersService } from './public-users.service';
@@ -157,6 +157,41 @@ export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	router.get('/me', publicUserAuthMiddleware(), meHandler);
 	router.put('/profile', publicUserAuthMiddleware(), validateBody(updateProfileSchema), profileHandler);
 	router.post('/logout', publicUserAuthMiddleware(), logoutHandler);
+
+	return router;
+}
+
+// ---- /me: account-scoped booking access (mounted under /api/v1/public/me) ----
+const myBookingsHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const result = await service.myBookings(pu.publicUserId);
+	return c.json({ success: true, data: result });
+};
+
+const myBookingDetailHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const result = await service.myBookingDetail(pu.publicUserId, c.req.param('id'));
+	return c.json({ success: true, data: result });
+};
+
+const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const result = await service.payRemaining(pu.publicUserId, c.req.param('bookingId'));
+	return c.json({ success: true, message: 'Reopen the invoice to pay the remainder', data: result });
+};
+
+export function createPublicMeRouter(): Hono<PublicUsersEnv> {
+	const router = new Hono<PublicUsersEnv>();
+	router.use('*', publicUsersServicesMiddleware());
+	router.use('*', publicUserAuthMiddleware());
+
+	router.get('/bookings', myBookingsHandler);
+	router.get('/bookings/:id', myBookingDetailHandler);
+	// Pay the remainder requires a verified phone (anti-abuse)
+	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
 
 	return router;
 }

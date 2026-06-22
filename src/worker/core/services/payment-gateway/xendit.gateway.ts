@@ -80,7 +80,7 @@ export class XenditGateway implements PaymentGateway {
 		}
 
 		const externalId = request.bookingId;
-		const body = {
+		const body: Record<string, unknown> = {
 			external_id: externalId,
 			amount: request.amount,
 			currency: request.currency === 'USD' ? 'USD' : 'IDR',
@@ -94,6 +94,16 @@ export class XenditGateway implements PaymentGateway {
 			failure_redirect_url: undefined,
 			payment_methods: this.resolvePaymentMethods(request.method),
 		};
+
+		// Down-payment support: one invoice for the full amount, allow_partial lets the
+		// customer pay at least `minimum_amount` (the DP). They reopen the same invoice
+		// to pay the remainder — no second invoice needed.
+		if (request.allowPartial) {
+			body.allow_partial = true;
+			if (request.minimumAmount && request.minimumAmount > 0) {
+				body.minimum_amount = request.minimumAmount;
+			}
+		}
 
 		console.log('[Xendit] Creating invoice:', { externalId, amount: request.amount, method: request.method });
 

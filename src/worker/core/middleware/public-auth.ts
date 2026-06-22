@@ -87,3 +87,44 @@ export function requirePhoneVerified() {
 		await next();
 	};
 }
+
+/**
+ * Optional public-user auth: sets c.get('publicUser') if a valid `type: 'public'`
+ * cookie is present, otherwise does nothing. Used by the public booking route so a
+ * logged-in user's booking is linked to their account while guests still work.
+ */
+export function optionalPublicUserAuth() {
+	return async (c: Context, next: Next) => {
+		const authHeader = c.req.header('Authorization');
+		let token: string | undefined;
+		if (authHeader?.startsWith('Bearer ')) {
+			token = authHeader.slice(7);
+		} else {
+			token = getCookie(c, 'token');
+		}
+		if (token) {
+			try {
+				const isValid = await jwt.verify(token, c.env.JWT_SECRET);
+				if (isValid) {
+					const decoded = jwt.decode(token) as { payload: { userId: string; type?: string; jti: string } };
+					if (decoded?.payload?.userId && decoded.payload.type === 'public') {
+						const db = createDb(c.env.DB);
+						const [user] = await db.select().from(publicUsers).where(eq(publicUsers.id, decoded.payload.userId)).limit(1);
+						if (user?.isActive) {
+							c.set('publicUser', {
+								publicUserId: user.id,
+								email: user.email,
+								name: user.name,
+								phone: user.phone,
+								phoneVerified: user.phoneVerified,
+							});
+						}
+					}
+				}
+			} catch {
+				// Ignore — optional auth, treat as guest
+			}
+		}
+		await next();
+	};
+}

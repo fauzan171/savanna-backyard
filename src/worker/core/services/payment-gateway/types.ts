@@ -13,6 +13,10 @@ export interface CreatePaymentRequest {
 	customerEmail?: string;
 	customerPhone?: string;
 	description?: string;
+	/** Xendit allow_partial: customer may pay less than `amount` (down-payment / DP). */
+	allowPartial?: boolean;
+	/** Minimum acceptable partial payment (the DP amount); used together with allowPartial. */
+	minimumAmount?: number;
 }
 
 // Response from creating a payment

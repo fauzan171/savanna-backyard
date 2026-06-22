@@ -1,5 +1,5 @@
 import { bookings, payments, customers, vehicles } from '@/worker/core/database/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
 import type { EmailService } from '@/worker/core/services/email.service';
 
@@ -203,85 +203,114 @@ export class WebhooksService {
 		}
 
 		const booking = bookingResult[0]!;
-
-		// Update booking status
 		const now = new Date().toISOString();
-		await this.db
-			.update(bookings)
-			.set({
-				status: statusMapping.bookingStatus as typeof bookings.$inferSelect.status,
-				paymentStatus: statusMapping.paymentStatus,
-				paidAt: ['PAID', 'SETTLED'].includes(invoiceStatus) ? (paidAt ?? now) : null,
-				updatedAt: now,
-			})
-			.where(eq(bookings.id, booking.id));
+		const isPaidEvent = ['PAID', 'SETTLED'].includes(invoiceStatus);
 
-		// If payment successful, create payment record and send email
-		if (['PAID', 'SETTLED'].includes(invoiceStatus)) {
-			try {
-				const paymentId = crypto.randomUUID();
-				await this.db.insert(payments).values({
-					id: paymentId,
-					bookingId: booking.id,
-					amount,
-					currency: 'IDR',
-					method: paymentMethod === 'QRIS' ? 'QRIS' : 'Gateway',
-					status: 'Verified',
-					transactionReference: invoiceId,
-					verifiedAt: now,
-					verifiedBy: null,
-					notes: 'Auto-verified via Xendit webhook',
-					createdAt: now,
-					updatedAt: now,
-				});
-			} catch (e) {
-				console.log('Payment record may already exist, skipping:', e);
+		// Resolve final statuses; branch DP vs full settlement on paid events
+		let bookingStatus = statusMapping.bookingStatus;
+		let paymentStatus = statusMapping.paymentStatus;
+		const updateFields: Record<string, unknown> = { updatedAt: now };
+
+		if (isPaidEvent) {
+			// Idempotency: record the payment only once per Xendit invoice id
+			const existing = await this.db
+				.select({ id: payments.id })
+				.from(payments)
+				.where(eq(payments.transactionReference, invoiceId))
+				.limit(1);
+			if (existing.length === 0) {
+				try {
+					await this.db.insert(payments).values({
+						id: crypto.randomUUID(),
+						bookingId: booking.id,
+						amount,
+						currency: 'IDR',
+						method: paymentMethod === 'QRIS' ? 'QRIS' : 'Gateway',
+						status: 'Verified',
+						transactionReference: invoiceId,
+						verifiedAt: now,
+						verifiedBy: null,
+						notes: 'Auto-verified via Xendit webhook',
+						createdAt: now,
+						updatedAt: now,
+					});
+				} catch (e) {
+					console.log('Payment record insert failed, skipping:', e);
+				}
 			}
 
-			// Send payment confirmation email
-			if (this.emailService) {
-				try {
-					// Fetch customer and vehicle details for email
-					const customerResult = await this.db
-						.select()
-						.from(customers)
-						.where(eq(customers.id, booking.customerId))
-						.limit(1);
+			// Sum all verified payments to decide DP (partial) vs full settlement
+			const paidRows = await this.db
+				.select({ sum: sql<number>`COALESCE(SUM(${payments.amount}), 0)` })
+				.from(payments)
+				.where(and(eq(payments.bookingId, booking.id), eq(payments.status, 'Verified')));
+			const totalPaid = Number(paidRows[0]?.sum ?? 0);
+			const total = booking.totalAmount;
+			const isFullyPaid = totalPaid >= total;
 
-					const vehicleResult = await this.db
-						.select()
-						.from(vehicles)
-						.where(eq(vehicles.id, booking.vehicleId))
-						.limit(1);
+			if (isFullyPaid) {
+				bookingStatus = 'Confirmed';
+				paymentStatus = 'settlement';
+				updateFields.fullyPaidAt = now;
+				updateFields.remainingAmount = 0;
+			} else {
+				// Partial payment => down-payment (DP). Booking stays pending until fully paid.
+				bookingStatus = 'pending_payment';
+				paymentStatus = 'dp_paid';
+				if (!booking.dpPaidAt) updateFields.dpPaidAt = now;
+				updateFields.remainingAmount = Math.max(0, total - totalPaid);
+			}
+			updateFields.paidAt = paidAt ?? now;
+		}
 
-					const customer = customerResult[0];
-					const vehicle = vehicleResult[0];
+		updateFields.status = bookingStatus as typeof bookings.$inferSelect.status;
+		updateFields.paymentStatus = paymentStatus;
 
-					if (customer?.email) {
-						const emailSent = await this.emailService.sendPaymentConfirmation({
-							customerName: customer.name,
-							customerEmail: customer.email,
-							bookingNumber: booking.bookingNumber,
-							vehicleName: vehicle?.name ?? 'Unknown Vehicle',
-							startDate: booking.startDate,
-							endDate: booking.endDate,
-							totalAmount: amount,
-							paymentMethod: paymentMethod === 'QRIS' ? 'QRIS' : 'Virtual Account',
-							paidAt: paidAt ?? now,
-						});
+		await this.db.update(bookings).set(updateFields).where(eq(bookings.id, booking.id));
 
-						if (emailSent) {
-							console.log(`Payment confirmation email sent to ${customer.email}`);
-						} else {
-							console.error(`Failed to send payment confirmation email to ${customer.email}`);
-						}
+		// Send payment confirmation email on paid events (full or DP)
+		if (isPaidEvent && this.emailService) {
+			try {
+				// Fetch customer and vehicle details for email
+				const customerResult = await this.db
+					.select()
+					.from(customers)
+					.where(eq(customers.id, booking.customerId))
+					.limit(1);
+
+				const vehicleResult = await this.db
+					.select()
+					.from(vehicles)
+					.where(eq(vehicles.id, booking.vehicleId))
+					.limit(1);
+
+				const customer = customerResult[0];
+				const vehicle = vehicleResult[0];
+
+				if (customer?.email) {
+					const emailSent = await this.emailService.sendPaymentConfirmation({
+						customerName: customer.name,
+						customerEmail: customer.email,
+						bookingNumber: booking.bookingNumber,
+						vehicleName: vehicle?.name ?? 'Unknown Vehicle',
+						startDate: booking.startDate,
+						endDate: booking.endDate,
+						totalAmount: amount,
+						paymentMethod: paymentMethod === 'QRIS' ? 'QRIS' : 'Virtual Account',
+						paidAt: paidAt ?? now,
+					});
+
+					if (emailSent) {
+						console.log(`Payment confirmation email sent to ${customer.email}`);
 					} else {
-						console.log(`Customer email not available for booking ${booking.bookingNumber}`);
+						console.error(`Failed to send payment confirmation email to ${customer.email}`);
 					}
-				} catch (emailError) {
-					// Don't fail the webhook if email fails
-					console.error('Error sending payment confirmation email:', emailError);
+				} else {
+					console.log(`Customer email not available for booking ${booking.bookingNumber}`);
 				}
+			} catch (emailError) {
+				// Don't fail the webhook if email fails
+				console.error('Error sending payment confirmation email:', emailError);
 			}
 		}
 	}

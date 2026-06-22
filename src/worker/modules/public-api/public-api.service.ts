@@ -239,12 +239,17 @@ export class PublicApiService {
       vendor: GatewayVendor;
       config: Record<string, string>;
     },
+    options?: { publicUserId?: string },
   ): Promise<{
     bookingId: string;
     bookingNumber: string;
     paymentPageUrl: string | null;
     qrString: string | null;
+    xenditInvoiceId: string | null;
     totalAmount: number;
+    paymentType: 'full' | 'dp';
+    dpAmount: number;
+    remainingAmount: number;
     paymentError: string | null;
   }> {
     // Validate dates
@@ -281,12 +286,43 @@ export class PublicApiService {
       });
     }
 
-    // Calculate amount
+    // Calculate base amount (vehicle)
     const days = Math.ceil(
       (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
         (1000 * 60 * 60 * 24),
     );
-    const totalAmount = days * vehicle.dailyRateIdr;
+    const baseAmount = days * vehicle.dailyRateIdr;
+
+    // ---- Equipment line items (per-day, same duration as the vehicle) ----
+    let equipmentTotalAmount = 0;
+    const equipmentRows: Array<{ equipmentId: string; quantity: number; unitPrice: number; totalPrice: number }> = [];
+    const requestedEquipment = data.equipment ?? [];
+    if (requestedEquipment.length > 0) {
+      const ids = requestedEquipment.map((e) => e.equipmentId);
+      const items = await this.repo.getActiveEquipmentByIds(ids);
+      const byId = new Map(items.map((i) => [i.id, i]));
+      for (const req of requestedEquipment) {
+        const item = byId.get(req.equipmentId);
+        if (!item)
+          throw new ValidationError(`Equipment not found or inactive: ${req.equipmentId}`);
+        const unitPrice = item.dailyRateIdr;
+        const totalPrice = unitPrice * req.quantity * days;
+        equipmentTotalAmount += totalPrice;
+        equipmentRows.push({ equipmentId: item.id, quantity: req.quantity, unitPrice, totalPrice });
+      }
+    }
+
+    const totalAmount = baseAmount + equipmentTotalAmount;
+
+    // ---- Payment type: full vs DP (down-payment via Xendit allow_partial) ----
+    const paymentType: 'full' | 'dp' = data.paymentType === 'dp' ? 'dp' : 'full';
+    let dpAmount = 0;
+    let remainingAmount = 0;
+    if (paymentType === 'dp') {
+      const dpPct = await this.configRepo.getNumber('dp_percentage', 30);
+      dpAmount = Math.round((totalAmount * dpPct) / 100);
+      remainingAmount = totalAmount - dpAmount;
+    }
 
     // Create booking
     const booking = await this.repo.createBooking({
@@ -295,21 +331,40 @@ export class PublicApiService {
       startDate: data.startDate,
       endDate: data.endDate,
       status: "pending_payment",
-      paymentTerms: "Full_Upfront",
+      paymentTerms: paymentType === 'dp' ? "DP_Pickup" : "Full_Upfront",
       paymentStatus: "pending",
       paymentMethod: "online",
-      baseAmount: totalAmount,
+      baseAmount,
+      equipmentTotalAmount,
       addonsAmount: 0,
       lateFee: 0,
       totalAmount,
+      paymentType,
+      dpAmount,
+      remainingAmount,
+      publicUserId: options?.publicUserId ?? null,
       currency: "IDR",
       notes: data.notes || null,
       createdBy: null,
     });
 
+    // Persist equipment line items (unit price snapshotted)
+    if (equipmentRows.length > 0) {
+      await this.repo.createBookingEquipment(
+        equipmentRows.map((r) => ({
+          bookingId: booking.id,
+          equipmentId: r.equipmentId,
+          quantity: r.quantity,
+          unitPrice: r.unitPrice,
+          totalPrice: r.totalPrice,
+        })),
+      );
+    }
+
     // Request payment page via the configured gateway
     let paymentPageUrl: string | null = null;
     let qrString: string | null = null;
+    let xenditInvoiceId: string | null = null;
 
     const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor, gatewayConfig.config);
     let paymentError: string | null = null;
@@ -327,16 +382,22 @@ export class PublicApiService {
           customerEmail: customer.email ?? undefined,
           customerPhone: customer.phone,
           description: `Rental ${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
+          // DP => one invoice for the full amount, allow_partial lets the customer pay
+          // at least the DP now and reopen the same invoice later for the remainder.
+          allowPartial: paymentType === 'dp',
+          minimumAmount: paymentType === 'dp' ? dpAmount : undefined,
         });
 
         if (result.success) {
           paymentPageUrl = result.paymentUrl ?? null;
           qrString = result.qrString ?? null;
+          xenditInvoiceId = result.transactionId ?? null;
 
-          // Save payment page URL to booking
-          if (paymentPageUrl) {
+          // Save payment page URL + Xendit invoice id to booking
+          if (paymentPageUrl || xenditInvoiceId) {
             await this.repo.updateBooking(booking.id, {
-              paymentPageUrl,
+              ...(paymentPageUrl ? { paymentPageUrl } : {}),
+              ...(xenditInvoiceId ? { xenditInvoiceId } : {}),
             });
           }
         } else {
@@ -354,7 +415,11 @@ export class PublicApiService {
       bookingNumber: booking.bookingNumber,
       paymentPageUrl,
       qrString,
+      xenditInvoiceId,
       totalAmount,
+      paymentType,
+      dpAmount,
+      remainingAmount,
       paymentError: paymentError ?? (paymentPageUrl ? null : 'paymentPageUrl is null — gateway may not have been called'),
     };
   }

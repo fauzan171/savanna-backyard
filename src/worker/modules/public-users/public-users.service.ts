@@ -267,4 +267,38 @@ export class PublicUsersService {
 		if (!b) throw new NotFoundError('Booking');
 		return toBookingSummary(b);
 	}
+
+	/**
+	 * Re-open the booking's payment to pay the remainder (DP -> full).
+	 * The Xendit invoice was created with allow_partial for the full amount, so the
+	 * customer reopens the SAME invoice_url to pay more. No new invoice is created
+	 * unless the original expired (follow-up: create a fresh invoice for the remainder).
+	 */
+	async payRemaining(publicUserId: string, bookingId: string): Promise<{
+		bookingId: string;
+		bookingNumber: string;
+		paymentStatus: string | null;
+		paymentPageUrl: string | null;
+		xenditInvoiceId: string | null;
+		totalAmount: number;
+		remainingAmount: number | null;
+	}> {
+		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+		if (!b) throw new NotFoundError('Booking');
+
+		const isFullyPaid = b.paymentStatus === 'settlement' || b.fullyPaidAt !== null;
+		if (isFullyPaid) {
+			throw new ValidationError('Booking is already fully paid');
+		}
+
+		return {
+			bookingId: b.id,
+			bookingNumber: b.bookingNumber,
+			paymentStatus: b.paymentStatus,
+			paymentPageUrl: b.paymentPageUrl,
+			xenditInvoiceId: b.xenditInvoiceId,
+			totalAmount: b.totalAmount,
+			remainingAmount: b.remainingAmount,
+		};
+	}
 }
