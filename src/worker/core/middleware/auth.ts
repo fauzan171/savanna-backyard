@@ -2,7 +2,7 @@ import { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import jwt from '@tsndr/cloudflare-worker-jwt';
 import { UnauthorizedError } from '../types/errors';
-import type { UserContext, JwtPayload } from '../types';
+import type { UserContext, PublicUserContext, JwtPayload } from '../types';
 import { createDb } from '../database';
 import { TokenBlacklistRepository } from '../repositories/token-blacklist.repository';
 
@@ -10,6 +10,7 @@ import { TokenBlacklistRepository } from '../repositories/token-blacklist.reposi
 declare module 'hono' {
 	interface ContextVariableMap {
 		user: UserContext;
+		publicUser: PublicUserContext;
 		body: unknown;
 		query: unknown;
 	}
@@ -45,6 +46,13 @@ export function authMiddleware() {
 			}
 
 			const payload = decoded.payload;
+
+			// Enforce admin token type: reject public-user tokens from admin routes.
+			// Absent type = legacy admin token issued before the type claim existed.
+			const tokenType = payload.type ?? 'admin';
+			if (tokenType !== 'admin' || !payload.role) {
+				throw new UnauthorizedError('Invalid token type');
+			}
 
 			// Check if token is blacklisted
 			const db = createDb(c.env.DB);
@@ -88,7 +96,8 @@ export function optionalAuth() {
 				const isValid = await jwt.verify(token, c.env.JWT_SECRET);
 				if (isValid) {
 					const payload = jwt.decode(token) as { payload: JwtPayload };
-					if (payload?.payload?.userId) {
+					// Only adopt admin tokens here (public-user tokens are never treated as admin)
+					if (payload?.payload?.userId && (payload.payload.type ?? 'admin') === 'admin' && payload.payload.role) {
 						c.set('user', {
 							userId: payload.payload.userId,
 							role: payload.payload.role,

@@ -78,6 +78,7 @@ export class AuthService {
 
 		const { token } = await this.jwtService.sign({
 			userId: user.id,
+			type: 'admin',
 			role: user.role,
 		});
 

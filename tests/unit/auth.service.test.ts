@@ -66,6 +66,7 @@ describe('AuthService', () => {
 			expect(mockUserRepo.findByEmail).toHaveBeenCalledWith(testUser.email);
 			expect(mockJwtService.sign).toHaveBeenCalledWith({
 				userId: testUser.id,
+				type: 'admin',
 				role: testUser.role,
 			});
 		});

@@ -2,6 +2,11 @@ import { Hono, Context } from 'hono';
 import { createDb } from '@/worker/core/database';
 import { WebhooksService } from './webhooks.service';
 import { EmailService } from '@/worker/core/services/email.service';
+import { ConfigRepository } from '@/worker/core/repositories/config.repository';
+import { JwtService } from '@/worker/core/services/jwt.service';
+import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
+import { PublicUsersRepository } from '@/worker/modules/public-users/public-users.repository';
+import { PublicUsersService } from '@/worker/modules/public-users/public-users.service';
 
 type WebhookEnv = { Bindings: Env };
 
@@ -97,12 +102,50 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 	return c.json({ success: true, message: 'OK' });
 };
 
+/**
+ * WhatsApp inbound webhook for the phone-OTP flow.
+ * The user sends the Ref code (from /public/auth/phone/init) to the WhatsApp business
+ * number; the provider forwards the inbound message here. We parse the Ref, generate
+ * an OTP, store its hash, and reply the OTP via WhatsApp.
+ *
+ * Verification: shared secret via `x-whatsapp-token` header or `?token=` query, set as
+ * WHATSAPP_WEBHOOK_TOKEN. When unset (stub/dev), the request is accepted so the flow
+ * works locally without a provider configured.
+ */
+const whatsappInboundHandler = async (c: Context<WebhookEnv>) => {
+	let data: Record<string, unknown>;
+	try {
+		const text = await c.req.text();
+		data = text ? JSON.parse(text) : {};
+	} catch {
+		return c.json({ success: false, message: 'Invalid JSON' }, 400);
+	}
+
+	const secret = c.env.WHATSAPP_WEBHOOK_TOKEN ?? '';
+	const provided = c.req.header('x-whatsapp-token') ?? c.req.query('token') ?? '';
+	if (secret && provided !== secret) {
+		return c.json({ success: false, message: 'Invalid signature' }, 401);
+	}
+
+	const db = createDb(c.env.DB);
+	const configRepo = new ConfigRepository(db);
+	const jwtService = new JwtService(c.env.JWT_SECRET);
+	const repo = new PublicUsersRepository(db);
+	const google = await createGoogleOAuthProvider(configRepo);
+	const whatsapp = await createWhatsAppProvider(configRepo);
+	const service = new PublicUsersService(repo, jwtService, google, whatsapp, configRepo);
+
+	await service.handleWhatsappInbound(data);
+	return c.json({ success: true, message: 'OK' });
+};
+
 export function createWebhookRouter(): Hono<WebhookEnv> {
 	const router = new Hono<WebhookEnv>();
 
 	router.post('/midtrans/notification', midtransNotificationHandler);
 	router.post('/ifortepay/notification', ifortepayNotificationHandler);
 	router.post('/xendit/notification', xenditNotificationHandler);
+	router.post('/whatsapp', whatsappInboundHandler);
 
 	return router;
 }

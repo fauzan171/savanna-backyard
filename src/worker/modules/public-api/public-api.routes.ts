@@ -18,6 +18,7 @@ import {
 	type CreatePublicBookingRequest,
 	type GetPublicReviewsQuery,
 } from './public-api.dto';
+import { createPublicAuthRouter } from '@/worker/modules/public-users/public-users.routes';
 
 type PublicApiVariables = { publicApiService: PublicApiService };
 type PublicApiEnv = { Bindings: Env; Variables: PublicApiVariables };
@@ -127,11 +128,14 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 		origin: (origin, c) => {
 			const allowedOrigins = c.env.ALLOWED_PUBLIC_API_ORIGINS?.split(',').map((o: string) => o.trim()) ?? [];
 			if (origin && allowedOrigins.includes(origin)) return origin;
+			// Allow localhost for local dev against the landing page
 			if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) return origin;
-			return allowedOrigins[0] ?? null;
+			// With credentials:true the origin must be explicit (never '*')
+			return null;
 		},
-		credentials: false,
-		allowMethods: ['GET', 'POST', 'OPTIONS'],
+		// Required so the cross-origin landing page can send the httpOnly 'token' cookie
+		credentials: true,
+		allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'OPTIONS'],
 		allowHeaders: ['Content-Type', 'X-API-Key'],
 	}));
 
@@ -252,6 +256,10 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 			},
 		});
 	});
+
+	// Public end-user auth (Google OAuth + WhatsApp OTP). Inherits X-API-Key + CORS
+	// (credentials:true) from this router; account routes add publicUserAuthMiddleware.
+	router.route('/auth', createPublicAuthRouter() as unknown as Hono<PublicApiEnv>);
 
 	return router;
 }
