@@ -133,11 +133,16 @@ v1Routes.route('/equipment', createEquipmentRouter() as unknown as Hono<{ Bindin
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
 
-// Legacy /api redirect to /api/v1 (optional)
-app.get('/api/*', (c) => {
-	const path = c.req.path.replace('/api', '/api/v1');
-	return c.redirect(path);
-});
+// Legacy /api redirect to /api/v1 (only for /api/* that's not /api/v1/*)
+// This redirect is disabled to prevent redirect loops
+// app.get('/api/*', (c) => {
+// 	const path = c.req.path;
+// 	if (!path.startsWith('/api/v1')) {
+// 		const newPath = path.replace('/api', '/api/v1');
+// 		return c.redirect(newPath);
+// 	}
+// 	return c.text('Not found', 404);
+// });
 
 // Serve images from R2 (legacy /images/* paths from seed data)
 app.get('/images/:key{.+}', async (c) => {
