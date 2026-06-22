@@ -1,7 +1,8 @@
-import { sqliteTable, text, real, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, real, integer, index } from 'drizzle-orm/sqlite-core';
 import { users } from './users';
 import { customers } from './customers';
 import { vehicles } from './vehicles';
+import { publicUsers } from './public-users';
 
 // Bookings table
 export const bookings = sqliteTable('bookings', {
@@ -35,6 +36,20 @@ export const bookings = sqliteTable('bookings', {
 	reminderHourSentAt: text('reminder_hour_sent_at'),
 	followupSentAt: text('followup_sent_at'),
 	reviewRequestSentAt: text('review_request_sent_at'),
+	// Public-user account linking (nullable: old guest bookings have no account)
+	publicUserId: text('public_user_id').references(() => publicUsers.id),
+	// Equipment rental total (Σ equipment dailyRate × qty × days)
+	equipmentTotalAmount: real('equipment_total_amount').default(0),
+	// DP / partial payment (single Xendit invoice with allow_partial)
+	paymentType: text('payment_type', { enum: ['full', 'dp'] }).default('full'),
+	xenditInvoiceId: text('xendit_invoice_id'),
+	dpAmount: real('dp_amount').default(0),
+	dpPaidAt: text('dp_paid_at'),
+	remainingAmount: real('remaining_amount').default(0),
+	fullyPaidAt: text('fully_paid_at'),
+	// QR pickup confirmation (user scans bike QR on pickup day)
+	pickupConfirmed: integer('pickup_confirmed', { mode: 'boolean' }).default(false),
+	pickupConfirmedAt: text('pickup_confirmed_at'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => ({
@@ -43,6 +58,7 @@ export const bookings = sqliteTable('bookings', {
 	statusIdx: index('bookings_status_idx').on(table.status),
 	datesIdx: index('bookings_dates_idx').on(table.startDate, table.endDate),
 	numberIdx: index('bookings_number_idx').on(table.bookingNumber),
+	publicUserIdx: index('bookings_public_user_idx').on(table.publicUserId),
 }));
 
 // Type exports
