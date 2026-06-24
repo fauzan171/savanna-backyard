@@ -1,3 +1,5 @@
+export type VehicleType = 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other';
+
 export interface CalendarMatrixCell {
 	status: 'available' | 'booked' | 'maintenance' | 'inactive';
 	booking?: {

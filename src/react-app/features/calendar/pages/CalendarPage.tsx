@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { PageHeader } from '@/react-app/components/layout';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import {
 	Select,
@@ -10,7 +9,7 @@ import {
 	SelectItem,
 } from '@/react-app/components/ui/select';
 import { Spinner } from '@/react-app/components/ui/spinner';
-import { CalendarMatrix } from '../components/CalendarMatrix';
+import { MonthCalendar } from '../components/MonthCalendar';
 import { useCalendarMatrix } from '../hooks/useCalendarMatrix';
 
 function currentMonth(): string {
@@ -26,7 +25,7 @@ function shiftMonth(month: string, delta: number): string {
 
 function formatMonthLabel(month: string): string {
 	const [y, m] = month.split('-').map(Number);
-	return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+	return new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 }
 
 export default function CalendarPage() {
@@ -35,32 +34,60 @@ export default function CalendarPage() {
 	const [status, setStatus] = useState<string | undefined>(undefined);
 
 	const { data, isLoading, error } = useCalendarMatrix({ month, type, status });
+	const isCurrentMonth = month === currentMonth();
 
 	return (
-		<div className="space-y-6">
-			<PageHeader
-				title="Fleet Calendar"
-				description="Vehicle availability matrix — every vehicle across every day of the month."
-			/>
+		<div className="flex flex-col overflow-hidden -mx-6 -mt-6 -mb-6" style={{ height: 'calc(100vh - 4rem)' }}>
+			{/* Top toolbar — compact, Google Calendar-like */}
+			<div className="flex flex-wrap items-center gap-2 border-b bg-background px-4 py-3 shrink-0">
+				{/* Logo / title */}
+				<div className="flex items-center gap-2 mr-2">
+					<Calendar className="size-5 text-primary" />
+					<span className="text-lg font-semibold tracking-tight">Fleet Calendar</span>
+				</div>
 
-			{/* Controls */}
-			<div className="flex flex-wrap items-center gap-3">
-				<div className="flex items-center gap-1">
-					<Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, -1))}>
+				{/* Today button */}
+				<Button
+					variant="outline"
+					size="sm"
+					onClick={() => setMonth(currentMonth())}
+					disabled={isCurrentMonth}
+					className="shrink-0"
+				>
+					Today
+				</Button>
+
+				{/* Month navigation */}
+				<div className="flex items-center gap-0.5">
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-8"
+						onClick={() => setMonth(shiftMonth(month, -1))}
+					>
 						<ChevronLeft className="size-4" />
 					</Button>
-					<div className="min-w-[160px] text-center font-medium">{formatMonthLabel(month)}</div>
-					<Button variant="outline" size="icon" onClick={() => setMonth(shiftMonth(month, 1))}>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="size-8"
+						onClick={() => setMonth(shiftMonth(month, 1))}
+					>
 						<ChevronRight className="size-4" />
 					</Button>
 				</div>
 
-				<Button variant="ghost" size="sm" onClick={() => setMonth(currentMonth())}>
-					Today
-				</Button>
+				{/* Month label */}
+				<h2 className="text-xl font-semibold min-w-[200px]">
+					{formatMonthLabel(month)}
+				</h2>
 
+				{/* Spacer */}
+				<div className="flex-1" />
+
+				{/* Filters */}
 				<Select value={type ?? 'all'} onValueChange={(v) => setType(v === 'all' ? undefined : v)}>
-					<SelectTrigger className="w-[150px]">
+					<SelectTrigger className="h-8 w-[140px] text-xs">
 						<SelectValue placeholder="All types" />
 					</SelectTrigger>
 					<SelectContent>
@@ -74,7 +101,7 @@ export default function CalendarPage() {
 				</Select>
 
 				<Select value={status ?? 'all'} onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}>
-					<SelectTrigger className="w-[160px]">
+					<SelectTrigger className="h-8 w-[150px] text-xs">
 						<SelectValue placeholder="All statuses" />
 					</SelectTrigger>
 					<SelectContent>
@@ -87,34 +114,54 @@ export default function CalendarPage() {
 				</Select>
 
 				{/* Legend */}
-				<div className="flex flex-wrap items-center gap-3 ml-auto text-xs">
-					<Legend className="bg-emerald-500/40" label="Available" />
-					<Legend className="bg-blue-500/70" label="Booked" />
-					<Legend className="bg-amber-500/70" label="Maintenance" />
-					<Legend className="bg-zinc-300" label="Inactive" />
+				<div className="hidden lg:flex items-center gap-3 border-l pl-3 text-xs">
+					<LegendDot color="bg-blue-600" label="Trail Bike" />
+					<LegendDot color="bg-emerald-600" label="Street Bike" />
+					<LegendDot color="bg-violet-600" label="Car" />
+					<LegendDot color="bg-amber-600" label="Jeep" />
+					<LegendDot color="bg-amber-100 border border-amber-300 dark:bg-amber-500/20" label="Maint." textClass="text-amber-700 dark:text-amber-400" />
 				</div>
 			</div>
 
-			{isLoading ? (
-				<div className="flex justify-center py-16">
-					<Spinner size="lg" />
-				</div>
-			) : error ? (
-				<div className="rounded-lg border border-error/50 bg-error/10 p-6 text-center text-error">
-					Failed to load calendar. Please try again.
-				</div>
-			) : data ? (
-				<CalendarMatrix data={data} />
-			) : null}
+			{/* Calendar body — fills remaining height */}
+			<div className="flex-1 overflow-auto px-4 py-4">
+				{isLoading ? (
+					<div className="flex h-full items-center justify-center">
+						<div className="flex flex-col items-center gap-3 text-muted-foreground">
+							<Spinner size="lg" />
+							<span className="text-sm">Loading calendar…</span>
+						</div>
+					</div>
+				) : error ? (
+					<div className="flex h-full items-center justify-center">
+						<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center text-destructive">
+							<p className="font-medium">Failed to load calendar</p>
+							<p className="mt-1 text-sm opacity-80">Please refresh the page or try again.</p>
+						</div>
+					</div>
+				) : data ? (
+					<div className="h-full min-h-[640px]">
+						<MonthCalendar data={data} />
+					</div>
+				) : null}
+			</div>
 		</div>
 	);
 }
 
-function Legend({ className, label }: { className: string; label: string }) {
+function LegendDot({
+	color,
+	label,
+	textClass,
+}: {
+	color: string;
+	label: string;
+	textClass?: string;
+}) {
 	return (
 		<div className="flex items-center gap-1.5">
-			<span className={`size-3 rounded-sm ${className}`} />
-			<span className="text-muted-foreground">{label}</span>
+			<span className={`inline-block size-2.5 rounded-full ${color}`} />
+			<span className={textClass ?? 'text-muted-foreground'}>{label}</span>
 		</div>
 	);
 }
