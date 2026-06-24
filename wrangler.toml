@@ -24,7 +24,7 @@ database_id = "11de4510-a98c-4d40-9e4c-6f4cfe5fa1f2"
 
 # Environment Variables
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
 ALLOWED_PUBLIC_API_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
 CORS_ALLOWED_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
 IFORTEPAY_MERCHANT_ID = ""
