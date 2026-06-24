@@ -21,6 +21,9 @@ import CustomerDetailPage from '@/react-app/features/customers/pages/CustomerDet
 import VehiclesPage from '@/react-app/features/vehicles/pages/VehiclesPage';
 import VehicleDetailPage from '@/react-app/features/vehicles/pages/VehicleDetailPage';
 
+// Calendar Page
+import { CalendarPage } from '@/react-app/features/calendar';
+
 // Leads Pages
 import LeadsPage from '@/react-app/features/leads/pages/LeadsPage';
 import LeadDetailPage from '@/react-app/features/leads/pages/LeadDetailPage';
@@ -84,6 +87,9 @@ export const routes: RouteObject[] = [
 							// Vehicle routes
 							{ path: 'vehicles', element: <VehiclesPage /> },
 							{ path: 'vehicles/:id', element: <VehicleDetailPage /> },
+
+							// Fleet calendar matrix
+							{ path: 'calendar', element: <CalendarPage /> },
 
 							// Leads routes
 							{ path: 'leads', element: <LeadsPage /> },

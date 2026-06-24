@@ -40,6 +40,10 @@ export const completeRentalSchema = z.object({
 	endKm: z.number().min(0),
 	returnNotes: z.string().max(1000).optional().nullable(),
 	damageNotes: z.string().max(1000).optional().nullable(),
+	// Optional admin override for the auto-calculated damage fee (flat damage_per_item x flipped items)
+	damageFeeOverride: z.number().min(0).optional().nullable(),
+	// Optional condition status to record for the vehicle after return
+	conditionStatus: z.enum(['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance']).optional(),
 });
 
 // Extend rental schema
@@ -54,6 +58,11 @@ export const extendRentalSchema = z.object({
 // Cancel booking schema
 export const cancelBookingSchema = z.object({
 	reason: z.string().min(1, 'Cancellation reason is required').max(500),
+});
+
+// Scan-return schema: admin scans the vehicle QR to resolve the active booking
+export const scanReturnSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
 });
 
 // Add addon schema
@@ -99,6 +108,7 @@ export type StartRentalRequest = z.infer<typeof startRentalSchema>;
 export type CompleteRentalRequest = z.infer<typeof completeRentalSchema>;
 export type ExtendRentalRequest = z.infer<typeof extendRentalSchema>;
 export type CancelBookingRequest = z.infer<typeof cancelBookingSchema>;
+export type ScanReturnRequest = z.infer<typeof scanReturnSchema>;
 export type AddAddonRequest = z.infer<typeof addAddonSchema>;
 export type ListBookingsQuery = z.infer<typeof listBookingsQuerySchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;

@@ -19,3 +19,9 @@ export const updateProfileSchema = z.object({
 	avatarUrl: z.string().url().nullable().optional(),
 });
 export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
+
+// Confirm pickup by scanning the vehicle QR code (customer-side)
+export const confirmPickupSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
+});
+export type ConfirmPickupRequest = z.infer<typeof confirmPickupSchema>;

@@ -2,6 +2,8 @@ import { BookingsRepository } from './bookings.repository';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
+import { VehicleConditionsRepository } from './vehicle-conditions.repository';
+import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import {
 	generateBookingNumber,
@@ -9,6 +11,7 @@ import {
 	calculateLateFee,
 	LATE_FEE_MULTIPLIER,
 } from './availability.helper';
+import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import { BOOKING_STATUS_TRANSITIONS } from './bookings.types';
 import type {
 	BookingResponse,
@@ -25,6 +28,7 @@ import type {
 	AvailabilityResult,
 	BookingStats,
 	BookingStatus,
+	PenaltyBreakdown,
 } from './bookings.types';
 import type {
 	CreateBookingRequest,
@@ -43,8 +47,50 @@ export class BookingsService {
 		private bookingRepo: BookingsRepository,
 		private vehicleRepo: VehiclesRepository,
 		private customerRepo: CustomersRepository,
-		private checklistRepo?: ChecklistsRepository
+		private checklistRepo?: ChecklistsRepository,
+		private configRepo?: ConfigRepository,
+		private conditionsRepo?: VehicleConditionsRepository,
 	) {}
+
+	/**
+	 * Admin scans a vehicle QR to resolve the active rental for return processing.
+	 * Resolve-only: the admin UI then opens the Complete dialog (POST /:id/complete)
+	 * so completeRental stays the single source of truth for penalties + vehicle status.
+	 */
+	async scanReturn(qrCode: string): Promise<{
+		bookingId: string;
+		bookingNumber: string;
+		vehicleId: string;
+		vehicleName: string;
+		customerName: string;
+		status: string;
+		startDate: string;
+		endDate: string;
+	}> {
+		const vehicleId = decodeVehicleQr(qrCode);
+		if (!vehicleId) throw new ValidationError('QR code tidak valid');
+
+		const booking = await this.bookingRepo.findActiveByVehicle(vehicleId);
+		if (!booking) {
+			throw new NotFoundError('Tidak ada rental aktif untuk kendaraan ini');
+		}
+
+		const [vehicle, customer] = await Promise.all([
+			this.vehicleRepo.findById(vehicleId),
+			this.customerRepo.findById(booking.customerId),
+		]);
+
+		return {
+			bookingId: booking.id,
+			bookingNumber: booking.bookingNumber,
+			vehicleId: booking.vehicleId,
+			vehicleName: vehicle?.name ?? 'Unknown',
+			customerName: customer?.name ?? 'Unknown',
+			status: booking.status,
+			startDate: booking.startDate,
+			endDate: booking.endDate,
+		};
+	}
 
 	// Transform addon to response format
 	private toAddonResponse(addon: { id: string; type: string; description: string | null; amount: number; isMandatory: boolean | null }): AddonResponse {
@@ -95,6 +141,10 @@ export class BookingsService {
 			baseAmount: booking.baseAmount,
 			addonsAmount: booking.addonsAmount ?? 0,
 			lateFee: booking.lateFee ?? 0,
+			damageFee: booking.damageFee ?? 0,
+			totalPenalty: booking.totalPenalty ?? 0,
+			penaltyPaid: booking.penaltyPaid ?? false,
+			returnConfirmed: booking.returnConfirmed ?? false,
 			totalAmount: booking.totalAmount,
 			currency: booking.currency,
 			notes: booking.notes,
@@ -386,11 +436,13 @@ export class BookingsService {
 		}
 
 		// Validate pickup checklist exists
+		let pickupChecklistId: string | undefined;
 		if (this.checklistRepo) {
 			const pickupChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'pickup');
 			if (!pickupChecklist) {
 				throw new ValidationError('Checklist pickup wajib diisi sebelum memulai rental');
 			}
+			pickupChecklistId = pickupChecklist.id;
 		}
 
 		this.validateStatusTransition(booking.status, 'Active');
@@ -400,8 +452,8 @@ export class BookingsService {
 			throw new ValidationError('Start KM must be a non-negative number');
 		}
 
-		// Update booking with start km
-		const updated = await this.bookingRepo.startRental(id, data.startKm);
+		// Update booking with start km + mark pickup confirmed
+		const updated = await this.bookingRepo.startRental(id, { startKm: data.startKm, pickupChecklistId });
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
@@ -423,11 +475,22 @@ export class BookingsService {
 			throw new ValidationError('Rental is already completed');
 		}
 
-		// Validate return checklist exists
+		// Validate return checklist exists + load pickup checklist for damage comparison
+		let returnChecklistId: string | undefined;
+		let returnCheckedBy: string | null = null;
+		let pickupItems: Record<string, boolean> = {};
+		let returnItems: Record<string, boolean> = {};
 		if (this.checklistRepo) {
 			const returnChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'return');
 			if (!returnChecklist) {
 				throw new ValidationError('Checklist return wajib diisi sebelum menyelesaikan rental');
+			}
+			returnChecklistId = returnChecklist.id;
+			returnCheckedBy = returnChecklist.createdBy;
+			returnItems = BookingsService.parseChecklistItems(returnChecklist.items);
+			const pickupChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'pickup');
+			if (pickupChecklist) {
+				pickupItems = BookingsService.parseChecklistItems(pickupChecklist.items);
 			}
 		}
 
@@ -456,7 +519,15 @@ export class BookingsService {
 			data.actualReturnDate
 		);
 
-		// Calculate new total by adding late fee to current total
+		// Damage detection: items that were OK (true) at pickup but NOT OK (false) at return.
+		// Flat rate per damaged item (configurable); admin may override the total.
+		const flippedItems = BookingsService.countFlippedItems(pickupItems, returnItems);
+		const ratePerItem = await this.getDamagePerItem();
+		const override = data.damageFeeOverride != null;
+		const damageFee = override ? (data.damageFeeOverride as number) : flippedItems * ratePerItem;
+		const totalPenalty = lateFee + damageFee;
+
+		// Calculate new total by adding late fee to current total (damage fee is tracked separately)
 		const newTotalAmount = booking.totalAmount + lateFee;
 
 		// Update booking
@@ -465,17 +536,38 @@ export class BookingsService {
 			endKm: data.endKm,
 			lateFee,
 			totalAmount: newTotalAmount,
+			damageFee,
+			totalPenalty,
+			returnChecklistId,
 		});
 
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
 
-		// Update vehicle status back to Available and update km
+		// Derive condition status (admin override wins) and update vehicle
+		const conditionStatus = (data.conditionStatus
+			?? (flippedItems === 0 && daysLate === 0 ? 'Excellent' : flippedItems > 0 ? 'Fair' : 'Good')) as NonNullable<Vehicle['conditionStatus']>;
+
 		await this.vehicleRepo.update(booking.vehicleId, {
 			status: 'Available',
 			totalKm: data.endKm,
+			lastKm: data.endKm,
+			conditionStatus,
 		});
+
+		// Record condition history
+		if (this.conditionsRepo) {
+			await this.conditionsRepo.create({
+				vehicleId: booking.vehicleId,
+				checklistId: returnChecklistId,
+				conditionStatus,
+				notes: data.returnNotes ?? data.damageNotes ?? null,
+				km: data.endKm,
+				checkedAt: new Date().toISOString(),
+				checkedBy: returnCheckedBy,
+			});
+		}
 
 		const response = await this.toResponse(updated);
 
@@ -489,9 +581,21 @@ export class BookingsService {
 			};
 		}
 
+		const damageFeeDetails = flippedItems > 0 || override
+			? {
+					flippedItems,
+					ratePerItem,
+					override,
+					calculation: override
+						? `Admin override = ${damageFee}`
+						: `${flippedItems} damaged item(s) x ${ratePerItem} = ${damageFee}`,
+				}
+			: null;
+
 		return {
 			...response,
 			lateFeeDetails,
+			damageFeeDetails,
 			vehicleStatus: 'Available',
 		};
 	}
@@ -714,5 +818,77 @@ export class BookingsService {
 				await this.bookingRepo.confirm(bookingId);
 			}
 		}
+	}
+
+	// ---------------- Penalty management ----------------
+
+	async getPenalties(id: string): Promise<PenaltyBreakdown> {
+		const booking = await this.bookingRepo.findById(id);
+		if (!booking) throw new NotFoundError('Booking');
+
+		let lateFeeDetails: LateFeeDetails | null = null;
+		const vehicle = await this.vehicleRepo.findById(booking.vehicleId);
+		if (vehicle && booking.actualReturnDate) {
+			const { daysLate } = calculateLateFee(vehicle.dailyRateIdr, booking.endDate, booking.actualReturnDate);
+			if (daysLate > 0) {
+				lateFeeDetails = {
+					daysLate,
+					dailyRate: vehicle.dailyRateIdr,
+					multiplier: LATE_FEE_MULTIPLIER,
+					calculation: `${daysLate} day(s) x ${vehicle.dailyRateIdr} x ${LATE_FEE_MULTIPLIER} = ${booking.lateFee ?? 0}`,
+				};
+			}
+		}
+
+		return {
+			lateFee: booking.lateFee ?? 0,
+			damageFee: booking.damageFee ?? 0,
+			totalPenalty: booking.totalPenalty ?? 0,
+			penaltyPaid: booking.penaltyPaid ?? false,
+			penaltyPaidAt: booking.penaltyPaidAt ?? null,
+			lateFeeDetails,
+			damageFeeDetails: null,
+		};
+	}
+
+	async markPenaltyPaid(id: string): Promise<BookingResponse> {
+		const booking = await this.bookingRepo.findById(id);
+		if (!booking) throw new NotFoundError('Booking');
+		const updated = await this.bookingRepo.update(id, {
+			penaltyPaid: true,
+			penaltyPaidAt: new Date().toISOString(),
+		});
+		if (!updated) throw new NotFoundError('Booking');
+		return this.toResponse(updated);
+	}
+
+	// ---------------- Checklist / penalty helpers ----------------
+
+	private static parseChecklistItems(raw: string): Record<string, boolean> {
+		try {
+			const parsed = JSON.parse(raw);
+			if (parsed && typeof parsed === 'object') {
+				return parsed as Record<string, boolean>;
+			}
+		} catch {
+			// ignore malformed JSON
+		}
+		return {};
+	}
+
+	/** Items that were OK at pickup (true) but NOT OK at return (false) = damage. */
+	private static countFlippedItems(pickup: Record<string, boolean>, ret: Record<string, boolean>): number {
+		let count = 0;
+		for (const key of Object.keys(ret)) {
+			if (pickup[key] === true && ret[key] === false) count++;
+		}
+		return count;
+	}
+
+	private async getDamagePerItem(): Promise<number> {
+		if (!this.configRepo) return 0;
+		const raw = await this.configRepo.getValue('damage_per_item');
+		const n = raw ? Number(raw) : NaN;
+		return Number.isFinite(n) ? n : 0;
 	}
 }

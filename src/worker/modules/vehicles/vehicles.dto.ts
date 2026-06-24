@@ -56,6 +56,13 @@ export const calendarQuerySchema = z.object({
 	month: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid month format (YYYY-MM)'),
 });
 
+// Calendar matrix query schema (admin fleet matrix: vehicles × dates)
+export const calendarMatrixQuerySchema = z.object({
+	month: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid month format (YYYY-MM)'),
+	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
+	status: z.enum(['Available', 'Rented', 'Maintenance', 'Inactive']).optional(),
+});
+
 // Types
 export type CreateVehicleRequest = z.infer<typeof createVehicleSchema>;
 export type UpdateVehicleRequest = z.infer<typeof updateVehicleSchema>;
@@ -63,3 +70,4 @@ export type UpdateStatusRequest = z.infer<typeof updateStatusSchema>;
 export type ListVehiclesQuery = z.infer<typeof listVehiclesQuerySchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
+export type CalendarMatrixQuery = z.infer<typeof calendarMatrixQuerySchema>;

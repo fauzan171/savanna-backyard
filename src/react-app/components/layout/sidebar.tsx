@@ -22,6 +22,7 @@ import {
 	Star,
 	Map,
 	UserCog,
+	CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -93,6 +94,11 @@ const defaultNavItems: NavItem[] = [
 		label: 'Vehicles',
 		href: '/vehicles',
 		icon: <Bike className="size-5" />,
+	},
+	{
+		label: 'Calendar',
+		href: '/calendar',
+		icon: <CalendarDays className="size-5" />,
 	},
 	{
 		label: 'Customers',

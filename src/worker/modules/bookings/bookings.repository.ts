@@ -35,6 +35,54 @@ export class BookingsRepository {
 		return result[0] ?? null;
 	}
 
+	/** Find the active rental for a vehicle (for admin QR scan-return resolution). */
+	async findActiveByVehicle(vehicleId: string): Promise<Booking | null> {
+		const result = await this.db
+			.select()
+			.from(bookings)
+			.where(and(eq(bookings.vehicleId, vehicleId), eq(bookings.status, 'Active')))
+			.orderBy(desc(bookings.endDate))
+			.limit(1);
+		return result[0] ?? null;
+	}
+
+	/**
+	 * Bookings overlapping a date range, joined with customer — for the admin
+	 * calendar matrix. `endDateExclusive` is the day AFTER the last day of the
+	 * window (end-exclusive overlap, matching findConflictingBookings).
+	 */
+	async findBookingsInRangeWithCustomer(startDate: string, endDateExclusive: string): Promise<Array<{
+		id: string;
+		bookingNumber: string;
+		vehicleId: string;
+		startDate: string;
+		endDate: string;
+		status: string;
+		customerName: string;
+		customerPhone: string;
+	}>> {
+		return this.db
+			.select({
+				id: bookings.id,
+				bookingNumber: bookings.bookingNumber,
+				vehicleId: bookings.vehicleId,
+				startDate: bookings.startDate,
+				endDate: bookings.endDate,
+				status: bookings.status,
+				customerName: customers.name,
+				customerPhone: customers.phone,
+			})
+			.from(bookings)
+			.innerJoin(customers, eq(customers.id, bookings.customerId))
+			.where(
+				and(
+					inArray(bookings.status, ['Confirmed', 'Active']),
+					lt(bookings.startDate, endDateExclusive),
+					gt(bookings.endDate, startDate),
+				),
+			);
+	}
+
 	async list(query: ListBookingsQuery): Promise<{ items: Booking[]; total: number }> {
 		const offset = (query.page - 1) * query.limit;
 
@@ -113,13 +161,30 @@ export class BookingsRepository {
 		return this.update(id, { status: 'Confirmed' });
 	}
 
-	async startRental(id: string, startKm: number): Promise<Booking | null> {
-		return this.update(id, { status: 'Active', startKm });
+	async startRental(
+		id: string,
+		data: { startKm: number; pickupChecklistId?: string },
+	): Promise<Booking | null> {
+		return this.update(id, {
+			status: 'Active',
+			startKm: data.startKm,
+			pickupConfirmed: true,
+			pickupConfirmedAt: new Date().toISOString(),
+			pickupChecklistId: data.pickupChecklistId,
+		});
 	}
 
 	async completeRental(
 		id: string,
-		data: { actualReturnDate: string; endKm: number; lateFee: number; totalAmount: number }
+		data: {
+			actualReturnDate: string;
+			endKm: number;
+			lateFee: number;
+			totalAmount: number;
+			damageFee?: number;
+			totalPenalty?: number;
+			returnChecklistId?: string;
+		}
 	): Promise<Booking | null> {
 		return this.update(id, {
 			status: 'Completed',
@@ -127,6 +192,11 @@ export class BookingsRepository {
 			endKm: data.endKm,
 			lateFee: data.lateFee,
 			totalAmount: data.totalAmount,
+			damageFee: data.damageFee ?? 0,
+			totalPenalty: data.totalPenalty ?? 0,
+			returnConfirmed: true,
+			returnConfirmedAt: new Date().toISOString(),
+			returnChecklistId: data.returnChecklistId,
 		});
 	}
 

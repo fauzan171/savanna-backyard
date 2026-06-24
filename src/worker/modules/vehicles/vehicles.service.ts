@@ -11,6 +11,8 @@ import type {
   VehicleWithDetails,
   AvailabilityResult,
   CalendarResult,
+  CalendarMatrixResult,
+  CalendarMatrixCell,
 } from "./vehicles.types";
 import type {
   CreateVehicleRequest,
@@ -18,6 +20,7 @@ import type {
   UpdateStatusRequest,
   ListVehiclesQuery,
   AvailabilityQuery,
+  CalendarMatrixQuery,
 } from "./vehicles.dto";
 import type { Vehicle } from "@/worker/core/database/schema";
 
@@ -297,6 +300,97 @@ export class VehiclesService {
     }
 
     return { vehicleId, month, calendar };
+  }
+
+  /**
+   * Admin fleet calendar matrix: every vehicle (row) × every day of the month
+   * (column), each cell marked available/booked/maintenance/inactive with the
+   * booking summary attached when booked.
+   */
+  async getCalendarMatrix(query: CalendarMatrixQuery): Promise<CalendarMatrixResult> {
+    const [year, monthNum] = query.month.split("-").map(Number);
+    const pad = (n: number) => String(n).padStart(2, "0");
+
+    const monthStart = `${query.month}-01`;
+    const endDateExclusive =
+      monthNum === 12 ? `${year + 1}-01-01` : `${year}-${pad(monthNum + 1)}-01`;
+
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const allDays: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      allDays.push(`${query.month}-${pad(d)}`);
+    }
+
+    const { items: fleet } = await this.vehicleRepo.list({
+      page: 1,
+      limit: 1000,
+      type: query.type,
+      status: query.status,
+    });
+
+    const rangeBookings = this.bookingRepo
+      ? await this.bookingRepo.findBookingsInRangeWithCustomer(monthStart, endDateExclusive)
+      : [];
+
+    const vehicles: CalendarMatrixResult["vehicles"] = [];
+    for (const v of fleet) {
+      const dates: Record<string, CalendarMatrixCell> = {};
+      const baseStatus: CalendarMatrixCell["status"] =
+        v.status === "Inactive"
+          ? "inactive"
+          : v.status === "Maintenance"
+            ? "maintenance"
+            : "available";
+      for (const day of allDays) {
+        dates[day] = { status: baseStatus };
+      }
+
+      // Overlay scheduled maintenance windows (only relevant for otherwise-available vehicles)
+      if (this.maintenanceRepo && baseStatus === "available") {
+        const conflicts = await this.maintenanceRepo.findConflictingMaintenance(
+          v.id,
+          monthStart,
+          endDateExclusive,
+        );
+        for (const m of conflicts) {
+          const mEnd = m.endDate ?? "9999-12-31";
+          for (const day of allDays) {
+            if (day >= m.startDate && day <= mEnd) {
+              dates[day] = { status: "maintenance" };
+            }
+          }
+        }
+      }
+
+      // Overlay bookings (booked takes precedence over maintenance for display)
+      const vBookings = rangeBookings.filter((b) => b.vehicleId === v.id);
+      for (const b of vBookings) {
+        for (const day of allDays) {
+          if (day >= b.startDate && day <= b.endDate) {
+            dates[day] = {
+              status: "booked",
+              booking: {
+                id: b.id,
+                bookingNumber: b.bookingNumber,
+                customerName: b.customerName,
+                customerPhone: b.customerPhone,
+              },
+            };
+          }
+        }
+      }
+
+      vehicles.push({
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        plateNumber: v.plateNumber,
+        status: v.status,
+        dates,
+      });
+    }
+
+    return { month: query.month, vehicles };
   }
 
   async checkAvailabilityForDates(

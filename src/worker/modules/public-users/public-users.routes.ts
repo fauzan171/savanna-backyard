@@ -14,9 +14,11 @@ import {
 	phoneInitSchema,
 	phoneVerifySchema,
 	updateProfileSchema,
+	confirmPickupSchema,
 	type PhoneInitRequest,
 	type PhoneVerifyRequest,
 	type UpdateProfileRequest,
+	type ConfirmPickupRequest,
 } from './public-users.dto';
 
 type PublicUsersVariables = {
@@ -165,6 +167,14 @@ const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
 	return c.json({ success: true, message: 'Reopen the invoice to pay the remainder', data: result });
 };
 
+const confirmPickupHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const body = getValidatedBody<ConfirmPickupRequest>(c);
+	const result = await service.confirmPickup(pu.publicUserId, c.req.param('id'), body.qrCode);
+	return c.json({ success: true, message: 'Pickup confirmed', data: result });
+};
+
 export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 	const router = new Hono<PublicUsersEnv>();
 	router.use('*', publicUsersServicesMiddleware());
@@ -174,6 +184,8 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 	router.get('/bookings/:id', myBookingDetailHandler);
 	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
+	// Confirm pickup via QR scan (requires a verified account)
+	router.post('/bookings/:id/confirm-pickup', requirePhoneVerified(), validateBody(confirmPickupSchema), confirmPickupHandler);
 
 	return router;
 }

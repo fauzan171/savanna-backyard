@@ -1,6 +1,7 @@
 import { PublicUsersRepository } from './public-users.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
+import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import type { WhatsAppProvider } from '@/worker/core/services/providers';
 import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
 import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
@@ -286,5 +287,40 @@ export class PublicUsersService {
 			totalAmount: b.totalAmount,
 			remainingAmount: b.remainingAmount,
 		};
+	}
+
+	/**
+	 * Confirm pickup by scanning the vehicle QR code. Soft-confirm: sets
+	 * pickupConfirmed + status=Active. Does NOT record startKm or flip the vehicle
+	 * to Rented — the admin's physical handover (pickup checklist + startRental)
+	 * still owns that. Kept here to avoid coupling the public-users service into
+	 * BookingsService.
+	 */
+	async confirmPickup(publicUserId: string, bookingId: string, qrCode: string): Promise<PublicBookingSummary> {
+		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+		if (!b) throw new NotFoundError('Booking');
+
+		const scannedVehicleId = decodeVehicleQr(qrCode);
+		if (!scannedVehicleId) throw new ValidationError('QR code tidak valid');
+		if (b.vehicleId !== scannedVehicleId) {
+			throw new ValidationError('QR code tidak sesuai dengan kendaraan pada booking ini');
+		}
+		if (b.status !== 'Confirmed') {
+			throw new ValidationError(`Status booking "${b.status}" tidak memungkinkan konfirmasi pickup`);
+		}
+		if (b.pickupConfirmed) {
+			throw new ValidationError('Pickup sudah dikonfirmasi sebelumnya');
+		}
+
+		const paymentReady =
+			b.paymentStatus === 'settlement' ||
+			b.fullyPaidAt !== null ||
+			(b.paymentType === 'dp' && b.dpPaidAt !== null);
+		if (!paymentReady) {
+			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran sebelum pickup.');
+		}
+
+		const updated = await this.repo.confirmPickup(bookingId);
+		return toBookingSummary(updated);
 	}
 }

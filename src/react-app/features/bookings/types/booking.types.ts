@@ -58,6 +58,10 @@ export interface Booking extends BaseEntity {
   baseAmount: number;
   addonsAmount: number;
   lateFee: number;
+  damageFee: number;
+  totalPenalty: number;
+  penaltyPaid: boolean;
+  returnConfirmed: boolean;
   totalAmount: number;
   notes: string | null;
   createdBy: UserReference;
@@ -159,6 +163,31 @@ export interface CompleteRentalRequest {
   endKm?: number;
   returnNotes?: string;
   damageNotes?: string;
+  /** Optional admin override for the auto-calculated damage fee */
+  damageFeeOverride?: number;
+  /** Optional condition status to record for the vehicle after return */
+  conditionStatus?: 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Maintenance';
+}
+
+/** Penalty breakdown for a booking (GET /bookings/:id/penalties) */
+export interface PenaltyBreakdown {
+  lateFee: number;
+  damageFee: number;
+  totalPenalty: number;
+  penaltyPaid: boolean;
+  penaltyPaidAt: string | null;
+  lateFeeDetails: {
+    daysLate: number;
+    dailyRate: number;
+    multiplier: number;
+    calculation: string;
+  } | null;
+  damageFeeDetails: {
+    flippedItems: number;
+    ratePerItem: number;
+    override: boolean;
+    calculation: string;
+  } | null;
 }
 
 export interface CancelBookingRequest {

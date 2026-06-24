@@ -89,3 +89,27 @@ export interface CalendarResult {
 		bookingId?: string;
 	}[];
 }
+
+export interface CalendarMatrixCell {
+	status: 'available' | 'booked' | 'maintenance' | 'inactive';
+	booking?: {
+		id: string;
+		bookingNumber: string;
+		customerName: string;
+		customerPhone: string;
+	};
+}
+
+export interface CalendarMatrixVehicle {
+	id: string;
+	name: string;
+	type: string;
+	plateNumber: string;
+	status: string;
+	dates: Record<string, CalendarMatrixCell>;
+}
+
+export interface CalendarMatrixResult {
+	month: string;
+	vehicles: CalendarMatrixVehicle[];
+}

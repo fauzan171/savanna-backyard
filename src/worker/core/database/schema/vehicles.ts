@@ -16,6 +16,11 @@ export const vehicles = sqliteTable('vehicles', {
 	dailyRateUsd: real('daily_rate_usd'),
 	status: text('status', { enum: ['Available', 'Rented', 'Maintenance', 'Inactive'] }).notNull().default('Available'),
 	totalKm: real('total_km').default(0),
+	// Condition tracking (updated on rental return / checklist completion)
+	conditionStatus: text('condition_status', {
+		enum: ['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance'],
+	}),
+	lastKm: real('last_km'),
 	photoUrl: text('photo_url'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),

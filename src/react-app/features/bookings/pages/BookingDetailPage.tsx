@@ -8,7 +8,8 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { StatusBadge } from '@/react-app/components/data-display/status-badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/react-app/components/ui/tabs';
 import { useBooking } from '../hooks/useBookings';
-import { getAvailableActions } from '../types/booking.types';
+import { getAvailableActions, type CompleteRentalRequest } from '../types/booking.types';
+import { PenaltyPanel } from '../components/PenaltyPanel';
 import {
 	Dialog,
 	DialogContent,
@@ -278,6 +279,7 @@ export function BookingDetailPage() {
 
 				<TabsContent value="payments" className="space-y-6">
 					<PaymentsTab payments={booking.payments ?? []} paymentSummary={booking.paymentSummary} currency={booking.currency} totalAmount={booking.totalAmount} />
+					<PenaltyPanel bookingId={booking.id} />
 				</TabsContent>
 
 				<TabsContent value="email" className="space-y-6">
@@ -786,6 +788,8 @@ function ActionDialog({
 	const [newEndDate, setNewEndDate] = useState('');
 	const [startKm, setStartKm] = useState('');
 	const [endKm, setEndKm] = useState('');
+	const [damageFeeOverride, setDamageFeeOverride] = useState('');
+	const [conditionStatus, setConditionStatus] = useState('');
 	const [actionError, setActionError] = useState('');
 
 	const confirmBooking = useConfirmBooking();
@@ -814,6 +818,8 @@ function ActionDialog({
 						actualReturnDate: new Date().toISOString().split('T')[0],
 						endKm: endKm ? Number(endKm) : undefined,
 						returnNotes: notes,
+						damageFeeOverride: damageFeeOverride ? Number(damageFeeOverride) : undefined,
+						conditionStatus: (conditionStatus || undefined) as CompleteRentalRequest['conditionStatus'],
 					});
 					break;
 				case 'cancel':
@@ -833,6 +839,8 @@ function ActionDialog({
 			setNewEndDate('');
 			setStartKm('');
 			setEndKm('');
+			setDamageFeeOverride('');
+			setConditionStatus('');
 		} catch (e: unknown) {
 			const msg = e instanceof Error ? e.message : 'Action failed';
 			setActionError(msg);
@@ -913,6 +921,35 @@ function ActionDialog({
 									placeholder="e.g. 12800"
 									min={0}
 								/>
+							</FormField>
+						)}
+
+						{action.action === 'complete' && (
+							<FormField label="Damage Fee Override (IDR)" hint="Override otomatis (flipped items × rate). Kosongkan untuk auto.">
+								<Input
+									type="number"
+									value={damageFeeOverride}
+									onChange={(e) => setDamageFeeOverride(e.target.value)}
+									placeholder="e.g. 200000"
+									min={0}
+								/>
+							</FormField>
+						)}
+
+						{action.action === 'complete' && (
+							<FormField label="Vehicle Condition">
+								<select
+									value={conditionStatus}
+									onChange={(e) => setConditionStatus(e.target.value)}
+									className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+								>
+									<option value="">Auto (derive from checklist)</option>
+									<option value="Excellent">Excellent</option>
+									<option value="Good">Good</option>
+									<option value="Fair">Fair</option>
+									<option value="Poor">Poor</option>
+									<option value="Maintenance">Maintenance</option>
+								</select>
 							</FormField>
 						)}
 

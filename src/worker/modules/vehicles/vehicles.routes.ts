@@ -13,12 +13,14 @@ import {
 	listVehiclesQuerySchema,
 	availabilityQuerySchema,
 	calendarQuerySchema,
+	calendarMatrixQuerySchema,
 	type CreateVehicleRequest,
 	type UpdateVehicleRequest,
 	type UpdateStatusRequest,
 	type ListVehiclesQuery,
 	type AvailabilityQuery,
 	type CalendarQuery,
+	type CalendarMatrixQuery,
 } from './vehicles.dto';
 
 type VehiclesVariables = {
@@ -101,6 +103,13 @@ const getCalendarHandler = async (c: Context<VehiclesEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const getCalendarMatrixHandler = async (c: Context<VehiclesEnv>) => {
+	const service = c.get('vehiclesService');
+	const query = getValidatedQuery<CalendarMatrixQuery>(c);
+	const result = await service.getCalendarMatrix(query);
+	return c.json({ success: true, data: result });
+};
+
 export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	const router = new Hono<VehiclesEnv>();
 
@@ -108,6 +117,7 @@ export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	router.use('*', authMiddleware());
 
 	router.get('/availability', validateQuery(availabilityQuerySchema), checkAvailabilityHandler);
+	router.get('/calendar', validateQuery(calendarMatrixQuerySchema), getCalendarMatrixHandler);
 	router.get('/', validateQuery(listVehiclesQuerySchema), listVehiclesHandler);
 	router.get('/:id', getVehicleByIdHandler);
 	router.get('/:id/calendar', validateQuery(calendarQuerySchema), getCalendarHandler);

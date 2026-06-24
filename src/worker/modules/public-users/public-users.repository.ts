@@ -106,4 +106,15 @@ export class PublicUsersRepository {
 			.limit(1);
 		return b ?? null;
 	}
+
+	/** Mark a booking as pickup-confirmed and activate it (soft confirm — no startKm). */
+	async confirmPickup(bookingId: string): Promise<Booking> {
+		const now = new Date().toISOString();
+		await this.db
+			.update(bookings)
+			.set({ pickupConfirmed: true, pickupConfirmedAt: now, status: 'Active', updatedAt: now })
+			.where(eq(bookings.id, bookingId));
+		const [b] = await this.db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+		return b!;
+	}
 }

@@ -50,6 +50,16 @@ export const bookings = sqliteTable('bookings', {
 	// QR pickup confirmation (user scans bike QR on pickup day)
 	pickupConfirmed: integer('pickup_confirmed', { mode: 'boolean' }).default(false),
 	pickupConfirmedAt: text('pickup_confirmed_at'),
+	// Return confirmation + penalties (damage detection vs pickup checklist)
+	returnConfirmed: integer('return_confirmed', { mode: 'boolean' }).default(false),
+	returnConfirmedAt: text('return_confirmed_at'),
+	damageFee: real('damage_fee').default(0),
+	totalPenalty: real('total_penalty').default(0),
+	penaltyPaid: integer('penalty_paid', { mode: 'boolean' }).default(false),
+	penaltyPaidAt: text('penalty_paid_at'),
+	// Soft refs to vehicle_checklists (no FK to avoid circular friction in SQLite)
+	pickupChecklistId: text('pickup_checklist_id'),
+	returnChecklistId: text('return_checklist_id'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => ({
