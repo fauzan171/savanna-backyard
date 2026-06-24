@@ -15,8 +15,8 @@ export class PublicUsersRepository {
 	constructor(private db: Database) {}
 
 	// ---------------- public_users ----------------
-	async findByGoogleId(googleId: string): Promise<PublicUser | null> {
-		const [u] = await this.db.select().from(publicUsers).where(eq(publicUsers.googleId, googleId)).limit(1);
+	async findByPhone(phone: string): Promise<PublicUser | null> {
+		const [u] = await this.db.select().from(publicUsers).where(eq(publicUsers.phone, phone)).limit(1);
 		return u ?? null;
 	}
 

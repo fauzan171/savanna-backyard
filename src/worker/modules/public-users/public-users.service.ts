@@ -1,9 +1,9 @@
 import { PublicUsersRepository } from './public-users.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
-import type { GoogleOAuthProvider, WhatsAppProvider } from '@/worker/core/services/providers';
-import { ValidationError, UnauthorizedError, NotFoundError } from '@/worker/core/types/errors';
-import type { GoogleLoginRequest, PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
+import type { WhatsAppProvider } from '@/worker/core/services/providers';
+import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
+import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
 import type { PublicUser, Booking } from '@/worker/core/database/schema';
 
 const REF_EXPIRY_MIN = 5;
@@ -13,9 +13,9 @@ const MAX_OTP_ATTEMPTS = 5;
 
 export interface PublicAccountInfo {
 	id: string;
-	email: string;
-	name: string;
-	phone: string | null;
+	phone: string;
+	name: string | null;
+	email: string | null;
 	phoneVerified: boolean;
 	avatarUrl: string | null;
 }
@@ -39,9 +39,9 @@ export interface PublicBookingSummary {
 function toAccountInfo(u: PublicUser): PublicAccountInfo {
 	return {
 		id: u.id,
-		email: u.email,
-		name: u.name,
 		phone: u.phone,
+		name: u.name,
+		email: u.email,
 		phoneVerified: u.phoneVerified,
 		avatarUrl: u.avatarUrl,
 	};
@@ -108,44 +108,16 @@ export class PublicUsersService {
 	constructor(
 		private repo: PublicUsersRepository,
 		private jwtService: JwtService,
-		private google: GoogleOAuthProvider,
 		private whatsapp: WhatsAppProvider,
 		private configRepo: ConfigRepository,
 	) {}
 
-	/** Google OAuth login: verify id_token, upsert user, mint a public-user JWT. */
-	async googleLogin(data: GoogleLoginRequest): Promise<{
-		token: string;
-		user: PublicAccountInfo;
-		requiresPhoneVerification: boolean;
-	}> {
-		const info = await this.google.verifyIdToken(data.idToken);
-		let user = await this.repo.findByGoogleId(info.googleId);
-		if (!user) {
-			user = await this.repo.create({
-				googleId: info.googleId,
-				email: info.email,
-				name: info.name,
-				avatarUrl: info.avatarUrl,
-				phone: null,
-				phoneVerified: false,
-				deviceFingerprint: data.deviceFingerprint ?? null,
-				isActive: true,
-			});
-		}
-		if (!user.isActive) {
-			throw new UnauthorizedError('Account is deactivated');
-		}
-		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
-		return {
-			token,
-			user: toAccountInfo(user),
-			requiresPhoneVerification: !user.phoneVerified,
-		};
-	}
-
-	/** Start phone verification: create a short-lived ref code + wa.me deep link. */
-	async phoneInit(publicUserId: string, data: PhoneInitRequest): Promise<{
+	/**
+	 * Start phone login: create a short-lived Ref code + wa.me deep link. No account
+	 * needed yet — the user sends the Ref to the WhatsApp business number, the inbound
+	 * webhook generates the OTP, and they verify via phoneVerify (which logs them in).
+	 */
+	async phoneInit(data: PhoneInitRequest): Promise<{
 		refCode: string;
 		waMeUrl: string;
 		expiresAt: string;
@@ -159,7 +131,7 @@ export class PublicUsersService {
 		const refCode = genRefCode();
 		const expiresAt = new Date(Date.now() + REF_EXPIRY_MIN * 60 * 1000).toISOString();
 		await this.repo.createVerificationCode({
-			publicUserId,
+			publicUserId: null,
 			phone: data.phone,
 			refCode,
 			otpHash: null,
@@ -170,7 +142,7 @@ export class PublicUsersService {
 		});
 
 		const businessNumber = (await this.configRepo.getValue('whatsapp_number')) ?? '';
-		const msg = encodeURIComponent(`Savanna Bromo - Verifikasi nomor. Ref: ${refCode}`);
+		const msg = encodeURIComponent(`Savanna Bromo - Login. Ref: ${refCode}`);
 		const waMeUrl = businessNumber ? `https://wa.me/${businessNumber}?text=${msg}` : '';
 
 		// In stub/dev mode, simulate the inbound step so OTP generation still happens
@@ -210,9 +182,11 @@ export class PublicUsersService {
 		return { handled: true };
 	}
 
-	/** Verify the OTP entered by the user; on success consume the code + verify the phone. */
-	async phoneVerify(publicUserId: string, data: PhoneVerifyRequest): Promise<{
-		verified: boolean;
+	/**
+	 * Verify the OTP and log the user in: find-or-create the account by phone, mark it
+	 * phone-verified, and mint a public-user JWT. This is the login endpoint.
+	 */
+	async phoneVerify(data: PhoneVerifyRequest): Promise<{
 		user: PublicAccountInfo;
 		token: string;
 	}> {
@@ -234,13 +208,25 @@ export class PublicUsersService {
 		}
 
 		await this.repo.updateVerification(code.id, { consumed: true });
-		await this.repo.setPhoneVerified(publicUserId, data.phone);
 
-		const user = await this.repo.findById(publicUserId);
-		if (!user) throw new NotFoundError('Account');
+		// Find-or-create the account by phone (this is the login)
+		let user = await this.repo.findByPhone(data.phone);
+		if (!user) {
+			user = await this.repo.create({
+				phone: data.phone,
+				name: null,
+				email: null,
+				phoneVerified: true,
+				deviceFingerprint: null,
+				avatarUrl: null,
+				isActive: true,
+			});
+		} else if (!user.phoneVerified) {
+			user = await this.repo.update(user.id, { phoneVerified: true });
+		}
 
 		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
-		return { verified: true, user: toAccountInfo(user), token };
+		return { user: toAccountInfo(user), token };
 	}
 
 	async getMe(publicUserId: string): Promise<PublicAccountInfo> {

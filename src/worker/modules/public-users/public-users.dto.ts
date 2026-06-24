@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
-// Google OAuth login (id_token from Google Sign-In on the landing page)
-export const googleLoginSchema = z.object({
-	idToken: z.string().min(1, 'Google id_token is required'),
-	deviceFingerprint: z.string().optional(),
-});
-export type GoogleLoginRequest = z.infer<typeof googleLoginSchema>;
-
-// Start WhatsApp phone verification (cookie-authenticated public user)
+// Start WhatsApp phone login (no auth — this IS the login entry point)
 export const phoneInitSchema = z.object({
 	phone: z.string().regex(/^\d{8,15}$/, 'Phone must be 8-15 digits (no spaces)'),
 });

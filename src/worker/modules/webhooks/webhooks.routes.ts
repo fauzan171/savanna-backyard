@@ -4,7 +4,7 @@ import { WebhooksService } from './webhooks.service';
 import { EmailService } from '@/worker/core/services/email.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
-import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
+import { createWhatsAppProvider } from '@/worker/core/services/providers';
 import { PublicUsersRepository } from '@/worker/modules/public-users/public-users.repository';
 import { PublicUsersService } from '@/worker/modules/public-users/public-users.service';
 
@@ -131,9 +131,8 @@ const whatsappInboundHandler = async (c: Context<WebhookEnv>) => {
 	const configRepo = new ConfigRepository(db);
 	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const repo = new PublicUsersRepository(db);
-	const google = await createGoogleOAuthProvider(configRepo);
 	const whatsapp = await createWhatsAppProvider(configRepo);
-	const service = new PublicUsersService(repo, jwtService, google, whatsapp, configRepo);
+	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo);
 
 	await service.handleWhatsappInbound(data);
 	return c.json({ success: true, message: 'OK' });

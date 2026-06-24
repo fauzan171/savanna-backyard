@@ -5,17 +5,15 @@ import { createDb } from '@/worker/core/database';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
-import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
+import { createWhatsAppProvider } from '@/worker/core/services/providers';
 import { publicUserAuthMiddleware, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { PublicUsersRepository } from './public-users.repository';
 import { PublicUsersService } from './public-users.service';
 import {
-	googleLoginSchema,
 	phoneInitSchema,
 	phoneVerifySchema,
 	updateProfileSchema,
-	type GoogleLoginRequest,
 	type PhoneInitRequest,
 	type PhoneVerifyRequest,
 	type UpdateProfileRequest,
@@ -32,9 +30,8 @@ export const publicUsersServicesMiddleware = () => async (c: Context<PublicUsers
 	const configRepo = new ConfigRepository(db);
 	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const repo = new PublicUsersRepository(db);
-	const google = await createGoogleOAuthProvider(configRepo);
 	const whatsapp = await createWhatsAppProvider(configRepo);
-	const service = new PublicUsersService(repo, jwtService, google, whatsapp, configRepo);
+	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo);
 	c.set('publicUsersService', service);
 	c.set('jwtService', jwtService);
 	await next();
@@ -67,35 +64,23 @@ function clearPublicUserCookie(c: Context) {
 	});
 }
 
-const googleLoginHandler = async (c: Context<PublicUsersEnv>) => {
-	const service = c.get('publicUsersService');
-	const body = getValidatedBody<GoogleLoginRequest>(c);
-	const result = await service.googleLogin(body);
-	setPublicUserCookie(c, result.token);
-	return c.json({
-		success: true,
-		message: result.requiresPhoneVerification ? 'Phone verification required' : 'Logged in',
-		data: { user: result.user, requiresPhoneVerification: result.requiresPhoneVerification },
-	});
-};
-
+// ---- Login (phone + WhatsApp OTP) — no cookie required, these SET the cookie ----
 const phoneInitHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
-	const pu = c.get('publicUser');
 	const body = getValidatedBody<PhoneInitRequest>(c);
-	const result = await service.phoneInit(pu.publicUserId, body);
+	const result = await service.phoneInit(body);
 	return c.json({ success: true, message: 'Send the Ref code to our WhatsApp number', data: result });
 };
 
 const phoneVerifyHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
-	const pu = c.get('publicUser');
 	const body = getValidatedBody<PhoneVerifyRequest>(c);
-	const result = await service.phoneVerify(pu.publicUserId, body);
+	const result = await service.phoneVerify(body);
 	setPublicUserCookie(c, result.token);
-	return c.json({ success: true, message: 'Phone verified', data: { user: result.user } });
+	return c.json({ success: true, message: 'Logged in', data: { user: result.user } });
 };
 
+// ---- Account (cookie-authenticated) ----
 const meHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
@@ -141,17 +126,14 @@ async function hashToken(token: string): Promise<string> {
 	return Array.from(new Uint8Array(hashBuffer), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Public-user auth router. Mounted under /api/v1/public/auth (inherits X-API-Key + CORS from the public router).
+// Public-user auth router. Mounted under /api/v1/public/auth (inherits X-API-Key + CORS).
 export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	const router = new Hono<PublicUsersEnv>();
 	router.use('*', publicUsersServicesMiddleware());
 
 	// Login (no cookie yet)
-	router.post('/google', validateBody(googleLoginSchema), googleLoginHandler);
-
-	// Phone verification (cookie-authenticated, phone may be unverified)
-	router.post('/phone/init', publicUserAuthMiddleware(), validateBody(phoneInitSchema), phoneInitHandler);
-	router.post('/phone/verify', publicUserAuthMiddleware(), validateBody(phoneVerifySchema), phoneVerifyHandler);
+	router.post('/phone/init', validateBody(phoneInitSchema), phoneInitHandler);
+	router.post('/phone/verify', validateBody(phoneVerifySchema), phoneVerifyHandler);
 
 	// Account (cookie-authenticated)
 	router.get('/me', publicUserAuthMiddleware(), meHandler);
@@ -190,7 +172,7 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 
 	router.get('/bookings', myBookingsHandler);
 	router.get('/bookings/:id', myBookingDetailHandler);
-	// Pay the remainder requires a verified phone (anti-abuse)
+	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
 
 	return router;
