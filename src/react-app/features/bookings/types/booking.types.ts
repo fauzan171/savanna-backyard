@@ -190,6 +190,18 @@ export interface PenaltyBreakdown {
   } | null;
 }
 
+/** Result of scanning a vehicle QR to resolve the active rental (POST /bookings/scan-return) */
+export interface ScanReturnResult {
+  bookingId: string;
+  bookingNumber: string;
+  vehicleId: string;
+  vehicleName: string;
+  customerName: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface CancelBookingRequest {
   reason: string;
 }

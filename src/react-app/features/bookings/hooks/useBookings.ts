@@ -24,6 +24,7 @@ import type {
 	ExtensionCalculationResult,
 	BookingAddon,
 	PenaltyBreakdown,
+	ScanReturnResult,
 } from '../types/booking.types';
 
 const BASE_PATH = '/v1/bookings';
@@ -179,6 +180,14 @@ export function useMarkPenaltyPaid() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: bookingKeys.all });
 		},
+	});
+}
+
+/** Scan a vehicle QR to resolve the active rental (admin return processing) */
+export function useScanReturn() {
+	return useMutation({
+		mutationFn: (qrCode: string) =>
+			api.post<ApiSuccessResponse<ScanReturnResult>>(`${BASE_PATH}/scan-return`, { qrCode }),
 	});
 }
 
