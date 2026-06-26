@@ -630,6 +630,8 @@ export class PublicApiService {
     bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
     totalAmount: number; paidAt: string | null;
+    paymentPageUrl: string | null; qrString: string | null;
+    paymentType: string; dpAmount: number; remainingAmount: number;
   } | null> {
     const booking = await this.repo.findBookingByNumber(bookingNumber);
     if (!booking) return null;
@@ -645,6 +647,11 @@ export class PublicApiService {
       endDate: booking.endDate,
       totalAmount: booking.totalAmount,
       paidAt: booking.paidAt,
+      paymentPageUrl: (booking as Record<string, unknown>).paymentPageUrl as string | null ?? null,
+      qrString: null,
+      paymentType: (booking as Record<string, unknown>).paymentType as string ?? 'full',
+      dpAmount: ((booking as Record<string, unknown>).dpAmount as number) ?? 0,
+      remainingAmount: ((booking as Record<string, unknown>).remainingAmount as number) ?? 0,
     };
   }
 

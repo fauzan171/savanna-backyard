@@ -76,14 +76,18 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 	const webhookToken = c.env.XENDIT_WEBHOOK_TOKEN ?? '';
 
 	if (!webhookToken) {
-		console.error('XENDIT_WEBHOOK_TOKEN not configured');
-		return c.json({ success: false, message: 'Webhook token not configured' }, 500);
+		console.error('[Xendit Webhook] XENDIT_WEBHOOK_TOKEN not configured. Run: npx wrangler secret put XENDIT_WEBHOOK_TOKEN');
+		return c.json({ success: false, message: 'Webhook token not configured. Server admin: set XENDIT_WEBHOOK_TOKEN via wrangler secret put.' }, 500);
 	}
 
 	// Verify X-CALLBACK-TOKEN header
 	const callbackToken = c.req.header('x-callback-token') ?? '';
+	if (!callbackToken) {
+		console.error('[Xendit Webhook] Missing X-Callback-Token header');
+		return c.json({ success: false, message: 'Missing X-Callback-Token header' }, 401);
+	}
 	if (callbackToken !== webhookToken) {
-		console.error('Invalid Xendit webhook signature');
+		console.error('[Xendit Webhook] Invalid X-Callback-Token. Expected token length:', webhookToken.length, 'Received token length:', callbackToken.length);
 		return c.json({ success: false, message: 'Invalid signature' }, 401);
 	}
 
