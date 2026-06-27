@@ -393,35 +393,122 @@ export class VehiclesService {
     return { month: query.month, vehicles };
   }
 
-  async checkAvailabilityForDates(
-    vehicleId: string,
-    startDate: string,
-    endDate: string,
-  ): Promise<boolean> {
-    const vehicle = await this.vehicleRepo.findById(vehicleId);
-    if (!vehicle) return false;
+	async checkAvailabilityForDates(
+		vehicleId: string,
+		startDate: string,
+		endDate: string,
+	): Promise<boolean> {
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) return false;
 
-    if (vehicle.status === "Maintenance" || vehicle.status === "Inactive")
-      return false;
+		if (vehicle.status === "Maintenance" || vehicle.status === "Inactive")
+			return false;
 
-    if (this.maintenanceRepo) {
-      const mConflicts = await this.maintenanceRepo.findConflictingMaintenance(
-        vehicleId,
-        startDate,
-        endDate,
-      );
-      if (mConflicts.length > 0) return false;
-    }
+		if (this.maintenanceRepo) {
+			const mConflicts = await this.maintenanceRepo.findConflictingMaintenance(
+				vehicleId,
+				startDate,
+				endDate,
+			);
+			if (mConflicts.length > 0) return false;
+		}
 
-    if (this.bookingRepo) {
-      const bConflicts = await this.bookingRepo.findConflictingBookings(
-        vehicleId,
-        startDate,
-        endDate,
-      );
-      if (bConflicts.length > 0) return false;
-    }
+		if (this.bookingRepo) {
+			const bConflicts = await this.bookingRepo.findConflictingBookings(
+				vehicleId,
+				startDate,
+				endDate,
+			);
+			if (bConflicts.length > 0) return false;
+		}
 
-    return true;
-  }
+		return true;
+	}
+
+	async getAvailabilityTimeline(): Promise<{
+		vehicles: {
+			id: string;
+			name: string;
+			type: string;
+			plateNumber: string;
+			status: string;
+			currentBooking: {
+				bookingNumber: string;
+				customerName: string;
+				endDate: string;
+			} | null;
+			nextAvailableDate: string | null;
+		}[];
+		summary: {
+			total: number;
+			available: number;
+			rented: number;
+			maintenance: number;
+			inactive: number;
+		};
+	}> {
+		const { items: allVehicles } = await this.vehicleRepo.list({ page: 1, limit: 1000 });
+		const today = new Date().toISOString().split('T')[0]!;
+
+		const summary = { total: 0, available: 0, rented: 0, maintenance: 0, inactive: 0 };
+		const vehicles: {
+			id: string;
+			name: string;
+			type: string;
+			plateNumber: string;
+			status: string;
+			currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null;
+			nextAvailableDate: string | null;
+		}[] = [];
+
+		for (const v of allVehicles) {
+			summary.total++;
+			if (v.status === 'Available') summary.available++;
+			else if (v.status === 'Maintenance') summary.maintenance++;
+			else if (v.status === 'Inactive') summary.inactive++;
+			else if (v.status === 'Rented') summary.rented++;
+
+			// Find current/next booking for this vehicle
+			let currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null = null;
+			let nextAvailableDate: string | null = null;
+
+			if (this.bookingRepo) {
+				const todayBookings = await this.bookingRepo.findConflictingBookings(v.id, today, today);
+				if (todayBookings.length > 0) {
+					const b = todayBookings[0]!;
+					currentBooking = {
+						bookingNumber: b.bookingNumber,
+						customerName: 'Customer',
+						endDate: b.endDate,
+					};
+					// Next available is day after endDate
+					const endDate = new Date(b.endDate);
+					endDate.setDate(endDate.getDate() + 1);
+					nextAvailableDate = endDate.toISOString().split('T')[0]!;
+				} else {
+					// Find next upcoming booking
+					const futureDate = new Date();
+					futureDate.setMonth(futureDate.getMonth() + 1);
+					const futureEnd = futureDate.toISOString().split('T')[0]!;
+					const upcoming = await this.bookingRepo.findConflictingBookings(v.id, today, futureEnd);
+					if (upcoming.length > 0) {
+						// Vehicle is available now but has upcoming booking
+						nextAvailableDate = upcoming[0]!.startDate;
+					}
+				}
+			}
+
+			vehicles.push({
+				id: v.id,
+				name: v.name,
+				type: v.type,
+				plateNumber: v.plateNumber,
+				status: v.status,
+				currentBooking,
+				nextAvailableDate,
+			});
+		}
+
+		return { vehicles, summary };
+	}
 }

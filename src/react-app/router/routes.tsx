@@ -20,6 +20,7 @@ import CustomerDetailPage from '@/react-app/features/customers/pages/CustomerDet
 // Vehicle Pages
 import VehiclesPage from '@/react-app/features/vehicles/pages/VehiclesPage';
 import VehicleDetailPage from '@/react-app/features/vehicles/pages/VehicleDetailPage';
+import { VehicleAvailabilityPage } from '@/react-app/features/vehicles';
 
 // Calendar Page
 import { CalendarPage } from '@/react-app/features/calendar';
@@ -32,7 +33,10 @@ import LeadDetailPage from '@/react-app/features/leads/pages/LeadDetailPage';
 import { BookingsPage, BookingDetailPage } from '@/react-app/features/bookings';
 
 // Payment Pages
-import { PaymentsPage, PaymentDetailPage } from '@/react-app/features/payments';
+import { PaymentsPage, PaymentDetailPage, PaymentDashboardPage } from '@/react-app/features/payments';
+
+// Equipment Pages
+import { EquipmentPage, EquipmentDetailPage } from '@/react-app/features/equipment';
 
 // Maintenance Pages
 import { MaintenancePage, MaintenanceDetailPage } from '@/react-app/features/maintenance';
@@ -86,6 +90,7 @@ export const routes: RouteObject[] = [
 
 							// Vehicle routes
 							{ path: 'vehicles', element: <VehiclesPage /> },
+							{ path: 'vehicles/availability', element: <VehicleAvailabilityPage /> },
 							{ path: 'vehicles/:id', element: <VehicleDetailPage /> },
 
 							// Fleet calendar matrix
@@ -101,7 +106,12 @@ export const routes: RouteObject[] = [
 
 							// Payment routes
 							{ path: 'payments', element: <PaymentsPage /> },
+							{ path: 'payments/dashboard', element: <PaymentDashboardPage /> },
 							{ path: 'payments/:id', element: <PaymentDetailPage /> },
+
+							// Equipment routes
+							{ path: 'equipment', element: <EquipmentPage /> },
+							{ path: 'equipment/:id', element: <EquipmentDetailPage /> },
 
 							// Maintenance routes
 							{ path: 'maintenance', element: <MaintenancePage /> },

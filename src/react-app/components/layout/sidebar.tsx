@@ -23,6 +23,8 @@ import {
 	Map,
 	UserCog,
 	CalendarDays,
+	Shirt,
+	Car,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -89,11 +91,20 @@ const defaultNavItems: NavItem[] = [
 		label: 'Payments',
 		href: '/payments',
 		icon: <CreditCard className="size-5" />,
+		children: [
+			{ label: 'All Payments', href: '/payments' },
+			{ label: 'Dashboard', href: '/payments/dashboard' },
+		],
 	},
 	{
 		label: 'Vehicles',
 		href: '/vehicles',
 		icon: <Bike className="size-5" />,
+	},
+	{
+		label: 'Availability',
+		href: '/vehicles/availability',
+		icon: <Car className="size-5" />,
 	},
 	{
 		label: 'Calendar',
@@ -104,6 +115,11 @@ const defaultNavItems: NavItem[] = [
 		label: 'Customers',
 		href: '/customers',
 		icon: <UserCircle className="size-5" />,
+	},
+	{
+		label: 'Equipment',
+		href: '/equipment',
+		icon: <Shirt className="size-5" />,
 	},
 	{
 		label: 'Maintenance',

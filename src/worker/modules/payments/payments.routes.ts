@@ -259,6 +259,12 @@ const getBookingPaymentSummaryHandler = async (c: Context<PaymentsEnv>) => {
   return c.json({ success: true, data: result });
 };
 
+const getBookingPaymentSummariesHandler = async (c: Context<PaymentsEnv>) => {
+  const service = c.get("paymentsService");
+  const result = await service.getBookingPaymentSummaries();
+  return c.json({ success: true, data: result });
+};
+
 // Factory function to create payments router
 export function createPaymentsRouter(): Hono<PaymentsEnv> {
   const router = new Hono<PaymentsEnv>();
@@ -280,6 +286,9 @@ export function createPaymentsRouter(): Hono<PaymentsEnv> {
 
   // Get payment statistics
   router.get("/stats", getPaymentStatsHandler);
+
+  // Get booking payment summaries (dashboard view)
+  router.get("/booking-summaries", getBookingPaymentSummariesHandler);
 
   // List payments (with pagination and filters)
   router.get("/", validateQuery(listPaymentsQuerySchema), listPaymentsHandler);

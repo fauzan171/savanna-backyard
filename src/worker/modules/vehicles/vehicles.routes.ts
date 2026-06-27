@@ -110,6 +110,12 @@ const getCalendarMatrixHandler = async (c: Context<VehiclesEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const getAvailabilityTimelineHandler = async (c: Context<VehiclesEnv>) => {
+	const service = c.get('vehiclesService');
+	const result = await service.getAvailabilityTimeline();
+	return c.json({ success: true, data: result });
+};
+
 export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	const router = new Hono<VehiclesEnv>();
 
@@ -117,6 +123,7 @@ export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	router.use('*', authMiddleware());
 
 	router.get('/availability', validateQuery(availabilityQuerySchema), checkAvailabilityHandler);
+	router.get('/availability-timeline', getAvailabilityTimelineHandler);
 	router.get('/calendar', validateQuery(calendarMatrixQuerySchema), getCalendarMatrixHandler);
 	router.get('/', validateQuery(listVehiclesQuerySchema), listVehiclesHandler);
 	router.get('/:id', getVehicleByIdHandler);
