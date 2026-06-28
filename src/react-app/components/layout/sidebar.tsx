@@ -184,10 +184,10 @@ function SidebarItem({ item, collapsed, onItemClick }: SidebarItemProps) {
 			className={({ isActive }) =>
 				cn(
 					'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-					'hover:bg-muted hover:text-foreground',
+					'hover:bg-accent hover:text-accent-foreground',
 					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
 					isActive
-						? 'bg-primary/10 text-primary hover:bg-primary/15'
+						? 'bg-primary/15 text-primary font-semibold'
 						: 'text-muted-foreground',
 					collapsed && 'justify-center px-2'
 				)
@@ -255,13 +255,13 @@ function Sidebar({
 	const sidebarContent = (
 		<div
 			className={cn(
-				'flex h-full flex-col bg-card border-r border-border transition-all duration-300',
+				'flex h-full flex-col bg-card border-r border-border shadow-lg md:shadow-none transition-all duration-300',
 				collapsed ? 'w-16' : 'w-64',
 				className
 			)}
 		>
 			{/* Logo Header */}
-			<div className="flex h-16 items-center justify-between border-b border-border px-4">
+			<div className="flex h-16 items-center justify-between border-b border-border px-4 bg-card">
 				{!collapsed && (
 					<Link to="/" className="flex items-center gap-2">
 						{logo || (
@@ -279,7 +279,7 @@ function Sidebar({
 			</div>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto p-3 space-y-1">
+			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted/30">
 				{items.map((item) => (
 					<SidebarItem
 						key={item.href}
@@ -292,7 +292,7 @@ function Sidebar({
 
 			{/* Footer Items */}
 			{footerItems.length > 0 && (
-				<div className="border-t border-border p-3 space-y-1">
+				<div className="border-t border-border p-3 space-y-1 bg-card">
 					{footerItems.map((item) => (
 						<SidebarItem
 							key={item.href}
