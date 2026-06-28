@@ -331,7 +331,7 @@ function Sidebar({
 			<Button
 				variant="ghost"
 				size="icon"
-				className="md:hidden fixed top-4 left-4 z-50"
+				className="md:hidden fixed top-3 left-3 z-50 h-10 w-10 bg-card border border-border shadow-sm"
 				onClick={() => handleMobileOpenChange(!mobileOpen)}
 			>
 				{mobileOpen ? (
