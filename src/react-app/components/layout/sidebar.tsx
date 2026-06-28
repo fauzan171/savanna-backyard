@@ -279,7 +279,7 @@ function Sidebar({
 			</div>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted/30">
+			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted">
 				{items.map((item) => (
 					<SidebarItem
 						key={item.href}
@@ -327,11 +327,11 @@ function Sidebar({
 
 	return (
 		<>
-			{/* Mobile Menu Button */}
+		{/* Mobile Menu Button */}
 			<Button
 				variant="ghost"
 				size="icon"
-				className="md:hidden fixed top-3 left-3 z-50 h-10 w-10 bg-card border border-border shadow-sm"
+				className="md:hidden fixed top-3 left-3 z-[51] h-10 w-10 bg-card border border-border shadow-md"
 				onClick={() => handleMobileOpenChange(!mobileOpen)}
 			>
 				{mobileOpen ? (
@@ -356,7 +356,7 @@ function Sidebar({
 			{/* Mobile: Slide-in drawer */}
 			<div
 				className={cn(
-					'md:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300',
+					'md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-2xl transform transition-transform duration-300',
 					mobileOpen ? 'translate-x-0' : '-translate-x-full'
 				)}
 			>
