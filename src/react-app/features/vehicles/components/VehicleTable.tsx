@@ -25,6 +25,7 @@ interface VehicleTableProps {
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
 	Available: { variant: 'success', label: 'Available' },
 	Rented: { variant: 'info', label: 'Rented' },
+	Cleaning: { variant: 'default', label: 'Cleaning' },
 	Maintenance: { variant: 'warning', label: 'Maintenance' },
 	Inactive: { variant: 'default', label: 'Inactive' },
 };
@@ -134,7 +135,7 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 				),
 			},
 		],
-		[onStatusChange]
+		[onStatusChange, onQrClick]
 	);
 
 	const renderCard = (vehicle: Vehicle) => (

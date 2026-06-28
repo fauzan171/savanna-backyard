@@ -26,6 +26,7 @@ import { createDb } from './core/database';
 import { ConfigRepository } from './core/repositories/config.repository';
 import { EmailService } from './core/services/email.service';
 import { NotificationService } from './core/services/notification.service';
+import { VehiclesRepository } from './modules/vehicles/vehicles.repository';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -176,6 +177,7 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
 
   const db = createDb(env.DB);
   const configRepo = new ConfigRepository(db);
+  const vehicleRepo = new VehiclesRepository(db);
   const emailService = new EmailService({
     apiKey: env.RESEND_API_KEY,
     fromEmail: env.EMAIL_FROM || 'Savanna Bromo <noreply@savannabromo.com>',
@@ -183,12 +185,26 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
   const notificationService = new NotificationService(db, emailService, configRepo);
 
   try {
-    // Run all notification jobs
+    // 1. Auto-release vehicles from Cleaning → Available
+    let cleanableVehicles = 0;
+    try {
+      const vehicles = await vehicleRepo.getCleanableVehicles();
+      for (const v of vehicles) {
+        await vehicleRepo.markCleaned(v.id);
+        console.log(`[Scheduled] Vehicle ${v.plateNumber} (${v.name}) auto-released from Cleaning → Available`);
+        cleanableVehicles++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error releasing cleaned vehicles:', error);
+    }
+
+    // 2. Run notification jobs
     const dailyReminders = await notificationService.runDailyReminders();
     const hourlyReminders = await notificationService.runHourlyReminders();
     const followups = await notificationService.runFollowups();
 
     console.log('[Scheduled] All jobs completed:', {
+      cleanableVehicles,
       dailyReminders,
       hourlyReminders,
       followups,

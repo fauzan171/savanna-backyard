@@ -3,7 +3,7 @@ export type { Vehicle, NewVehicle, VehicleStatusLog, NewVehicleStatusLog } from 
 
 // Vehicle type enum
 export type VehicleType = 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other';
-export type VehicleStatus = 'Available' | 'Rented' | 'Maintenance' | 'Inactive';
+export type VehicleStatus = 'Available' | 'Rented' | 'Cleaning' | 'Maintenance' | 'Inactive';
 
 // API-specific types
 export interface VehicleResponse {

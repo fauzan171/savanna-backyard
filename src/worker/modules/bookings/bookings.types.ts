@@ -131,7 +131,7 @@ export interface ExtendRentalResult {
 	id: string;
 	originalEndDate: string;
 	newEndDate: string;
-	additionalDays: number;
+	additionalBlocks: number;
 	additionalAmount: number;
 	newTotalAmount: number;
 	extendedAt: string;

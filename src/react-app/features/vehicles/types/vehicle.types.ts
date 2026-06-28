@@ -4,7 +4,7 @@ import type { BaseEntity } from '@/react-app/features/shared/types/api.types';
 export type VehicleType = 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other';
 
 // Vehicle status enum
-export type VehicleStatus = 'Available' | 'Rented' | 'Maintenance' | 'Inactive';
+export type VehicleStatus = 'Available' | 'Rented' | 'Cleaning' | 'Maintenance' | 'Inactive';
 
 // Vehicle entity matching backend
 export interface Vehicle extends BaseEntity {

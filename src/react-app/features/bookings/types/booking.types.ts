@@ -278,7 +278,7 @@ export interface ExtensionCalculationParams {
 export interface ExtensionCalculationResult {
   currentEndDate: string;
   newEndDate: string;
-  additionalDays: number;
+  additionalBlocks: number;
   additionalAmount: number;
   newTotalAmount: number;
   dailyRate: number;

@@ -9,6 +9,7 @@ import {
 	generateBookingNumber,
 	calculateDays,
 	calculateLateFee,
+	getHourlyRate,
 	LATE_FEE_MULTIPLIER,
 } from './availability.helper';
 import { decodeVehicleQr } from '@/worker/core/lib/qr';
@@ -43,6 +44,12 @@ import type {
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
+	/** Get cleaning duration in hours from config (default 4 hours) */
+	private async getCleaningDurationHours(): Promise<number> {
+		if (!this.configRepo) return 4;
+		return this.configRepo.getNumber('cleaning_duration_hours', 4);
+	}
+
 	constructor(
 		private bookingRepo: BookingsRepository,
 		private vehicleRepo: VehiclesRepository,
@@ -337,18 +344,18 @@ export class BookingsService {
 			};
 		}
 
-		// Calculate amounts with validation for daily rate
-		const days = calculateDays(data.startDate, data.endDate);
-		const dailyRate = data.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
+		// Calculate amounts (12-hour block pricing, not daily)
+		const blocks = calculateDays(data.startDate, data.endDate);
+		const blockRate = data.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
 
-		// Validate daily rate exists
-		if (dailyRate === 0) {
+		// Validate block rate exists
+		if (blockRate === 0) {
 			throw new ValidationError(
-				`Vehicle does not have a ${data.currency} daily rate configured`
+				`Vehicle does not have a ${data.currency} rate configured`
 			);
 		}
 
-		const baseAmount = dailyRate * days;
+		const baseAmount = blockRate * blocks;
 
 		// Calculate addons amount
 		let addonsAmount = 0;
@@ -512,8 +519,8 @@ export class BookingsService {
 			throw new NotFoundError('Vehicle');
 		}
 
-		// Calculate late fee - add to existing total, not recalculate
-		const { daysLate, lateFee } = calculateLateFee(
+		// Calculate late fee - hourly based now
+		const { daysLate, lateFee, hoursLate } = calculateLateFee(
 			vehicle.dailyRateIdr,
 			booking.endDate,
 			data.actualReturnDate
@@ -549,11 +556,16 @@ export class BookingsService {
 		const conditionStatus = (data.conditionStatus
 			?? (flippedItems === 0 && daysLate === 0 ? 'Excellent' : flippedItems > 0 ? 'Fair' : 'Good')) as NonNullable<Vehicle['conditionStatus']>;
 
+		// Vehicle goes to Cleaning, not Available directly
+		const cleaningDurationHours = await this.getCleaningDurationHours();
+		const cleaningCompletedAt = new Date(Date.now() + cleaningDurationHours * 60 * 60 * 1000).toISOString();
+
 		await this.vehicleRepo.update(booking.vehicleId, {
-			status: 'Available',
+			status: 'Cleaning',
 			totalKm: data.endKm,
 			lastKm: data.endKm,
 			conditionStatus,
+			cleaningCompletedAt,
 		});
 
 		// Record condition history
@@ -572,12 +584,12 @@ export class BookingsService {
 		const response = await this.toResponse(updated);
 
 		let lateFeeDetails: LateFeeDetails | null = null;
-		if (daysLate > 0) {
+		if (hoursLate > 0) {
 			lateFeeDetails = {
 				daysLate,
 				dailyRate: vehicle.dailyRateIdr,
 				multiplier: LATE_FEE_MULTIPLIER,
-				calculation: `${daysLate} day(s) x ${vehicle.dailyRateIdr} x ${LATE_FEE_MULTIPLIER} = ${lateFee}`,
+				calculation: `${hoursLate} hour(s) late x Rp${Math.round(getHourlyRate(vehicle.dailyRateIdr))}/hour x ${LATE_FEE_MULTIPLIER} = Rp${Math.round(lateFee).toLocaleString('id-ID')}`,
 			};
 		}
 
@@ -630,14 +642,14 @@ export class BookingsService {
 			);
 		}
 
-		// Calculate additional amount
+		// Calculate additional blocks (12-hour based)
 		const vehicle = await this.vehicleRepo.findById(booking.vehicleId);
 		if (!vehicle) {
 			throw new NotFoundError('Vehicle');
 		}
 
-		const additionalDays = calculateDays(booking.endDate, data.newEndDate);
-		const additionalAmount = vehicle.dailyRateIdr * additionalDays;
+		const additionalBlocks = calculateDays(booking.endDate, data.newEndDate);
+		const additionalAmount = vehicle.dailyRateIdr * additionalBlocks;
 		const newTotalAmount = booking.totalAmount + additionalAmount;
 
 		// Update booking
@@ -648,7 +660,7 @@ export class BookingsService {
 			id,
 			originalEndDate,
 			newEndDate: data.newEndDate,
-			additionalDays,
+			additionalBlocks,
 			additionalAmount,
 			newTotalAmount,
 			extendedAt: new Date().toISOString(),
@@ -829,13 +841,13 @@ export class BookingsService {
 		let lateFeeDetails: LateFeeDetails | null = null;
 		const vehicle = await this.vehicleRepo.findById(booking.vehicleId);
 		if (vehicle && booking.actualReturnDate) {
-			const { daysLate } = calculateLateFee(vehicle.dailyRateIdr, booking.endDate, booking.actualReturnDate);
-			if (daysLate > 0) {
+			const { daysLate, hoursLate } = calculateLateFee(vehicle.dailyRateIdr, booking.endDate, booking.actualReturnDate);
+			if (hoursLate > 0) {
 				lateFeeDetails = {
 					daysLate,
 					dailyRate: vehicle.dailyRateIdr,
 					multiplier: LATE_FEE_MULTIPLIER,
-					calculation: `${daysLate} day(s) x ${vehicle.dailyRateIdr} x ${LATE_FEE_MULTIPLIER} = ${booking.lateFee ?? 0}`,
+					calculation: `${hoursLate} hour(s) late x Rp${Math.round(getHourlyRate(vehicle.dailyRateIdr))}/hour x ${LATE_FEE_MULTIPLIER} = Rp${Math.round(booking.lateFee ?? 0).toLocaleString('id-ID')}`,
 				};
 			}
 		}
