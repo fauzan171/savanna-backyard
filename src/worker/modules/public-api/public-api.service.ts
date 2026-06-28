@@ -232,6 +232,49 @@ export class PublicApiService {
     };
   }
 
+  /** Get vehicle by QR/barcode code (SVN:{vehicleId}) for public scan */
+  async getVehicleByCode(code: string): Promise<{
+    id: string;
+    name: string;
+    type: string;
+    brand: string | null;
+    model: string | null;
+    year: number | null;
+    category: string | null;
+    plateNumber: string;
+    dailyRateIdr: number;
+    image: string | null;
+    specs: Record<string, string> | null;
+    description: string | null;
+    available: boolean;
+    displayName: string;
+  } | null> {
+    const vehicle = await this.repo.getVehicleByCode(code);
+    if (!vehicle) return null;
+
+    const parsedSpecs = safeJsonParse<Record<string, string> | null>(
+      typeof vehicle.specs === "string" ? vehicle.specs : null,
+      vehicle.specs ? { details: String(vehicle.specs) } : null,
+    );
+
+    return {
+      id: vehicle.id,
+      name: vehicle.name,
+      type: vehicle.type,
+      brand: vehicle.brand,
+      model: vehicle.model,
+      year: vehicle.year,
+      category: vehicle.category,
+      plateNumber: vehicle.plateNumber,
+      dailyRateIdr: vehicle.dailyRateIdr,
+      image: resolveUrl(vehicle.photoUrl, this.baseUrl),
+      specs: parsedSpecs,
+      description: vehicle.description,
+      available: vehicle.status === "Available",
+      displayName: this.getDisplayName(vehicle.type),
+    };
+  }
+
   // 5. Create Booking (public — no auth required, only API key)
   async createPublicBooking(
     data: CreatePublicBookingRequest,

@@ -67,6 +67,16 @@ const getVehicleDetailsHandler = async (c: Context<PublicApiEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const getVehicleByCodeHandler = async (c: Context<PublicApiEnv>) => {
+	const service = c.get('publicApiService');
+	const code = c.req.param('code');
+	const result = await service.getVehicleByCode(decodeURIComponent(code));
+	if (!result) {
+		return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Vehicle not found for this code' } }, 404);
+	}
+	return c.json({ success: true, data: result });
+};
+
 const createBookingHandler = async (c: Context<PublicApiEnv>) => {
 	const service = c.get('publicApiService');
 	const body = getValidatedBody<CreatePublicBookingRequest>(c);
@@ -149,6 +159,7 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	router.post('/leads', validateBody(submitLeadSchema), submitLeadHandler);
 	router.get('/availability', validateQuery(checkAvailabilityQuerySchema), checkAvailabilityHandler);
 	router.get('/vehicle-types', validateQuery(getVehicleTypesQuerySchema), getVehicleTypesHandler);
+	router.get('/vehicles/by-code/:code', getVehicleByCodeHandler);
 	router.get('/vehicles/:id', getVehicleDetailsHandler);
 
 	// New: public booking endpoint

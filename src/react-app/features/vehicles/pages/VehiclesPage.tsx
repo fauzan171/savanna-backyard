@@ -7,11 +7,13 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useVehicles, useCreateVehicle } from '../hooks/useVehicles';
 import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
+import { VehicleQrCard } from '../components/VehicleQrCard';
 import type { Vehicle, VehicleFormData } from '../types/vehicle.types';
 
 export default function VehiclesPage() {
 	const navigate = useNavigate();
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+	const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null);
 
 	// Queries and mutations
 	const { data, isLoading } = useVehicles({ page: 1, limit: 25 });
@@ -22,7 +24,8 @@ export default function VehiclesPage() {
 			const result = await createMutation.mutateAsync(formData);
 			setIsCreateDialogOpen(false);
 			if (result.data?.id) {
-				navigate(`/vehicles/${result.data.id}`);
+				// Show QR so admin can immediately print & attach to motor
+				setQrVehicle({ id: result.data.id, name: formData.name } as Vehicle);
 			}
 		} catch (error) {
 			console.log(error)
@@ -31,6 +34,10 @@ export default function VehiclesPage() {
 
 	const handleRowClick = (vehicle: Vehicle) => {
 		navigate(`/vehicles/${vehicle.id}`);
+	};
+
+	const handleQrClick = (vehicle: Vehicle) => {
+		setQrVehicle(vehicle);
 	};
 
 	return (
@@ -50,6 +57,7 @@ export default function VehiclesPage() {
 				data={data?.items ?? []}
 				isLoading={isLoading}
 				onRowClick={handleRowClick}
+				onQrClick={handleQrClick}
 			/>
 
 			{/* Create Dialog */}
@@ -65,6 +73,26 @@ export default function VehiclesPage() {
 					/>
 				</DialogContent>
 			</Dialog>
+
+			{/* QR Code — shown after vehicle creation or when clicking Generate QR from list */}
+			{qrVehicle && (
+				<div className="rounded-lg border p-5 flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-gray-900">
+					<div>
+						<h3 className="text-base font-semibold">
+							QR Code — {qrVehicle.name}
+						</h3>
+						<p className="text-sm text-gray-500 dark:text-gray-400">
+							Print and attach this QR to the motor. Scan to see vehicle identity.
+						</p>
+					</div>
+					<div className="flex items-center gap-3">
+						<VehicleQrCard vehicleId={qrVehicle.id} vehicleName={qrVehicle.name} />
+						<Button variant="ghost" size="sm" onClick={() => setQrVehicle(null)}>
+							Close
+						</Button>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

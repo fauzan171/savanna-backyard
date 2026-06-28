@@ -31,6 +31,14 @@ export class PublicApiRepository {
 		return result[0] ?? null;
 	}
 
+	/** Get vehicle by QR code value (SVN:{vehicleId}) — for public scan */
+	async getVehicleByCode(code: string): Promise<Vehicle | null> {
+		// Strip SVN: prefix if present
+		const vehicleId = code.startsWith('SVN:') ? code.slice(4) : code;
+		if (!vehicleId) return null;
+		return this.getVehicleById(vehicleId);
+	}
+
 	// Check if vehicle is available for date range (no conflicting bookings)
 	async isVehicleAvailableForDates(vehicleId: string, startDate: string, endDate: string): Promise<boolean> {
 		const conflicts = await this.db
