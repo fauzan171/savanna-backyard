@@ -712,6 +712,10 @@ const equipment = await apiGet<Equipment[]>('/public/equipment');
 interface BookingResult {
   bookingId: string;
   bookingNumber: string;
+  startDate: string;           // ISO 8601 datetime dari request client
+  endDate: string;             // ISO 8601 datetime dari request client
+  blocks: number;              // jumlah 12-jam block
+  vehicleName: string;         // nama motor yang dipilih
   paymentPageUrl: string | null;
   totalAmount: number;
   dpAmount: number;
@@ -738,6 +742,12 @@ const booking = await apiPost<BookingResult>('/public/bookings', {
   paymentMethod: 'QRIS', // 'Gateway' | 'QRIS' | 'BankTransfer'
 });
 
+// FE bisa langsung tampilkan info pickup/return TANPA extra API call:
+console.log(`Pickup: ${booking.startDate}`);    // "2026-06-28T02:00:00+07:00"
+console.log(`Return: ${booking.endDate}`);      // "2026-06-28T14:00:00+07:00"
+console.log(`Motor: ${booking.vehicleName}`);    // "KLX 150"
+console.log(`Block: ${booking.blocks}`);         // 1
+
 // Redirect user ke paymentPageUrl
 window.location.href = booking.paymentPageUrl;
 ```
@@ -750,8 +760,9 @@ interface BookingStatus {
   status: 'Pending' | 'Confirmed' | 'Active' | 'Completed' | 'Cancelled';
   paymentStatus: 'pending' | 'settlement' | 'deny' | 'expire' | 'cancel' | 'refund';
   vehicleName: string;
-  startDate: string;
-  endDate: string;
+  startDate: string;         // ISO 8601 datetime — jam pickup
+  endDate: string;           // ISO 8601 datetime — deadline return
+  blocks: number;            // jumlah 12-jam block
   totalAmount: number;
   paidAt: string | null;
 }

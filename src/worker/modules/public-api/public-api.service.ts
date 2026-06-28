@@ -30,8 +30,11 @@ function safeJsonParseStringArray(value: string | null | undefined): string[] {
 }
 
 /** Parse a 'YYYY-MM-DD' string into a UTC Date (timezone-safe). */
+/** Parse a YYYY-MM-DD or ISO 8601 datetime string into a UTC Date. */
 function parseDateStr(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
+  // Strip time portion if present (ISO 8601: "2026-06-28T02:00:00+07:00" -> "2026-06-28")
+  const datePart = value.includes('T') ? value.split('T')[0]! : value;
+  const [y, m, d] = datePart.split('-').map(Number);
   return new Date(Date.UTC(y!, m! - 1, d!));
 }
 
@@ -287,6 +290,10 @@ export class PublicApiService {
   ): Promise<{
     bookingId: string;
     bookingNumber: string;
+    startDate: string;
+    endDate: string;
+    blocks: number;
+    vehicleName: string;
     paymentPageUrl: string | null;
     qrString: string | null;
     xenditInvoiceId: string | null;
@@ -454,6 +461,10 @@ export class PublicApiService {
     return {
       bookingId: booking.id,
       bookingNumber: booking.bookingNumber,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      blocks,
+      vehicleName: vehicle.name,
       paymentPageUrl,
       qrString,
       xenditInvoiceId,
@@ -670,6 +681,7 @@ export class PublicApiService {
   async getBookingStatus(bookingNumber: string): Promise<{
     bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
+    blocks: number;
     totalAmount: number; paidAt: string | null;
     paymentPageUrl: string | null; qrString: string | null;
     paymentType: string; dpAmount: number; remainingAmount: number;
@@ -686,6 +698,7 @@ export class PublicApiService {
       vehicleName: vehicle?.name ?? 'Unknown',
       startDate: booking.startDate,
       endDate: booking.endDate,
+      blocks: calculateTwelveHourBlocks(booking.startDate, booking.endDate),
       totalAmount: booking.totalAmount,
       paidAt: booking.paidAt,
       paymentPageUrl: (booking as Record<string, unknown>).paymentPageUrl as string | null ?? null,
