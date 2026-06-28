@@ -16,9 +16,12 @@ export const submitLeadSchema = z.object({
 });
 
 // Check availability query schema
+// startDate/endDate accept either YYYY-MM-DD or ISO 8601 datetime
+const isoOrDateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
+
 export const checkAvailabilityQuerySchema = z.object({
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	startDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
+	endDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
 });
 
@@ -26,17 +29,18 @@ export const checkAvailabilityQuerySchema = z.object({
 export const getVehicleTypesQuerySchema = z.object({});
 
 // Create booking schema
+// startDate/endDate accept either YYYY-MM-DD or ISO 8601 datetime (supports12-hour blocks)
 export const createPublicBookingSchema = z.object({
 	vehicleId: z.string().min(1, 'Vehicle ID is required'),
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	startDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
+	endDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
 	customerName: z.string().min(2, 'Name must be at least 2 characters'),
 	customerPhone: z.string().min(8, 'Phone number must be at least 8 characters'),
 	customerEmail: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
 	notes: z.string().max(1000).optional().nullable().or(z.literal('')),
 	/** Payment method: 'QRIS' | 'BankTransfer' | 'Gateway' (all methods). Default: 'Gateway' */
 	paymentMethod: z.enum(['QRIS', 'BankTransfer', 'Gateway']).optional(),
-	/** Equipment line items to rent alongside the vehicle (per-day, same duration). */
+	/** Equipment line items to rent alongside the vehicle (per-block, same duration). */
 	equipment: z.array(z.object({
 		equipmentId: z.string().min(1),
 		quantity: z.number().int().min(1),

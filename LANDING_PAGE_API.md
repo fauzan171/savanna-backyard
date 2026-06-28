@@ -383,19 +383,29 @@ Buat booking baru dari landing page.
   "customerName": "Ahmad Rizki",
   "customerPhone": "+6281234567890",
   "customerEmail": "ahmad@email.com",
-  "notes": "Minta full riding gear lengkap"
+  "notes": "Minta full riding gear lengkap",
+  "equipment": [
+    { "equipmentId": "equip-uuid-1", "quantity": 1 },
+    { "equipmentId": "equip-uuid-2", "quantity": 1 }
+  ],
+  "paymentType": "full"
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `vehicleId` | string | Ya | UUID motor |
-| `startDate` | string | Ya | ISO 8601 datetime (termasuk jam & timezone) |
-| `endDate` | string | Ya | ISO 8601 datetime (harus > startDate, durasi min 1 block/12 jam) |
+| `vehicleId` | string | Ya | UUID motor (ambil dari GET /public/vehicles) |
+| `startDate` | string | Ya | ISO 8601 datetime atau YYYY-MM-DD (default 00:00 UTC) |
+| `endDate` | string | Ya | ISO 8601 datetime atau YYYY-MM-DD (harus > startDate) |
 | `customerName` | string | Ya | Min 2 karakter |
-| `customerPhone` | string | Ya | Min 10 karakter |
+| `customerPhone` | string | Ya | Min 8 karakter |
 | `customerEmail` | string | Tidak | Format email valid |
 | `notes` | string | Tidak | Max 1000 karakter |
+| `equipment` | array | Tidak | Line items peralatan tambahan (lihat GET /public/equipment) |
+| `equipment[].equipmentId` | string | Ya* | UUID peralatan |
+| `equipment[].quantity` | number | Ya* | Jumlah (min 1) |
+| `paymentType` | string | Tidak | `"full"` (default) atau `"dp"` (down payment 30%) |
+| `paymentMethod` | string | Tidak | `"Gateway"` (default), `"QRIS"`, atau `"BankTransfer"` |
 
 **Response 201:**
 
@@ -696,7 +706,7 @@ interface Equipment {
 const equipment = await apiGet<Equipment[]>('/public/equipment');
 ```
 
-### 5. Create Booking
+### 5. Create Booking (with Equipment)
 
 ```ts
 interface BookingResult {
@@ -704,6 +714,9 @@ interface BookingResult {
   bookingNumber: string;
   paymentPageUrl: string | null;
   totalAmount: number;
+  dpAmount: number;
+  remainingAmount: number;
+  paymentType: 'full' | 'dp';
 }
 
 const startDate = '2026-06-28T02:00:00+07:00'; // jam 2 pagi
@@ -717,6 +730,12 @@ const booking = await apiPost<BookingResult>('/public/bookings', {
   customerPhone: '+6281234567890',
   customerEmail: 'ahmad@email.com',
   notes: 'Minta helm size M',
+  equipment: [
+    { equipmentId: 'equip-uuid-1', quantity: 1 }, // Helm Offroad
+    { equipmentId: 'equip-uuid-2', quantity: 1 }, // Sarung Tangan
+  ],
+  paymentType: 'full',   // 'full' (bayar semua) atau 'dp' (DP 30%)
+  paymentMethod: 'QRIS', // 'Gateway' | 'QRIS' | 'BankTransfer'
 });
 
 // Redirect user ke paymentPageUrl

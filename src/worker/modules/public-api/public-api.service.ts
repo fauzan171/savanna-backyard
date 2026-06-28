@@ -2,6 +2,7 @@ import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
 import { ValidationError } from "@/worker/core/types/errors";
 import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
+import { calculateTwelveHourBlocks } from '@/worker/modules/bookings/availability.helper';
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
 import type {
   SubmitLeadRequest,
@@ -329,14 +330,11 @@ export class PublicApiService {
       });
     }
 
-    // Calculate base amount (vehicle)
-    const days = Math.ceil(
-      (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
-    const baseAmount = days * vehicle.dailyRateIdr;
+    // Calculate base amount using 12-hour blocks (not daily)
+    const blocks = calculateTwelveHourBlocks(data.startDate, data.endDate);
+    const baseAmount = blocks * vehicle.dailyRateIdr;
 
-    // ---- Equipment line items (per-day, same duration as the vehicle) ----
+    // ---- Equipment line items (per-block, same duration as the vehicle) ----
     let equipmentTotalAmount = 0;
     const equipmentRows: Array<{ equipmentId: string; quantity: number; unitPrice: number; totalPrice: number }> = [];
     const requestedEquipment = data.equipment ?? [];
@@ -349,7 +347,7 @@ export class PublicApiService {
         if (!item)
           throw new ValidationError(`Equipment not found or inactive: ${req.equipmentId}`);
         const unitPrice = item.dailyRateIdr;
-        const totalPrice = unitPrice * req.quantity * days;
+        const totalPrice = unitPrice * req.quantity * blocks;
         equipmentTotalAmount += totalPrice;
         equipmentRows.push({ equipmentId: item.id, quantity: req.quantity, unitPrice, totalPrice });
       }
@@ -424,7 +422,7 @@ export class PublicApiService {
           bookingId: booking.bookingNumber,
           customerEmail: customer.email ?? undefined,
           customerPhone: customer.phone,
-          description: `Rental ${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
+          description: `Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""})`,
           // DP => one invoice for the full amount, allow_partial lets the customer pay
           // at least the DP now and reopen the same invoice later for the remainder.
           allowPartial: paymentType === 'dp',
