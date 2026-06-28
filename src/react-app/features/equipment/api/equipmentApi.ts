@@ -1,5 +1,5 @@
 import { api } from '@/react-app/lib/api-client';
-import type { ApiSuccessResponse, ApiPaginatedSuccessResponse } from '@/react-app/features/shared/types/api.types';
+import type { ApiSuccessResponse } from '@/react-app/features/shared/types/api.types';
 import type { Equipment, EquipmentFilters, CreateEquipmentRequest, UpdateEquipmentRequest } from '../types/equipment.types';
 
 const BASE_PATH = '/v1/equipment';

@@ -8,7 +8,6 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { DataTable } from '@/react-app/components/ui/table';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/react-app/components/ui/card';
-import { Spinner } from '@/react-app/components/ui/spinner';
 import { api } from '@/react-app/lib/api-client';
 import { useQuery } from '@tanstack/react-query';
 import type { ApiSuccessResponse } from '@/react-app/features/shared/types/api.types';

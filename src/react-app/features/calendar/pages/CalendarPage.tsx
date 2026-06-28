@@ -118,7 +118,7 @@ export default function CalendarPage() {
 					<LegendDot color="bg-blue-600" label="Trail Bike" />
 					<LegendDot color="bg-emerald-600" label="Street Bike" />
 					<LegendDot color="bg-violet-600" label="Car" />
-					<LegendDot color="bg-amber-600" label="Jeep" />
+					<LegendDot color="bg-orange-500" label="Jeep" />
 					<LegendDot color="bg-amber-100 border border-amber-300 dark:bg-amber-500/20" label="Maint." textClass="text-amber-700 dark:text-amber-400" />
 				</div>
 			</div>

@@ -15,7 +15,7 @@ interface EquipmentFormProps {
 }
 
 export function EquipmentForm({ onSubmit, onCancel, isLoading, defaultValues }: EquipmentFormProps) {
-	const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<CreateEquipmentRequest>({
+	const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreateEquipmentRequest>({
 		resolver: zodResolver(createEquipmentSchema),
 		defaultValues: {
 			name: '',
