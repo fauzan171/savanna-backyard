@@ -27,6 +27,8 @@ import { ConfigRepository } from './core/repositories/config.repository';
 import { EmailService } from './core/services/email.service';
 import { NotificationService } from './core/services/notification.service';
 import { VehiclesRepository } from './modules/vehicles/vehicles.repository';
+import { BookingsRepository } from './modules/bookings/bookings.repository';
+import { calculateLateFee } from './modules/bookings/availability.helper';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -203,11 +205,55 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
     const hourlyReminders = await notificationService.runHourlyReminders();
     const followups = await notificationService.runFollowups();
 
+    // 3. Booking status transitions: Confirmed → Active (rental start time arrived)
+    let activatedCount = 0;
+    try {
+      const bookingRepo = new BookingsRepository(db);
+      const readyToActivate = await bookingRepo.getConfirmedReadyToActivate();
+      for (const b of readyToActivate) {
+        await bookingRepo.update(b.id, {
+          status: 'Active',
+          pickupConfirmed: true,
+          pickupConfirmedAt: new Date().toISOString(),
+        });
+        console.log(`[Scheduled] Booking ${b.bookingNumber} auto-activated (Confirmed → Active)`);
+        activatedCount++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error activating bookings:', error);
+    }
+
+    // 4. Booking status transitions: Active → Completed (end time passed, overdue)
+    let completedCount = 0;
+    try {
+      const bookingRepo = new BookingsRepository(db);
+      const overdue = await bookingRepo.getActiveOverdue();
+      for (const b of overdue) {
+        const now = new Date().toISOString();
+        const { lateFee } = calculateLateFee(b.baseAmount, b.endDate, now);
+        const newTotal = b.baseAmount + (b.equipmentTotalAmount ?? 0) + lateFee;
+        await bookingRepo.update(b.id, {
+          status: 'Completed',
+          actualReturnDate: now,
+          lateFee,
+          totalAmount: newTotal,
+          returnConfirmed: true,
+          returnConfirmedAt: now,
+        });
+        console.log(`[Scheduled] Booking ${b.bookingNumber} auto-completed (Active → Completed, lateFee=${lateFee})`);
+        completedCount++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error completing overdue bookings:', error);
+    }
+
     console.log('[Scheduled] All jobs completed:', {
       cleanableVehicles,
       dailyReminders,
       hourlyReminders,
       followups,
+      activated: activatedCount,
+      overdueCompleted: completedCount,
     });
   } catch (error) {
     console.error('[Scheduled] Error running notification jobs:', error);

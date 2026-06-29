@@ -1,9 +1,10 @@
-import { eq, desc, and, gte, sql } from 'drizzle-orm';
+import { eq, desc, and, gte, sql, isNull } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
 import {
 	publicUsers,
 	verificationCodes,
 	bookings,
+	customers,
 	type PublicUser,
 	type NewPublicUser,
 	type VerificationCode,
@@ -96,6 +97,35 @@ export class PublicUsersRepository {
 			.where(eq(bookings.publicUserId, publicUserId))
 			.orderBy(desc(bookings.createdAt))
 			.limit(limit);
+	}
+
+	/**
+	 * Legacy fallback: find bookings where the customer phone matches the public user's
+	 * phone but publicUserId is still NULL (booking created before account linking was
+	 * added, or cookie was absent during booking creation).
+	 */
+	async listBookingsByPhone(phone: string, limit = 50): Promise<Booking[]> {
+		return this.db
+			.select()
+			.from(bookings)
+			.innerJoin(customers, eq(customers.id, bookings.customerId))
+			.where(and(eq(customers.phone, phone), isNull(bookings.publicUserId)))
+			.orderBy(desc(bookings.createdAt))
+			.limit(limit) as unknown as Booking[];
+	}
+
+	/** Link unlinked bookings to a public user by customer phone match. */
+	async linkBookingsByPhone(publicUserId: string, phone: string): Promise<number> {
+		const result = await this.db
+			.update(bookings)
+			.set({ publicUserId, updatedAt: new Date().toISOString() })
+			.where(
+				and(
+					isNull(bookings.publicUserId),
+					sql`${bookings.customerId} IN (SELECT ${customers.id} FROM ${customers} WHERE ${customers.phone} = ${phone})`,
+				),
+			);
+		return result.meta?.rows_written ?? 0;
 	}
 
 	async findBookingByIdAndUser(bookingId: string, publicUserId: string): Promise<Booking | null> {

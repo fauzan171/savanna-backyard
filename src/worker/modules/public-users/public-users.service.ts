@@ -245,8 +245,34 @@ export class PublicUsersService {
 	}
 
 	async myBookings(publicUserId: string): Promise<PublicBookingSummary[]> {
-		const rows = await this.repo.listBookingsByPublicUser(publicUserId);
-		return rows.map(toBookingSummary);
+		const user = await this.repo.findById(publicUserId);
+
+		// Primary: bookings directly linked via publicUserId
+		const linked = await this.repo.listBookingsByPublicUser(publicUserId);
+
+		// Fallback: bookings where customer phone matches but publicUserId is still NULL
+		// (legacy bookings created before account linking was implemented)
+		let phoneMatched: Booking[] = [];
+		if (user?.phone) {
+			phoneMatched = await this.repo.listBookingsByPhone(user.phone);
+			// Auto-link any orphaned phone-matched bookings so they appear via the primary
+			// path next time (one-time migration per user)
+			if (phoneMatched.length > 0) {
+				await this.repo.linkBookingsByPhone(publicUserId, user.phone);
+			}
+		}
+
+		// Union (deduplicate by ID)
+		const seen = new Set<string>();
+		const all: Booking[] = [];
+		for (const b of [...linked, ...phoneMatched]) {
+			if (!seen.has(b.id)) {
+				seen.add(b.id);
+				all.push(b);
+			}
+		}
+
+		return all.map(toBookingSummary);
 	}
 
 	async myBookingDetail(publicUserId: string, bookingId: string): Promise<PublicBookingSummary> {

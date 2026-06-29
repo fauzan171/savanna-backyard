@@ -1,0 +1,1883 @@
+# ============================================================
+# Savanna Bromo Rental - Public API Contract
+# For: Landing Page Frontend Team
+# Base URL: https://api.savannabromo.com/api/v1/public
+# Auth: X-API-Key header (provided by backend team)
+# Date: 2026-06-20
+# ============================================================
+
+openapi: 3.0.3
+info:
+  title: Savanna Bromo Rental - Public API
+  description: |
+    Public API untuk landing page Savanna Bromo Rental.
+    Semua request WAJIB menyertakan header `X-API-Key`.
+
+    ## Response Format
+    Semua response mengikuti format:
+    ```json
+    {
+      "success": true,
+      "data": { ... },
+      "message": "optional message"
+    }
+    ```
+
+    Error format:
+    ```json
+    {
+      "success": false,
+      "error": {
+        "code": "ERROR_CODE",
+        "message": "Human readable message"
+      }
+    }
+    ```
+
+    ## Date Format
+    Tanggal menerima dua format:
+    - `YYYY-MM-DD` (date only, e.g. `2026-07-01`)
+    - ISO 8601 datetime dengan timezone (e.g. `2026-07-01T02:00:00+07:00`)
+    
+    Backend secara otomatis mengekstrak bagian tanggal (`YYYY-MM-DD`) dari input datetime.
+    Response endpoint booking (`POST /bookings`, `GET /bookings/{n}/status`) selalu mengembalikan
+    format ISO 8601 datetime penuh agar FE bisa langsung menampilkan jam pickup & deadline return.
+
+    ## Currency
+    Semua harga dalam IDR (Rupiah Indonesia), bertipe number.
+  version: 1.0.0
+  contact:
+    name: Backend Team
+
+servers:
+  - url: https://api.savannabromo.com/api/v1/public
+    description: Production
+  - url: http://localhost:8484/api/v1/public
+    description: Local Development
+
+# ============================================================
+# SECURITY
+# ============================================================
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key yang didapat dari backend team
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: httpOnly JWT cookie (type 'public') set by /auth/phone/verify (the login). Required (in addition to X-API-Key) for account endpoints (/auth/me, /auth/profile, /me/*). Cross-origin: send with `credentials: 'include'`.
+
+  schemas:
+    # ---- Common Error ----
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: "startDate is required"
+
+    # ---- Vehicle Types ----
+    VehicleType:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [TrailBike, StreetBike, Car, Jeep, Other]
+          example: TrailBike
+        displayName:
+          type: string
+          example: "Trail Bike"
+        count:
+          type: integer
+          example: 4
+        minDailyRate:
+          type: number
+          example: 150000
+        maxDailyRate:
+          type: number
+          example: 350000
+
+    # ---- Vehicle ----
+    VehicleListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "v_abc123"
+        name:
+          type: string
+          example: "Honda CRF 250L"
+        type:
+          type: string
+          enum: [TrailBike, StreetBike, Car, Jeep, Other]
+          example: TrailBike
+        category:
+          type: string
+          nullable: true
+          example: "Adventure"
+        image:
+          type: string
+          nullable: true
+          example: "https://api.savannabromo.com/api/v1/uploads/vehicles/crf250.jpg"
+        dailyRateIdr:
+          type: number
+          example: 250000
+        specs:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+          example:
+            engine: "250cc"
+            transmission: "6-speed"
+        description:
+          type: string
+          nullable: true
+          example: "Perfect for Bromo trail riding"
+        available:
+          type: boolean
+          example: true
+
+    VehicleDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "v_abc123"
+        name:
+          type: string
+          example: "Honda CRF 250L"
+        type:
+          type: string
+          enum: [TrailBike, StreetBike, Car, Jeep, Other]
+          example: TrailBike
+        brand:
+          type: string
+          nullable: true
+          example: "Honda"
+        model:
+          type: string
+          nullable: true
+          example: "CRF 250L"
+        year:
+          type: integer
+          nullable: true
+          example: 2024
+        category:
+          type: string
+          nullable: true
+          example: "150cc Trail"
+        dailyRateIdr:
+          type: number
+          example: 250000
+        image:
+          type: string
+          nullable: true
+          example: "https://api.savannabromo.com/api/v1/uploads/vehicles/crf250.jpg"
+        specs:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+          example:
+            engine: "150cc"
+            power: "12.7 HP"
+            weight: "122 kg"
+        description:
+          type: string
+          nullable: true
+          example: "Perfect for Bromo trail riding"
+        available:
+          type: boolean
+          example: true
+
+    # ---- Availability ----
+    AvailableVehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "v_abc123"
+        name:
+          type: string
+          example: "Honda CRF 250L"
+        type:
+          type: string
+          example: TrailBike
+        dailyRateIdr:
+          type: number
+          example: 250000
+        photoUrl:
+          type: string
+          nullable: true
+
+    UnavailableVehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "v_xyz789"
+        name:
+          type: string
+          example: "Kawasaki KLX 230"
+        reason:
+          type: string
+          enum: ["Already booked", "Under maintenance", "Currently unavailable"]
+          example: "Already booked"
+
+    # ---- Packages ----
+    Package:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "pkg_001"
+        name:
+          type: string
+          example: "Bromo Sunrise Tour"
+        tagline:
+          type: string
+          nullable: true
+          example: "Experience the magic of Bromo sunrise"
+        description:
+          type: string
+          nullable: true
+          example: "Full day tour to Mount Bromo..."
+        image:
+          type: string
+          nullable: true
+          example: "https://api.savannabromo.com/api/v1/uploads/packages/sunrise.jpg"
+        duration:
+          type: string
+          nullable: true
+          example: "1 day"
+        distance:
+          type: string
+          nullable: true
+          example: "30 km"
+        groupSize:
+          type: string
+          nullable: true
+          example: "2-6 people"
+        price:
+          type: number
+          example: 500000
+        trailId:
+          type: string
+          nullable: true
+          example: "trail_001"
+
+    # ---- Pricing ----
+    PricingTier:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "tier_001"
+        name:
+          type: string
+          example: "Standard"
+        description:
+          type: string
+          nullable: true
+          example: "Basic trail bike rental"
+        dailyPrice:
+          type: number
+          example: 200000
+        multiDayPrice:
+          type: number
+          example: 175000
+        features:
+          type: array
+          items:
+            type: string
+          example:
+            - "Trail bike rental"
+            - "Helmet included"
+            - "Basic insurance"
+        notIncluded:
+          type: array
+          items:
+            type: string
+          example:
+            - "Meals"
+            - "Accommodation"
+        highlighted:
+          type: boolean
+          example: false
+        icon:
+          type: string
+          nullable: true
+          example: "motorcycle"
+
+    # ---- Reviews ----
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "rev_001"
+        name:
+          type: string
+          example: "John Doe"
+        location:
+          type: string
+          nullable: true
+          example: "Jakarta, Indonesia"
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 5
+        text:
+          type: string
+          example: "Amazing experience! The trail was incredible."
+        avatar:
+          type: string
+          nullable: true
+          description: "2-letter initials from customer name (e.g. 'JD' for 'John Doe')"
+          example: "JD"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-05-15T10:30:00.000Z"
+
+    # ---- Trails ----
+    Trail:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "trail_001"
+        name:
+          type: string
+          example: "Bromo Crater Trail"
+        desc:
+          type: string
+          nullable: true
+          example: "Classic route to Bromo crater"
+        terrain:
+          type: string
+          nullable: true
+          example: "Volcanic sand, rocky"
+        elevation:
+          type: string
+          nullable: true
+          example: "2,329m"
+        difficulty:
+          type: string
+          nullable: true
+          example: "Moderate"
+        recommended:
+          type: string
+          nullable: true
+          example: "Best for intermediate riders"
+        image:
+          type: string
+          nullable: true
+        mapImage:
+          type: string
+          nullable: true
+
+    TrailDetail:
+      allOf:
+        - $ref: "#/components/schemas/Trail"
+        - type: object
+          properties:
+            blogContent:
+              type: object
+              nullable: true
+              properties:
+                overview:
+                  type: string
+                  nullable: true
+                  description: "Markdown content for the trail overview section"
+                subtitle:
+                  type: string
+                  nullable: true
+                  description: "Short subtitle shown below the title"
+                tips:
+                  type: string
+                  nullable: true
+                  description: "Markdown content for riding tips"
+                gallery:
+                  type: array
+                  items:
+                    type: string
+                  example:
+                    - "https://api.savannabromo.com/api/v1/uploads/trails/gal1.jpg"
+                    - "https://api.savannabromo.com/api/v1/uploads/trails/gal2.jpg"
+                gpxUrl:
+                  type: string
+                  nullable: true
+                  example: "https://api.savannabromo.com/api/v1/uploads/trails/sea_of_sand.gpx"
+                estimatedDuration:
+                  type: string
+                  nullable: true
+                  example: "3-4 hours"
+                distance:
+                  type: string
+                  nullable: true
+                  example: "12 km"
+                bestTime:
+                  type: string
+                  nullable: true
+                  example: "April - October"
+                stages:
+                  type: array
+                  nullable: true
+                  description: "Itinerary stages for the trail"
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Start Point - Cemoro Lawang"
+                      desc:
+                        type: string
+                        example: "Begin at the viewpoint parking area"
+                  example:
+                    - name: "Cemoro Lawang Viewpoint"
+                      desc: "Start at the famous viewpoint overlooking the caldera"
+                    - name: "Sea of Sand Descent"
+                      desc: "Descend into the vast volcanic sand plain"
+                    - name: "Mount Bromo Crater"
+                      desc: "Hike up to the crater rim (200 steps)"
+                checklist:
+                  type: array
+                  nullable: true
+                  description: "Gear/equipment checklist for riders"
+                  items:
+                    type: string
+                  example:
+                    - "Riding boots (ankle protection)"
+                    - "Gloves"
+                    - "Goggles or sunglasses"
+                    - "Sunscreen SPF 50+"
+                    - "Warm layer (morning temperatures can drop to 5°C)"
+                culture:
+                  type: string
+                  nullable: true
+                  description: "Cultural rules and etiquette to be aware of"
+                  example: "Respect the Tenggerese Hindu tradition. Do not disturb prayer offerings near the crater. Ask permission before photographing locals."
+                warning:
+                  type: string
+                  nullable: true
+                  description: "Safety warnings and hazards"
+                  example: "Volcanic gases can be strong near the crater — bring a mask. Sand riding requires intermediate+ skill level. Weather changes rapidly above 2000m."
+
+    # ---- Settings ----
+    Settings:
+      type: object
+      properties:
+        contactEmail:
+          type: string
+          example: "info@savannabromo.com"
+        contactPhone:
+          type: string
+          example: "+628123456789"
+        whatsappNumber:
+          type: string
+          example: "628123456789"
+        location:
+          type: string
+          example: "Bromo, East Java, Indonesia"
+        instagramUrl:
+          type: string
+          example: "https://instagram.com/savannabromo"
+        bankAccount:
+          type: object
+          properties:
+            bankName:
+              type: string
+              example: "BCA"
+            accountNumber:
+              type: string
+              example: "1234567890"
+            accountHolder:
+              type: string
+              example: "PT Savanna Bromo"
+        deposit:
+          type: object
+          properties:
+            amount:
+              type: number
+              example: 100000
+            description:
+              type: string
+              example: "Deposit required at pickup"
+
+    # ---- Payment Methods ----
+    PaymentMethods:
+      type: object
+      properties:
+        gateway:
+          type: string
+          example: "xendit"
+        methods:
+          type: object
+          properties:
+            qris:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "QRIS"
+                name:
+                  type: string
+                  example: "QRIS"
+                description:
+                  type: string
+                  example: "Scan QR code to pay with any e-wallet or bank app"
+                icon:
+                  type: string
+                  example: "qris"
+            bankTransfer:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "BankTransfer"
+                name:
+                  type: string
+                  example: "Virtual Account"
+                description:
+                  type: string
+                  example: "Pay via bank transfer to virtual account number"
+                icon:
+                  type: string
+                  example: "bank"
+                banks:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      code:
+                        type: string
+                        example: "BCA"
+                      name:
+                        type: string
+                        example: "Bank Central Asia"
+                      icon:
+                        type: string
+                        example: "bca"
+            gateway:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "Gateway"
+                name:
+                  type: string
+                  example: "All Methods"
+                description:
+                  type: string
+                  example: "Choose from all available payment methods"
+                icon:
+                  type: string
+                  example: "gateway"
+
+    # ---- Booking Status ----
+    BookingStatus:
+      type: object
+      properties:
+        bookingNumber:
+          type: string
+          example: "SVN-2026-0001"
+        status:
+          type: string
+          enum: [pending_payment, Confirmed, Active, Completed, Cancelled, payment_failed, expired, refunded]
+          example: "Confirmed"
+        paymentStatus:
+          type: string
+          nullable: true
+          enum: [pending, dp_paid, settlement, expire, deny, cancel, refund]
+          example: "settlement"
+        vehicleName:
+          type: string
+          example: "Honda CRF 250L"
+        startDate:
+          type: string
+          example: "2026-07-01T02:00:00+07:00"
+          description: ISO 8601 datetime — jam pickup aktual
+        endDate:
+          type: string
+          example: "2026-07-03T02:00:00+07:00"
+          description: ISO 8601 datetime — deadline return
+        blocks:
+          type: integer
+          example: 2
+          description: Jumlah block 12-jam
+        totalAmount:
+          type: number
+          example: 750000
+        paidAt:
+          type: string
+          nullable: true
+          format: date-time
+          example: "2026-06-25T14:30:00.000Z"
+
+    # ---- Booking Create Response ----
+    BookingCreateResponse:
+      type: object
+      properties:
+        bookingId:
+          type: string
+          example: "bkg_abc123"
+        bookingNumber:
+          type: string
+          example: "SVN-2026-0001"
+        startDate:
+          type: string
+          example: "2026-07-01T02:00:00+07:00"
+          description: ISO 8601 datetime — jam pickup yang dipilih client
+        endDate:
+          type: string
+          example: "2026-07-01T14:00:00+07:00"
+          description: ISO 8601 datetime — deadline return (startDate + N×12 jam)
+        blocks:
+          type: integer
+          example: 1
+          description: Jumlah block 12-jam
+        vehicleName:
+          type: string
+          example: "Honda CRF 150L"
+          description: Nama kendaraan yang dibooking
+        paymentPageUrl:
+          type: string
+          nullable: true
+          example: "https://checkout.xendit.co/web/xxxxx"
+        qrString:
+          type: string
+          nullable: true
+          example: "00020101021226..."
+        totalAmount:
+          type: number
+          example: 750000
+        paymentType:
+          type: string
+          enum: [full, dp]
+          example: "full"
+          description: "Down-payment (dp) uses one Xendit invoice with allow_partial."
+        dpAmount:
+          type: number
+          nullable: true
+          example: 225000
+          description: "DP amount (only for paymentType=dp)."
+        remainingAmount:
+          type: number
+          nullable: true
+          example: 525000
+        xenditInvoiceId:
+          type: string
+          nullable: true
+          example: "inv_abc123"
+        paymentError:
+          type: string
+          nullable: true
+          example: null
+
+    # ---- Lead ----
+    LeadSubmitResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "lead_abc123"
+        status:
+          type: string
+          example: "New"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-06-20T10:30:00.000Z"
+
+# ============================================================
+# PATHS
+# ============================================================
+paths:
+
+  # ============================================================
+  # 1. VEHICLES - List & Detail
+  # ============================================================
+  /vehicles:
+    get:
+      tags: [Vehicles]
+      summary: List semua kendaraan
+      description: |
+        Mendapatkan daftar semua kendaraan yang tersedia.
+        Digunakan untuk menampilkan katalog kendaraan di landing page.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VehicleListItem"
+              example:
+                success: true
+                data:
+                  - id: "v_001"
+                    name: "Honda CRF 250L"
+                    type: "TrailBike"
+                    category: "Adventure"
+                    image: "https://api.savannabromo.com/api/v1/uploads/vehicles/crf250.jpg"
+                    dailyRateIdr: 250000
+                    specs:
+                      engine: "250cc"
+                      fuel: "13L"
+                    description: "Perfect for Bromo trail riding"
+                    available: true
+                  - id: "v_002"
+                    name: "Kawasaki KLX 230"
+                    type: "TrailBike"
+                    category: "Adventure"
+                    image: "https://api.savannabromo.com/api/v1/uploads/vehicles/klx230.jpg"
+                    dailyRateIdr: 200000
+                    specs:
+                      engine: "233cc"
+                      fuel: "7.5L"
+                    description: "Lightweight and agile"
+                    available: true
+
+  /vehicles/{id}:
+    get:
+      tags: [Vehicles]
+      summary: Detail kendaraan
+      description: Mendapatkan detail lengkap satu kendaraan berdasarkan ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Vehicle ID
+          example: "v_001"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/VehicleDetail"
+        "404":
+          description: Vehicle not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Vehicle not found"
+
+  # ============================================================
+  # 2. VEHICLE TYPES
+  # ============================================================
+  /vehicle-types:
+    get:
+      tags: [Vehicles]
+      summary: List tipe kendaraan
+      description: |
+        Mendapatkan daftar tipe kendaraan dengan statistik (jumlah unit, range harga).
+        Digunakan untuk filter/kategori di landing page.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      types:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/VehicleType"
+              example:
+                success: true
+                data:
+                  types:
+                    - type: "TrailBike"
+                      displayName: "Trail Bike"
+                      count: 4
+                      minDailyRate: 150000
+                      maxDailyRate: 350000
+                    - type: "Jeep"
+                      displayName: "Jeep"
+                      count: 2
+                      minDailyRate: 500000
+                      maxDailyRate: 800000
+
+  # ============================================================
+  # 3. AVAILABILITY CHECK
+  # ============================================================
+  /availability:
+    get:
+      tags: [Availability]
+      summary: Cek ketersediaan kendaraan
+      description: |
+        Mengecek kendaraan yang tersedia pada tanggal tertentu.
+        WAJIB gunakan endpoint ini SEBELUM membuat booking.
+
+        **Unavailable reasons:**
+        - `Already booked` - Sudah dibooking orang lain
+        - `Under maintenance` - Sedang dalam perbaikan
+        - `Currently unavailable` - Status tidak tersedia
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: Tanggal mulai (YYYY-MM-DD)
+          example: "2026-07-01"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          description: Tanggal selesai (YYYY-MM-DD)
+          example: "2026-07-03"
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [TrailBike, StreetBike, Car, Jeep, Other]
+          description: Filter berdasarkan tipe kendaraan (opsional)
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      requestedPeriod:
+                        type: object
+                        properties:
+                          startDate:
+                            type: string
+                            example: "2026-07-01"
+                          endDate:
+                            type: string
+                            example: "2026-07-03"
+                      availableVehicles:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/AvailableVehicle"
+                      unavailableVehicles:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/UnavailableVehicle"
+                      totalAvailable:
+                        type: integer
+                        example: 3
+              example:
+                success: true
+                data:
+                  requestedPeriod:
+                    startDate: "2026-07-01"
+                    endDate: "2026-07-03"
+                  availableVehicles:
+                    - id: "v_001"
+                      name: "Honda CRF 250L"
+                      type: "TrailBike"
+                      dailyRateIdr: 250000
+                      photoUrl: "https://api.savannabromo.com/api/v1/uploads/vehicles/crf250.jpg"
+                  unavailableVehicles:
+                    - id: "v_002"
+                      name: "Kawasaki KLX 230"
+                      reason: "Already booked"
+                  totalAvailable: 1
+        "400":
+          description: Validation error (startDate > endDate)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============================================================
+  # 4. BOOKINGS
+  # ============================================================
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Buat booking baru
+      description: |
+        Membuat booking baru dan trigger payment ke Xendit.
+
+        **Sistem sewa 12 jam:**
+        - Sewa dihitung per block 12 jam, bukan per hari
+        - Contoh: startDate `02:00` → endDate `14:00` = 1 block (12 jam)
+        - Contoh: startDate `02:00` → endDate `02:00 besok` = 1 block (12 jam)
+        - Denda keterlambatan: per jam = (rate/12) × 1.5
+
+        **Flow:**
+        1. Cek ketersediaan via `GET /availability`
+        2. Kirim request booking ini (bisa kirim datetime lengkap dengan jam)
+        3. Response berisi `startDate`, `endDate` (datetime lengkap), `paymentPageUrl`, `qrString`
+        4. Redirect user ke `paymentPageUrl` ATAU render QR dari `qrString`
+        5. User bayar
+        6. Backend otomatis update status via webhook Xendit
+
+        **Validasi otomatis:**
+        - endDate harus > startDate
+        - Vehicle harus ada dan status Available
+        - Tidak ada conflict booking pada rentang waktu yang sama
+        - Customer otomatis dibuat/ambil berdasarkan phone number
+        - Double-booking return 409 Conflict
+
+        **Harga:**
+        - `totalAmount = jumlah_12jam_block × dailyRateIdr + equipment`
+        - Pembayaran full di depan (Full_Upfront) atau DP (Down Payment)
+
+        **Payment method:**
+        - `Gateway` (default) - Semua metode pembayaran
+        - `QRIS` - QR code saja
+        - `BankTransfer` - Virtual Account (BCA, BNI, BRI, Mandiri)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vehicleId
+                - startDate
+                - endDate
+                - customerName
+                - customerPhone
+              properties:
+                vehicleId:
+                  type: string
+                  description: ID kendaraan dari endpoint GET /vehicles
+                  example: "v_001"
+                  minLength: 1
+                startDate:
+                  type: string
+                  pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}([+-][0-9]{2}:[0-9]{2}|Z)?)?$"
+                  description: Tanggal/jam mulai rental (YYYY-MM-DD atau ISO 8601 datetime)
+                  example: "2026-07-01T02:00:00+07:00"
+                endDate:
+                  type: string
+                  pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}([+-][0-9]{2}:[0-9]{2}|Z)?)?$"
+                  description: Tanggal/jam selesai rental (YYYY-MM-DD atau ISO 8601 datetime)
+                  example: "2026-07-03T14:00:00+07:00"
+                customerName:
+                  type: string
+                  description: Nama lengkap customer
+                  example: "Budi Santoso"
+                  minLength: 2
+                customerPhone:
+                  type: string
+                  description: Nomor telepon customer (min 8 digit)
+                  example: "+628123456789"
+                  minLength: 8
+                customerEmail:
+                  type: string
+                  format: email
+                  description: Email customer (opsional, untuk kirim konfirmasi)
+                  example: "budi@email.com"
+                  nullable: true
+                paymentMethod:
+                  type: string
+                  enum: [QRIS, BankTransfer, Gateway]
+                  description: "Metode pembayaran (default: Gateway)"
+                  default: "Gateway"
+                  example: "Gateway"
+                notes:
+                  type: string
+                  description: Catatan tambahan (opsional)
+                  example: "Pickup di hotel"
+                  maxLength: 1000
+                  nullable: true
+                paymentType:
+                  type: string
+                  enum: [full, dp]
+                  description: "Tipe pembayaran: full (lunas) atau dp (down payment, default 30%)"
+                  default: "full"
+                  example: "full"
+                equipment:
+                  type: array
+                  description: Peralatan tambahan yang disewa (opsional)
+                  items:
+                    type: object
+                    required: [equipmentId, quantity]
+                    properties:
+                      equipmentId:
+                        type: string
+                        example: "eq_helm_honda"
+                        description: ID equipment dari GET /equipment
+                      quantity:
+                        type: integer
+                        minimum: 1
+                        example: 1
+            examples:
+              minimal:
+                summary: Minimal request (date-only)
+                value:
+                  vehicleId: "v_001"
+                  startDate: "2026-07-01"
+                  endDate: "2026-07-03"
+                  customerName: "Budi Santoso"
+                  customerPhone: "+628123456789"
+              with_time:
+                summary: Request dengan jam (datetime)
+                value:
+                  vehicleId: "v_001"
+                  startDate: "2026-07-01T02:00:00+07:00"
+                  endDate: "2026-07-01T14:00:00+07:00"
+                  customerName: "Budi Santoso"
+                  customerPhone: "+628123456789"
+                  customerEmail: "budi@email.com"
+                  paymentMethod: "QRIS"
+                  notes: "Pickup di Hotel Bromo Indah jam 8 pagi"
+                  paymentType: "dp"
+                  equipment:
+                    - equipmentId: "eq_helm_honda"
+                      quantity: 1
+                    - equipmentId: "eq_phone_mount"
+                      quantity: 1
+      responses:
+        "201":
+          description: Booking created, payment initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Booking created successfully"
+                  data:
+                    $ref: "#/components/schemas/BookingCreateResponse"
+              examples:
+                qris_payment:
+                  summary: QRIS payment (render QR code)
+                  value:
+                    success: true
+                    message: "Booking created successfully"
+                    data:
+                      bookingId: "bkg_abc123"
+                      bookingNumber: "SVN-2026-0001"
+                      startDate: "2026-07-01T02:00:00+07:00"
+                      endDate: "2026-07-01T14:00:00+07:00"
+                      blocks: 1
+                      vehicleName: "Honda CRF 150L"
+                      paymentPageUrl: "https://checkout.xendit.co/web/xxxxx"
+                      qrString: "00020101021226580014COM.GO-JEK.WWW0118936009143654328902035000303UME51440014CO.QRIS.WWW0215ID102541999900303UME5204599953033605407100000.005802ID5914SAVANNA BROMO6008TRENGGALEK6105661236250..."
+                      totalAmount: 750000
+                      dpAmount: 0
+                      remainingAmount: 0
+                      paymentType: "full"
+                      paymentError: null
+                gateway_payment:
+                  summary: Gateway payment (redirect to Xendit)
+                  value:
+                    success: true
+                    message: "Booking created successfully"
+                    data:
+                      bookingId: "bkg_def456"
+                      bookingNumber: "SVN-2026-0002"
+                      startDate: "2026-07-02T06:00:00+07:00"
+                      endDate: "2026-07-02T18:00:00+07:00"
+                      blocks: 1
+                      vehicleName: "Kawasaki KLX 230"
+                      paymentPageUrl: "https://checkout.xendit.co/web/xxxxx"
+                      qrString: null
+                      totalAmount: 500000
+                      dpAmount: 0
+                      remainingAmount: 0
+                      paymentType: "full"
+                      paymentError: null
+                payment_error:
+                  summary: Payment gateway error (booking tetap dibuat)
+                  value:
+                    success: true
+                    message: "Booking created successfully"
+                    data:
+                      bookingId: "bkg_ghi789"
+                      bookingNumber: "SVN-2026-0003"
+                      startDate: "2026-07-03T08:00:00+07:00"
+                      endDate: "2026-07-03T20:00:00+07:00"
+                      blocks: 1
+                      vehicleName: "Honda CRF 250L"
+                      paymentPageUrl: null
+                      qrString: null
+                      totalAmount: 500000
+                      dpAmount: 0
+                      remainingAmount: 0
+                      paymentType: "full"
+                      paymentError: "Failed to create payment invoice"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalid_dates:
+                  summary: Invalid dates
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "End date must be after start date"
+                vehicle_unavailable:
+                  summary: Vehicle not available
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Vehicle is not available"
+                date_conflict:
+                  summary: Date conflict
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Vehicle is already booked for the selected dates"
+                vehicle_not_found:
+                  summary: Vehicle not found
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Vehicle not found"
+                blacklisted:
+                  summary: Customer blacklisted
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_ERROR"
+                      message: "Customer is blacklisted"
+
+  # ============================================================
+  # 5. BOOKING STATUS CHECK
+  # ============================================================
+  /bookings/{bookingNumber}/status:
+    get:
+      tags: [Bookings]
+      summary: Cek status booking
+      description: |
+        Mengecek status booking berdasarkan booking number.
+        Digunakan untuk halaman "Cek Pesanan" di landing page.
+        Customer bisa cek status tanpa login, cukup dengan booking number.
+      parameters:
+        - name: bookingNumber
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Booking number (format: SVN-YYYY-NNNN)"
+          example: "SVN-2026-0001"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/BookingStatus"
+              examples:
+                confirmed:
+                  summary: Booking confirmed (sudah bayar)
+                  value:
+                    success: true
+                    data:
+                      bookingNumber: "SVN-2026-0001"
+                      status: "Confirmed"
+                      paymentStatus: "settlement"
+                      vehicleName: "Honda CRF 250L"
+                      startDate: "2026-07-01T02:00:00+07:00"
+                      endDate: "2026-07-02T02:00:00+07:00"
+                      blocks: 2
+                      totalAmount: 750000
+                      paidAt: "2026-06-25T14:30:00.000Z"
+                pending:
+                  summary: Belum bayar
+                  value:
+                    success: true
+                    data:
+                      bookingNumber: "SVN-2026-0002"
+                      status: "pending_payment"
+                      paymentStatus: "pending"
+                      vehicleName: "Kawasaki KLX 230"
+                      startDate: "2026-07-05T06:00:00+07:00"
+                      endDate: "2026-07-05T18:00:00+07:00"
+                      blocks: 1
+                      totalAmount: 200000
+                      paidAt: null
+        "404":
+          description: Booking not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                success: false
+                error:
+                  code: "NOT_FOUND"
+                  message: "Booking not found"
+
+  # ============================================================
+  # 6. PAYMENT METHODS
+  # ============================================================
+  /payment-methods:
+    get:
+      tags: [Payments]
+      summary: List metode pembayaran
+      description: |
+        Mendapatkan daftar metode pembayaran yang tersedia.
+        Digunakan untuk menampilkan pilihan pembayaran di halaman booking.
+        Data diambil dari konfigurasi backend (Xendit).
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/PaymentMethods"
+
+  # ============================================================
+  # 7. PACKAGES
+  # ============================================================
+  /packages:
+    get:
+      tags: [Packages]
+      summary: List paket wisata
+      description: |
+        Mendapatkan daftar paket wisata/trail yang tersedia.
+        Digunakan untuk section "Packages" di landing page.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Package"
+
+  # ============================================================
+  # 8. PRICING
+  # ============================================================
+  /pricing:
+    get:
+      tags: [Pricing]
+      summary: List harga/pricing tiers
+      description: |
+        Mendapatkan daftar pricing tiers.
+        Digunakan untuk section "Harga" atau "Pricing" di landing page.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PricingTier"
+
+  # ============================================================
+  # 9. REVIEWS
+  # ============================================================
+  /reviews:
+    get:
+      tags: [Reviews]
+      summary: List reviews/testimonial
+      description: |
+        Mendapatkan daftar review dari customer.
+        Digunakan untuk section "Testimonial" di landing page.
+
+        **Filter:**
+        - `limit` - Jumlah review per halaman (default: 10, max: 100)
+        - `offset` - Offset untuk pagination (default: 0)
+        - `rating` - Filter berdasarkan rating (1-5)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          description: Jumlah review per halaman
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Offset untuk pagination
+        - name: rating
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter berdasarkan rating
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Review"
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        example: 25
+                      averageRating:
+                        type: number
+                        example: 4.8
+              example:
+                success: true
+                data:
+                  - id: "rev_001"
+                    name: "John Doe"
+                    location: "Jakarta, Indonesia"
+                    rating: 5
+                    text: "Amazing experience! The trail was incredible."
+                    avatar: "JD"
+                    createdAt: "2026-05-15T10:30:00.000Z"
+                  - id: "rev_002"
+                    name: "Sarah Smith"
+                    location: "Bali"
+                    rating: 5
+                    text: "Best adventure ever! Will come back again."
+                    avatar: "SS"
+                    createdAt: "2026-05-10T08:00:00.000Z"
+                meta:
+                  total: 25
+                  averageRating: 4.8
+
+  # ============================================================
+  # 10. TRAILS
+  # ============================================================
+  /trails:
+    get:
+      tags: [Trails]
+      summary: List jalur trail
+      description: |
+        Mendapatkan daftar jalur trail yang tersedia.
+        Digunakan untuk section "Trails" atau "Adventure Routes" di landing page.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Trail"
+
+  /trails/{trailId}:
+    get:
+      tags: [Trails]
+      summary: Detail trail
+      description: |
+        Mendapatkan detail lengkap satu trail termasuk blog content.
+        Digunakan untuk halaman detail trail di landing page.
+      parameters:
+        - name: trailId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Trail ID
+          example: "trail_001"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/TrailDetail"
+        "404":
+          description: Trail not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============================================================
+  # 11. SETTINGS
+  # ============================================================
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Pengaturan umum
+      description: |
+        Mendapatkan pengaturan umum website (kontak, sosial media, rekening bank).
+        Digunakan untuk footer, halaman kontak, dan halaman pembayaran manual.
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: "#/components/schemas/Settings"
+
+  # ============================================================
+  # 12. LEADS (Contact Form / Inquiry)
+  # ============================================================
+  /leads:
+    post:
+      tags: [Leads]
+      summary: Submit inquiry / contact form
+      description: |
+        Mengirim inquiry atau pesan dari form kontak di landing page.
+        Data akan masuk ke sistem CRM admin sebagai lead baru.
+
+        **Source otomatis:** Jika tidak dikirim, source default ke "Website".
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - phone
+              properties:
+                name:
+                  type: string
+                  description: Nama lengkap
+                  example: "Budi Santoso"
+                  minLength: 2
+                phone:
+                  type: string
+                  description: Nomor telepon (min 10 digit)
+                  example: "+628123456789"
+                  minLength: 10
+                email:
+                  type: string
+                  format: email
+                  description: Email (opsional)
+                  example: "budi@email.com"
+                  nullable: true
+                message:
+                  type: string
+                  description: Pesan/inquiry (opsional, max 1000 char)
+                  example: "Saya tertarik dengan paket Bromo Sunrise Tour"
+                  maxLength: 1000
+                  nullable: true
+                source:
+                  type: string
+                  enum: [WhatsApp, Instagram, Facebook, TikTok, Website, WalkIn]
+                  description: Sumber lead (default: Website)
+                  example: "Website"
+                preferredDates:
+                  type: object
+                  nullable: true
+                  description: Tanggal yang diinginkan (opsional)
+                  properties:
+                    start:
+                      type: string
+                      pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      description: Tanggal mulai
+                      example: "2026-07-01"
+                    end:
+                      type: string
+                      pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+                      description: Tanggal selesai
+                      example: "2026-07-03"
+                    vehicleInterest:
+                      type: string
+                      enum: [TrailBike, StreetBike, Car, Jeep, Other]
+                      description: Tipe kendaraan yang diminati
+                    vehicleTypeId:
+                      type: string
+                      description: ID kendaraan spesifik yang diminati
+            examples:
+              simple:
+                summary: Simple inquiry
+                value:
+                  name: "Budi Santoso"
+                  phone: "+628123456789"
+                  message: "Saya tertarik dengan paket Bromo Sunrise Tour"
+              full:
+                summary: Full inquiry with preferred dates
+                value:
+                  name: "Budi Santoso"
+                  phone: "+628123456789"
+                  email: "budi@email.com"
+                  message: "Saya tertarik dengan paket Bromo Sunrise Tour"
+                  source: "Instagram"
+                  preferredDates:
+                    start: "2026-07-01"
+                    end: "2026-07-03"
+                    vehicleInterest: "TrailBike"
+                    vehicleTypeId: "v_001"
+      responses:
+        "201":
+          description: Lead submitted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Lead submitted successfully"
+                  data:
+                    $ref: "#/components/schemas/LeadSubmitResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ============================================================
+  # EQUIPMENT (rental add-ons)
+  # ============================================================
+  /equipment:
+    get:
+      tags: [Equipment]
+      summary: Daftar equipment rental (helm, jersey, dll)
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string, example: "Helm Full Face" }
+                        category: { type: string, enum: [Safety, Apparel, Accessories, Electronics] }
+                        description: { type: string, nullable: true }
+                        dailyRateIdr: { type: number, example: 50000 }
+                        image: { type: string, nullable: true }
+                        stock: { type: number, example: 10 }
+                        minRentalDays: { type: number, example: 1 }
+
+  /equipment/{id}:
+    get:
+      tags: [Equipment]
+      summary: Detail equipment
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Success }
+        "404": { description: Not found }
+
+  # ============================================================
+  # VEHICLE AVAILABILITY CALENDAR
+  # ============================================================
+  /vehicles/{id}/availability:
+    get:
+      tags: [Availability]
+      summary: Kalender ketersediaan kendaraan per bulan
+      description: "Mengembalikan tanggal tersedia vs terpesan untuk sebulan. Sebuah booking menempati [startDate, endDate) — endDate bebas untuk booking berikutnya."
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: month, in: query, required: true, schema: { type: string, example: "2026-07" }, description: "YYYY-MM" }
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      vehicleId: { type: string }
+                      month: { type: string, example: "2026-07" }
+                      availableDates: { type: array, items: { type: string }, example: ["2026-07-01","2026-07-03"] }
+                      bookedDates: { type: array, items: { type: string }, example: ["2026-07-05"] }
+        "400": { description: Invalid month }
+
+  # ============================================================
+  # PUBLIC USER AUTH (X-API-Key + CookieAuth)
+  # ============================================================
+  /auth/phone/init:
+    post:
+      tags: [Auth]
+      summary: Mulai login via WhatsApp — minta OTP (rate-limited 3/jam)
+      security: [ { ApiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone: { type: string, example: "6281234567890", description: "8-15 digit" }
+      responses:
+        "200":
+          description: Ref code + wa.me deep link
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      refCode: { type: string, example: "A3F9" }
+                      waMeUrl: { type: string }
+                      expiresAt: { type: string, format: date-time }
+
+  /auth/phone/verify:
+    post:
+      tags: [Auth]
+      summary: Verifikasi OTP & login (set httpOnly cookie)
+      security: [ { ApiKeyAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone: { type: string }
+                code: { type: string, example: "123456", description: "6 digit" }
+      responses:
+        "200": { description: Logged in (sets cookie 'token'); find-or-create account by phone }
+        "400": { description: Invalid/expired OTP }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Akun saat ini
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      responses:
+        "200": { description: Success }
+        "401": { description: Not authenticated }
+
+  /auth/profile:
+    put:
+      tags: [Auth]
+      summary: Update profil (nama/avatar)
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                avatarUrl: { type: string, nullable: true }
+      responses:
+        "200": { description: Success }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (revoke token + clear cookie)
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      responses:
+        "200": { description: Logged out }
+
+  # ============================================================
+  # ACCOUNT-SCOPED BOOKINGS (/me)
+  # ============================================================
+  /me/bookings:
+    get:
+      tags: [Bookings]
+      summary: Daftar booking milik user (akun)
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BookingStatus"
+
+  /me/bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Detail booking milik user
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Success }
+        "404": { description: Not owned by caller }
+
+  /me/bookings/{bookingId}/pay-remaining:
+    post:
+      tags: [Payments]
+      summary: Buka ulang invoice untuk bayar sisa DP (butuh nomor terverifikasi)
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      parameters:
+        - { name: bookingId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Invoice URL untuk bayar sisa
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      bookingId: { type: string }
+                      bookingNumber: { type: string }
+                      paymentStatus: { type: string, example: "dp_paid" }
+                      paymentPageUrl: { type: string, nullable: true }
+                      xenditInvoiceId: { type: string, nullable: true }
+                      totalAmount: { type: number }
+                      remainingAmount: { type: number, nullable: true }
+        "400": { description: Already fully paid }
+        "404": { description: Not owned by caller }
+
+# ============================================================
+# TAGS (untuk grouping di dokumentasi)
+# ============================================================
+tags:
+  - name: Vehicles
+    description: Katalog kendaraan
+  - name: Availability
+    description: Cek ketersediaan kendaraan
+  - name: Bookings
+    description: Booking dan status
+  - name: Payments
+    description: Metode pembayaran
+  - name: Packages
+    description: Paket wisata
+  - name: Pricing
+    description: Harga dan tier
+  - name: Reviews
+    description: Testimonial customer
+  - name: Trails
+    description: Jalur trail dan adventure
+  - name: Settings
+    description: Pengaturan umum
+  - name: Leads
+    description: Inquiry dan kontak
+  - name: Equipment
+    description: Equipment rental (helm, jersey, dll)
+  - name: Auth
+    description: Akun pengguna publik (Google OAuth + WhatsApp OTP)

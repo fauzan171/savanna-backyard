@@ -357,4 +357,35 @@ export class BookingsRepository {
 			totalRevenue,
 		};
 	}
+
+	/**
+	 * Confirmed bookings whose rental start time has arrived.
+	 * Used by the scheduled cron to auto-transition Confirmed → Active.
+	 */
+	async getConfirmedReadyToActivate(): Promise<Booking[]> {
+		const now = new Date().toISOString();
+		return this.db
+			.select()
+			.from(bookings)
+			.where(and(
+				eq(bookings.status, 'Confirmed'),
+				sql`${bookings.startDate} <= ${now}`,
+			));
+	}
+
+	/**
+	 * Active bookings whose end time has passed (overdue).
+	 * Used by the scheduled cron to auto-complete and calculate late fees.
+	 */
+	async getActiveOverdue(): Promise<Booking[]> {
+		const now = new Date().toISOString();
+		return this.db
+			.select()
+			.from(bookings)
+			.where(and(
+				eq(bookings.status, 'Active'),
+				sql`${bookings.endDate} < ${now}`,
+				sql`${bookings.actualReturnDate} IS NULL`,
+			));
+	}
 }
