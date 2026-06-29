@@ -6,7 +6,7 @@ import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
 import { createWhatsAppProvider } from '@/worker/core/services/providers';
-import { publicUserAuthMiddleware, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
+import { publicUserAuthMiddleware, optionalPublicUserAuth, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { PublicUsersRepository } from './public-users.repository';
 import { PublicUsersService } from './public-users.service';
@@ -84,8 +84,12 @@ const phoneVerifyHandler = async (c: Context<PublicUsersEnv>) => {
 
 // ---- Account (cookie-authenticated) ----
 const meHandler = async (c: Context<PublicUsersEnv>) => {
-	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
+	if (!pu) {
+		// No valid public-user token (guest, or admin token was ignored by optional middleware)
+		return c.json({ success: true, data: null });
+	}
+	const service = c.get('publicUsersService');
 	const user = await service.getMe(pu.publicUserId);
 	return c.json({ success: true, data: user });
 };
@@ -137,8 +141,9 @@ export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	router.post('/phone/init', validateBody(phoneInitSchema), phoneInitHandler);
 	router.post('/phone/verify', validateBody(phoneVerifySchema), phoneVerifyHandler);
 
-	// Account (cookie-authenticated)
-	router.get('/me', publicUserAuthMiddleware(), meHandler);
+	// /me: graceful fallback — returns null when no valid public-user token
+	// (guests, or admin cookies that are ignored by optionalPublicUserAuth)
+	router.get('/me', optionalPublicUserAuth(), meHandler);
 	router.put('/profile', publicUserAuthMiddleware(), validateBody(updateProfileSchema), profileHandler);
 	router.post('/logout', publicUserAuthMiddleware(), logoutHandler);
 

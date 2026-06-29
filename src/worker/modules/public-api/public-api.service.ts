@@ -1,6 +1,6 @@
 import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
-import { ValidationError } from "@/worker/core/types/errors";
+import { ValidationError, ConflictError } from "@/worker/core/types/errors";
 import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
 import { calculateTwelveHourBlocks } from '@/worker/modules/bookings/availability.helper';
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
@@ -321,8 +321,8 @@ export class PublicApiService {
       data.endDate,
     );
     if (!isAvailable)
-      throw new ValidationError(
-        "Vehicle is already booked for the selected dates",
+      throw new ConflictError(
+        "Vehicle is already booked for the selected dates. Please choose another vehicle or different dates.",
       );
 
     // Find or create customer
