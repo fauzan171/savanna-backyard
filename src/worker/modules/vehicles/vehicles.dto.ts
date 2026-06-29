@@ -11,6 +11,7 @@ export const createVehicleSchema = z.object({
 	year: z.number().int().min(1990).max(2030).optional().nullable(),
 	dailyRateIdr: z.number().positive('Daily rate must be positive'),
 	dailyRateUsd: z.number().positive().optional().nullable(),
+	description: z.string().max(1000).optional().nullable(),
 	photoUrl: urlOrPath.optional().nullable(),
 });
 
@@ -24,6 +25,7 @@ export const updateVehicleSchema = z.object({
 	year: z.number().int().min(1990).max(2030).optional().nullable(),
 	dailyRateIdr: z.number().positive().optional(),
 	dailyRateUsd: z.number().positive().optional().nullable(),
+	description: z.string().max(1000).optional().nullable(),
 	totalKm: z.number().optional().nullable(),
 	photoUrl: urlOrPath.optional().nullable(),
 });

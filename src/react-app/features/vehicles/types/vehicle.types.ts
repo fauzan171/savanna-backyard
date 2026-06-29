@@ -16,6 +16,7 @@ export interface Vehicle extends BaseEntity {
 	year: number | null;
 	dailyRateIdr: number;
 	dailyRateUsd: number | null;
+	description: string | null;
 	status: VehicleStatus;
 	totalKm: number | null;
 	photoUrl: string | null;
@@ -61,6 +62,7 @@ export interface CreateVehicleRequest {
 	year?: number;
 	dailyRateIdr: number;
 	dailyRateUsd?: number;
+	description?: string;
 	photoUrl?: string;
 }
 
@@ -73,6 +75,7 @@ export interface UpdateVehicleRequest {
 	year?: number;
 	dailyRateIdr?: number;
 	dailyRateUsd?: number;
+	description?: string;
 	totalKm?: number;
 	photoUrl?: string;
 }

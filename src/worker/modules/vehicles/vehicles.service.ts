@@ -42,6 +42,7 @@ export class VehiclesService {
       year: vehicle.year,
       dailyRateIdr: vehicle.dailyRateIdr,
       dailyRateUsd: vehicle.dailyRateUsd,
+      description: vehicle.description,
       status: vehicle.status,
       totalKm: vehicle.totalKm,
       photoUrl: vehicle.photoUrl,
@@ -94,6 +95,7 @@ export class VehiclesService {
       year: data.year ?? null,
       dailyRateIdr: data.dailyRateIdr,
       dailyRateUsd: data.dailyRateUsd ?? null,
+      description: data.description ?? null,
       photoUrl: data.photoUrl ?? null,
       status: "Available",
       totalKm: 0,
@@ -128,6 +130,7 @@ export class VehiclesService {
       year: data.year,
       dailyRateIdr: data.dailyRateIdr,
       dailyRateUsd: data.dailyRateUsd,
+      description: data.description,
       totalKm: data.totalKm,
       photoUrl: data.photoUrl,
     });

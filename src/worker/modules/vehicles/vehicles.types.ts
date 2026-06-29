@@ -16,6 +16,7 @@ export interface VehicleResponse {
 	year: number | null;
 	dailyRateIdr: number;
 	dailyRateUsd: number | null;
+	description: string | null;
 	status: VehicleStatus;
 	totalKm: number | null;
 	photoUrl: string | null;

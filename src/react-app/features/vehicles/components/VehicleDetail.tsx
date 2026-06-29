@@ -158,6 +158,20 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange }: VehicleDetail
 				</CardContent>
 			</Card>
 
+			{/* Description */}
+			{vehicle.description && (
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-lg">Description</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+							{vehicle.description}
+						</p>
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Photo */}
 			{vehicle.photoUrl && (
 				<Card>
