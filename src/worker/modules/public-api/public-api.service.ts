@@ -688,11 +688,23 @@ export class PublicApiService {
     totalAmount: number; paidAt: string | null;
     paymentPageUrl: string | null; qrString: string | null;
     paymentType: string; dpAmount: number; remainingAmount: number;
+    isFullyPaid: boolean;
+    isPickupTime: boolean;
   } | null> {
     const booking = await this.repo.findBookingByNumber(bookingNumber);
     if (!booking) return null;
 
     const vehicle = await this.repo.getVehicleById(booking.vehicleId);
+
+    const paymentType = (booking as Record<string, unknown>).paymentType as string ?? 'full';
+    const dpAmount = ((booking as Record<string, unknown>).dpAmount as number) ?? 0;
+    const remainingAmount = ((booking as Record<string, unknown>).remainingAmount as number) ?? 0;
+    const isFullyPaid = booking.paymentStatus === 'settlement' || booking.fullyPaidAt !== null || remainingAmount <= 0;
+
+    // isPickupTime = current time >= booking startDate (ISO 8601 datetime string)
+    const now = new Date();
+    const start = new Date(booking.startDate);
+    const isPickupTime = now >= start;
 
     return {
       bookingNumber: booking.bookingNumber,
@@ -706,9 +718,11 @@ export class PublicApiService {
       paidAt: booking.paidAt,
       paymentPageUrl: (booking as Record<string, unknown>).paymentPageUrl as string | null ?? null,
       qrString: null,
-      paymentType: (booking as Record<string, unknown>).paymentType as string ?? 'full',
-      dpAmount: ((booking as Record<string, unknown>).dpAmount as number) ?? 0,
-      remainingAmount: ((booking as Record<string, unknown>).remainingAmount as number) ?? 0,
+      paymentType,
+      dpAmount,
+      remainingAmount,
+      isFullyPaid,
+      isPickupTime,
     };
   }
 

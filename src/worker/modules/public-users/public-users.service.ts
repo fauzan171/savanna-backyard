@@ -384,10 +384,9 @@ export class PublicUsersService {
 
 		const paymentReady =
 			b.paymentStatus === 'settlement' ||
-			b.fullyPaidAt !== null ||
-			(b.paymentType === 'dp' && b.dpPaidAt !== null);
+			b.fullyPaidAt !== null;
 		if (!paymentReady) {
-			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran sebelum pickup.');
+			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran penuh sebelum pickup.');
 		}
 
 		const updated = await this.repo.confirmPickup(bookingId);
