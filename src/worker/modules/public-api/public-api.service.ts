@@ -699,7 +699,10 @@ export class PublicApiService {
     const paymentType = (booking as Record<string, unknown>).paymentType as string ?? 'full';
     const dpAmount = ((booking as Record<string, unknown>).dpAmount as number) ?? 0;
     const remainingAmount = ((booking as Record<string, unknown>).remainingAmount as number) ?? 0;
-    const isFullyPaid = booking.paymentStatus === 'settlement' || booking.fullyPaidAt !== null || remainingAmount <= 0;
+    const isFullyPaid = booking.paymentStatus === 'settlement' || booking.fullyPaidAt !== null;
+    // NOTE: Do NOT use remainingAmount <= 0 here. Full-payment bookings initialize
+    // remainingAmount to 0 at creation time, so that would incorrectly report unpaid
+    // bookings as fully paid. Rely on paymentStatus/fullyPaidAt instead.
 
     // isPickupTime = current time >= booking startDate (ISO 8601 datetime string)
     const now = new Date();

@@ -3,7 +3,7 @@ import { PublicApiService } from '@/worker/modules/public-api/public-api.service
 import { PublicApiRepository } from '@/worker/modules/public-api/public-api.repository';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { ValidationError } from '@/worker/core/types/errors';
-import { createTestVehicle, createTestLead } from '@test/utils';
+import { createTestVehicle, createTestLead, createTestBooking } from '@test/utils';
 
 describe('PublicApiService', () => {
 	let publicApiService: PublicApiService;
@@ -19,6 +19,7 @@ describe('PublicApiService', () => {
 			getVehicleById: vi.fn(),
 			getVehicleTypes: vi.fn(),
 			isVehicleAvailableForDates: vi.fn().mockResolvedValue(true),
+			findBookingByNumber: vi.fn(),
 		} as unknown as PublicApiRepository;
 
 		mockConfigRepo = {
@@ -600,6 +601,123 @@ describe('PublicApiService', () => {
 			const result = await publicApiService.getVehicleDetails('vehicle-123');
 
 			expect(result?.dailyRateIdr).toBe(450000);
+		});
+	});
+
+	describe('getBookingStatus', () => {
+		// ============================================
+		// P0: Critical bug fix — isFullyPaid for full-payment bookings
+		// ============================================
+
+		it('[P0] should return isFullyPaid=false for unpaid full-payment booking (BUG regression)', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'pending',
+				paymentType: 'full',
+				paymentTerms: 'Full_Upfront',
+				remainingAmount: 0,
+				fullyPaidAt: null,
+				paidAt: null,
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+			expect(result!.paymentStatus).toBe('pending');
+			expect(result!.paymentType).toBe('full');
+		});
+
+		it('[P0] should return isFullyPaid=true for paid full-payment booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'Confirmed',
+				paymentStatus: 'settlement',
+				paymentType: 'full',
+				paymentTerms: 'Full_Upfront',
+				remainingAmount: 0,
+				fullyPaidAt: '2026-03-01T10:00:00Z',
+				paidAt: '2026-03-01T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(true);
+		});
+
+		it('[P0] should return isFullyPaid=false for unpaid DP booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'pending',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 245000,
+				fullyPaidAt: null,
+				paidAt: null,
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+			expect(result!.paymentType).toBe('dp');
+		});
+
+		it('[P0] should return isFullyPaid=false for DP booking with only DP paid', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'dp_paid',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 245000,
+				fullyPaidAt: null,
+				paidAt: '2026-03-01T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+		});
+
+		it('[P0] should return isFullyPaid=true for fully paid DP booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'Confirmed',
+				paymentStatus: 'settlement',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 0,
+				fullyPaidAt: '2026-03-02T10:00:00Z',
+				paidAt: '2026-03-02T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(true);
+		});
+
+		it('[P0] should return null for non-existent booking', async () => {
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(null);
+
+			const result = await publicApiService.getBookingStatus('NONEXISTENT');
+
+			expect(result).toBeNull();
 		});
 	});
 
