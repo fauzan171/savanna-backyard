@@ -2,6 +2,7 @@ import { PublicUsersRepository } from './public-users.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { decodeVehicleQr } from '@/worker/core/lib/qr';
+import { PaymentGatewayFactory } from '@/worker/core/services/payment-gateway/factory';
 import type { WhatsAppProvider } from '@/worker/core/services/providers';
 import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
 import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
@@ -282,12 +283,16 @@ export class PublicUsersService {
 	}
 
 	/**
-	 * Re-open the booking's payment to pay the remainder (DP -> full).
-	 * The Xendit invoice was created with allow_partial for the full amount, so the
-	 * customer reopens the SAME invoice_url to pay more. No new invoice is created
-	 * unless the original expired (follow-up: create a fresh invoice for the remainder).
+	 * Pay the remainder for a DP booking by creating a fresh Xendit invoice.
+	 * The new invoice is for the `remainingAmount` only, with external_id =
+	 * `{bookingNumber}-remainder` so the webhook can distinguish it from the
+	 * original DP invoice.
 	 */
-	async payRemaining(publicUserId: string, bookingId: string): Promise<{
+	async payRemaining(
+		publicUserId: string,
+		bookingId: string,
+		gatewayConfig: { vendor: string; config: Record<string, string> },
+	): Promise<{
 		bookingId: string;
 		bookingNumber: string;
 		paymentStatus: string | null;
@@ -304,14 +309,53 @@ export class PublicUsersService {
 			throw new ValidationError('Booking is already fully paid');
 		}
 
+		const remaining = (b as Record<string, unknown>).remainingAmount as number ?? 0;
+		if (remaining <= 0) {
+			throw new ValidationError('No remaining amount to pay');
+		}
+
+		// Create a NEW invoice for the remainder amount
+		const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor as 'xendit' | 'ifortepay' | 'midtrans' | 'manual', gatewayConfig.config);
+		let paymentPageUrl = b.paymentPageUrl;
+		let newInvoiceId: string | null = null;
+
+		if (gateway.name !== 'manual') {
+			try {
+				const result = await gateway.createPayment({
+					amount: remaining,
+					currency: 'IDR',
+					method: 'Gateway',
+					bookingId: `${b.bookingNumber}-remainder`,
+					customerEmail: (b as Record<string, unknown>).customerEmail as string ?? undefined,
+					customerPhone: (b as Record<string, unknown>).customerPhone as string ?? undefined,
+					description: `Pelunasan ${b.bookingNumber} — sisa Rp ${remaining.toLocaleString('id-ID')}`,
+				});
+
+				if (result.success) {
+					paymentPageUrl = result.paymentUrl ?? b.paymentPageUrl;
+					newInvoiceId = result.transactionId ?? null;
+
+					// Save the new payment link + invoice id to the booking
+					await this.repo.updateBookingPaymentLink(bookingId, {
+						...(paymentPageUrl ? { paymentPageUrl } : {}),
+						...(newInvoiceId ? { xenditInvoiceId: newInvoiceId } : {}),
+					});
+				} else {
+					console.error('[payRemaining] Failed to create remainder invoice:', result.error);
+				}
+			} catch (error) {
+				console.error('[payRemaining] Exception creating remainder invoice:', error);
+			}
+		}
+
 		return {
 			bookingId: b.id,
 			bookingNumber: b.bookingNumber,
 			paymentStatus: b.paymentStatus,
-			paymentPageUrl: b.paymentPageUrl,
-			xenditInvoiceId: b.xenditInvoiceId,
+			paymentPageUrl,
+			xenditInvoiceId: newInvoiceId ?? b.xenditInvoiceId,
 			totalAmount: b.totalAmount,
-			remainingAmount: b.remainingAmount,
+			remainingAmount: remaining,
 		};
 	}
 

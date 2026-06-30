@@ -147,4 +147,15 @@ export class PublicUsersRepository {
 		const [b] = await this.db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 		return b!;
 	}
+
+	/** Update payment link and Xendit invoice id on a booking (e.g. remainder payment). */
+	async updateBookingPaymentLink(
+		bookingId: string,
+		data: { paymentPageUrl?: string; xenditInvoiceId?: string },
+	): Promise<void> {
+		const set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+		if (data.paymentPageUrl) set.paymentPageUrl = data.paymentPageUrl;
+		if (data.xenditInvoiceId) set.xenditInvoiceId = data.xenditInvoiceId;
+		await this.db.update(bookings).set(set).where(eq(bookings.id, bookingId));
+	}
 }

@@ -422,18 +422,21 @@ export class PublicApiService {
         // Use the payment method from request, default to 'Gateway' (all methods)
         const paymentMethod = data.paymentMethod ?? 'Gateway';
 
+        // ---- Payment amount: DP creates invoice for dpAmount only, full creates for totalAmount.
+        //      The payment page shows exactly what the customer needs to pay — no ambiguity.
+        //      external_id = bookingNumber so the webhook can match it.
+        const invoiceAmount = paymentType === 'dp' ? dpAmount : totalAmount;
+
         const result = await gateway.createPayment({
-          amount: totalAmount,
+          amount: invoiceAmount,
           currency: 'IDR',
           method: paymentMethod,
           bookingId: booking.bookingNumber,
           customerEmail: customer.email ?? undefined,
           customerPhone: customer.phone,
-          description: `Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""})`,
-          // DP => one invoice for the full amount, allow_partial lets the customer pay
-          // at least the DP now and reopen the same invoice later for the remainder.
-          allowPartial: paymentType === 'dp',
-          minimumAmount: paymentType === 'dp' ? dpAmount : undefined,
+          description: paymentType === 'dp'
+            ? `DP Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""}) — DP ${dpAmount.toLocaleString('id-ID')}`
+            : `Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""})`,
         });
 
         if (result.success) {

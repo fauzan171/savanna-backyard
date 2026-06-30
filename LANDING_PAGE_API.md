@@ -416,16 +416,46 @@ Buat booking baru dari landing page.
   "data": {
     "bookingId": "8616e081-c40d-480a-be27-3b9d38f04580",
     "bookingNumber": "SM-20260628-XK3M2P",
+    "startDate": "2026-06-28T02:00:00+07:00",
+    "endDate": "2026-06-28T14:00:00+07:00",
+    "blocks": 1,
+    "vehicleName": "Honda CRF 150L",
     "paymentPageUrl": "https://checkout.xendit.co/...",
-    "totalAmount": 200000
+    "qrString": null,
+    "xenditInvoiceId": "inv_xxx",
+    "totalAmount": 200000,
+    "paymentType": "full",
+    "dpAmount": 0,
+    "remainingAmount": 0,
+    "paymentError": null
   }
 }
 ```
 
-**Catatan:**
-- `bookingNumber` format: `SM-YYYYMMDD-{6 char random}`
-- `paymentPageUrl` — URL halaman pembayaran (Xendit / iFortepay / Midtrans). Redirect user ke URL ini untuk bayar.
-- `totalAmount` — harga sudah termasuk kalkulasi 12-jam block.
+**Field Response:**
+
+| Field | Type | Keterangan |
+|-------|------|-----------|
+| `bookingId` | string | UUID booking (internal) |
+| `bookingNumber` | string | Format `SM-YYYYMMDD-{6 char random}` |
+| `startDate` | string | ISO 8601 datetime pickup |
+| `endDate` | string | ISO 8601 datetime deadline return |
+| `blocks` | number | Jumlah block 12-jam |
+| `vehicleName` | string | Nama motor yang dibooking |
+| `paymentPageUrl` | string\|null | URL pembayaran — redirect user ke sini |
+| `qrString` | string\|null | QR code raw string (untuk render QR inline by FE) |
+| `xenditInvoiceId` | string\|null | Invoice ID Xendit (untuk track payment) |
+| `totalAmount` | number | Total harga (sudah include equipment + 12-jam blocks) |
+| `paymentType` | string | `"full"` atau `"dp"` |
+| `dpAmount` | number | Jumlah DP yang harus dibayar (0 untuk full payment) |
+| `remainingAmount` | number | Sisa yang harus dilunasi (0 untuk full payment) |
+| `paymentError` | string\|null | `null` = sukses; isi = gagal generate payment link |
+
+**Catatan penting tentang `paymentType`:**
+- `"full"` — payment page menampilkan **totalAmount** (harga penuh)
+- `"dp"` — payment page menampilkan **dpAmount** saja (DP 30%), bukan harga penuh
+  - Setelah DP dibayar, booking status `pending_payment` / `dp_paid`
+  - User harus melunasi sisa via endpoint **Pay Remaining** (lihat section 7a)
 
 **Response 400 (motor sudah dibooking):**
 
@@ -455,6 +485,63 @@ Buat booking baru dari landing page.
 
 ---
 
+## 7a. Pay Remaining — Lunasi Sisa DP
+
+Setelah user membayar DP dan ingin melunasi sisa, gunakan endpoint ini.
+Endpoint ini **membutuhkan login** (phone auth).
+
+### POST `/me/bookings/:bookingId/pay-remaining`
+
+**Headers:**
+```
+Authorization: Bearer {publicUserJwtToken}
+X-API-Key: savanna-dev-api-key-2026
+```
+
+**Response 200:**
+
+```json
+{
+  "success": true,
+  "message": "Remainder payment invoice created",
+  "data": {
+    "bookingId": "8616e081-c40d-480a-be27-3b9d38f04580",
+    "bookingNumber": "SM-20260628-XK3M2P",
+    "paymentStatus": "dp_paid",
+    "paymentPageUrl": "https://checkout.xendit.co/...",
+    "xenditInvoiceId": "inv_yyy",
+    "totalAmount": 200000,
+    "remainingAmount": 140000
+  }
+}
+```
+
+**Bagaimana cara kerjanya:**
+
+| Step | Aksi | Keterangan |
+|------|------|-----------|
+| 1 | User book dengan `paymentType: "dp"` | Invoice pertama dibuat untuk **dpAmount** (DP 30%) |
+| 2 | User bayar DP via `paymentPageUrl` | Xendit webhook -> booking status `dp_paid`, `remainingAmount` terupdate |
+| 3 | User login via phone auth | `POST /public/auth/phone/init` -> `POST /public/auth/phone/verify` |
+| 4 | User panggil endpoint ini | Backend buat **invoice BARU** untuk `remainingAmount` dengan `external_id = {bookingNumber}-remainder` |
+| 5 | User bayar sisa via `paymentPageUrl` baru | Xendit webhook -> booking status `Confirmed`, payment `settlement` |
+
+**Flow di Backend:**
+- `POST /public/bookings` dengan `paymentType: "dp"` -> Xendit invoice for `dpAmount` only, `external_id = bookingNumber`
+- Webhook PAID -> `remainingAmount` = total - dp, status `dp_paid`
+- `POST /me/bookings/:bookingId/pay-remaining` -> Xendit invoice BARU untuk `remainingAmount`, `external_id = {bookingNumber}-remainder`
+- Webhook PAID (remainder) -> total paid >= totalAmount -> status `Confirmed`
+
+**Response jika booking sudah lunas:**
+```json
+{
+  "success": false,
+  "message": "Booking is already fully paid"
+}
+```
+
+---
+
 ## 8. Booking Status — Cek Status Booking
 
 ### GET `/public/bookings/:bookingNumber/status`
@@ -475,17 +562,23 @@ Digunakan user untuk mengecek status booking-nya (setelah booking dibuat).
     "vehicleName": "Honda CRF 150L",
     "startDate": "2026-06-28T02:00:00+07:00",
     "endDate": "2026-06-28T14:00:00+07:00",
+    "blocks": 1,
     "totalAmount": 200000,
-    "paidAt": "2026-06-27T22:15:00.000Z"
+    "paidAt": "2026-06-27T22:15:00.000Z",
+    "paymentPageUrl": "https://checkout.xendit.co/...",
+    "qrString": null,
+    "paymentType": "full",
+    "dpAmount": 0,
+    "remainingAmount": 0
   }
 }
 ```
 
 **Booking Status Values:**
-`Pending`, `Confirmed`, `Active`, `Completed`, `Cancelled`
+`pending_payment`, `dp_paid`, `Confirmed`, `Active`, `Completed`, `Cancelled`, `expired`
 
 **Payment Status Values:**
-`pending`, `settlement`, `deny`, `expire`, `cancel`, `refund`
+`pending`, `dp_paid`, `settlement`, `deny`, `expire`, `cancel`, `refund`
 
 ---
 

@@ -168,8 +168,26 @@ const myBookingDetailHandler = async (c: Context<PublicUsersEnv>) => {
 const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
-	const result = await service.payRemaining(pu.publicUserId, c.req.param('bookingId'));
-	return c.json({ success: true, message: 'Reopen the invoice to pay the remainder', data: result });
+
+	// Build payment gateway config from env vars for remainder invoice creation
+	const vendor = c.env.PAYMENT_GATEWAY_VENDOR ?? 'xendit';
+	let gatewayConfig: { vendor: string; config: Record<string, string> };
+	if (vendor === 'xendit') {
+		gatewayConfig = {
+			vendor,
+			config: { apiKey: c.env.XENDIT_API_KEY ?? '', webhookToken: c.env.XENDIT_WEBHOOK_TOKEN ?? '', isProduction: c.env.ENVIRONMENT === 'production' ? 'true' : 'false' },
+		};
+	} else if (vendor === 'ifortepay') {
+		gatewayConfig = {
+			vendor,
+			config: { merchantId: c.env.IFORTEPAY_MERCHANT_ID ?? '', secretUnboundId: c.env.IFORTEPAY_SECRET_UNBOUND_ID ?? '', hashKey: c.env.IFORTEPAY_HASH_KEY ?? '', callbackUrl: c.env.IFORTEPAY_CALLBACK_URL ?? '', successRedirectUrl: c.env.IFORTEPAY_SUCCESS_REDIRECT_URL ?? '', failedRedirectUrl: c.env.IFORTEPAY_FAILED_REDIRECT_URL ?? '' },
+		};
+	} else {
+		gatewayConfig = { vendor, config: {} };
+	}
+
+	const result = await service.payRemaining(pu.publicUserId, c.req.param('bookingId'), gatewayConfig);
+	return c.json({ success: true, message: 'Remainder payment invoice created', data: result });
 };
 
 const confirmPickupHandler = async (c: Context<PublicUsersEnv>) => {
