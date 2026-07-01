@@ -137,6 +137,15 @@ export class PublicUsersRepository {
 		return b ?? null;
 	}
 
+	async findBookingByNumberAndUser(bookingNumber: string, publicUserId: string): Promise<Booking | null> {
+		const [b] = await this.db
+			.select()
+			.from(bookings)
+			.where(and(eq(bookings.bookingNumber, bookingNumber), eq(bookings.publicUserId, publicUserId)))
+			.limit(1);
+		return b ?? null;
+	}
+
 	/** Mark a booking as pickup-confirmed and activate it (soft confirm — no startKm). */
 	async confirmPickup(bookingId: string): Promise<Booking> {
 		const now = new Date().toISOString();

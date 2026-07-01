@@ -276,10 +276,25 @@ export class PublicUsersService {
 		return all.map(toBookingSummary);
 	}
 
-	async myBookingDetail(publicUserId: string, bookingId: string): Promise<PublicBookingSummary> {
-		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+	async myBookingDetail(publicUserId: string, bookingIdOrNumber: string): Promise<PublicBookingSummary> {
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 		return toBookingSummary(b);
+	}
+
+	/**
+	 * Helper: try UUID lookup first, then fall back to bookingNumber.
+	 * Makes endpoints accept both formats for better DX.
+	 */
+	private async findBookingByIdOrNumberAndUser(
+		publicUserId: string,
+		bookingIdOrNumber: string,
+	): Promise<Booking | null> {
+		let b = await this.repo.findBookingByIdAndUser(bookingIdOrNumber, publicUserId);
+		if (!b) {
+			b = await this.repo.findBookingByNumberAndUser(bookingIdOrNumber, publicUserId);
+		}
+		return b;
 	}
 
 	/**
@@ -290,7 +305,7 @@ export class PublicUsersService {
 	 */
 	async payRemaining(
 		publicUserId: string,
-		bookingId: string,
+		bookingIdOrNumber: string,
 		gatewayConfig: { vendor: string; config: Record<string, string> },
 	): Promise<{
 		bookingId: string;
@@ -301,7 +316,7 @@ export class PublicUsersService {
 		totalAmount: number;
 		remainingAmount: number | null;
 	}> {
-		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 
 		const isFullyPaid = b.paymentStatus === 'settlement' || b.fullyPaidAt !== null;
@@ -336,7 +351,7 @@ export class PublicUsersService {
 					newInvoiceId = result.transactionId ?? null;
 
 					// Save the new payment link + invoice id to the booking
-					await this.repo.updateBookingPaymentLink(bookingId, {
+					await this.repo.updateBookingPaymentLink(b.id, {
 						...(paymentPageUrl ? { paymentPageUrl } : {}),
 						...(newInvoiceId ? { xenditInvoiceId: newInvoiceId } : {}),
 					});
@@ -366,8 +381,8 @@ export class PublicUsersService {
 	 * still owns that. Kept here to avoid coupling the public-users service into
 	 * BookingsService.
 	 */
-	async confirmPickup(publicUserId: string, bookingId: string, qrCode: string): Promise<PublicBookingSummary> {
-		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+	async confirmPickup(publicUserId: string, bookingIdOrNumber: string, qrCode: string): Promise<PublicBookingSummary> {
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 
 		const scannedVehicleId = decodeVehicleQr(qrCode);
@@ -389,7 +404,7 @@ export class PublicUsersService {
 			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran penuh sebelum pickup.');
 		}
 
-		const updated = await this.repo.confirmPickup(bookingId);
+		const updated = await this.repo.confirmPickup(b.id);
 		return toBookingSummary(updated);
 	}
 }

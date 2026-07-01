@@ -101,7 +101,18 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 	}
 
 	const service = new WebhooksService(createDb(c.env.DB), emailService);
-	await service.handleXenditNotification(data);
+
+	// Run the notification handler in the background so we return 200 to Xendit immediately.
+	// Xendit has a webhook timeout; slow email sending must not block the HTTP response.
+	// Idempotency guards (existing payment check by invoiceId) make this safe to retry.
+	const handlePromise = service.handleXenditNotification(data);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const waitUntil = (c as any).executionCtx?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
+	if (waitUntil) {
+		waitUntil(handlePromise);
+	} else {
+		await handlePromise;
+	}
 
 	return c.json({ success: true, message: 'OK' });
 };
