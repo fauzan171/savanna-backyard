@@ -96,6 +96,23 @@ export const availabilityQuerySchema = z.object({
 	{ message: 'Start date must be before or equal to end date' }
 );
 
+// Submit QR scan checklist schema (pickup or motor condition check)
+export const submitChecklistSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
+	scanMode: z.enum(['pickup_checklist', 'motor_condition_check']),
+	items: z.record(z.boolean()).refine(
+		(v) => Object.keys(v).length > 0,
+		{ message: 'At least one checklist item is required' }
+	),
+	kmReading: z.number().min(0),
+	fuelLevel: z.number().int().min(0).max(100).optional().nullable(),
+	photos: z.array(z.string().url()).max(10).optional().default([]),
+	notes: z.string().max(2000).optional().nullable(),
+	conditionStatus: z.enum(['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance']).optional(),
+	// For pickup checklist: auto-start rental after checklist is submitted
+	startRental: z.boolean().default(true),
+});
+
 // Calendar query schema
 export const calendarQuerySchema = z.object({
 	month: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid month format (YYYY-MM)'),
@@ -112,5 +129,6 @@ export type ScanReturnRequest = z.infer<typeof scanReturnSchema>;
 export type AddAddonRequest = z.infer<typeof addAddonSchema>;
 export type ListBookingsQuery = z.infer<typeof listBookingsQuerySchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
+export type SubmitChecklistRequest = z.infer<typeof submitChecklistSchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 export type AddonInput = z.infer<typeof addonInputSchema>;

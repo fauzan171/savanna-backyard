@@ -18,6 +18,7 @@ import {
 	cancelBookingSchema,
 	addAddonSchema,
 	scanReturnSchema,
+	submitChecklistSchema,
 	listBookingsQuerySchema,
 	availabilityQuerySchema,
 	type CreateBookingRequest,
@@ -28,6 +29,7 @@ import {
 	type CancelBookingRequest,
 	type AddAddonRequest,
 	type ScanReturnRequest,
+	type SubmitChecklistRequest,
 	type ListBookingsQuery,
 	type AvailabilityQuery,
 } from './bookings.dto';
@@ -221,6 +223,14 @@ const scanQrHandler = async (c: Context<BookingsEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const submitChecklistHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const body = getValidatedBody<SubmitChecklistRequest>(c);
+	const user = c.get('user');
+	const result = await service.submitChecklist(body, user.userId);
+	return c.json({ success: true, data: result }, 201);
+};
+
 // Factory function to create bookings router
 export function createBookingsRouter(): Hono<BookingsEnv> {
 	const router = new Hono<BookingsEnv>();
@@ -242,6 +252,9 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 
 	// Scan vehicle QR to determine pickup checklist vs motor condition check
 	router.post('/scan-qr', scanQrHandler);
+
+	// Submit QR scan checklist results (pickup or motor condition)
+	router.post('/submit-checklist', validateBody(submitChecklistSchema), submitChecklistHandler);
 
 	// Get booking by number
 	router.get('/number/:bookingNumber', getBookingByNumberHandler);

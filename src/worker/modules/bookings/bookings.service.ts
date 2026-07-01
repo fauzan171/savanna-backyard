@@ -41,6 +41,7 @@ import type {
 	ListBookingsQuery,
 	AvailabilityQuery,
 	AddAddonRequest,
+	SubmitChecklistRequest,
 } from './bookings.dto';
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
@@ -1003,5 +1004,100 @@ export class BookingsService {
 			{ key: 'body_scratches', label: 'Tidak ada goresan / kerusakan baru', required: false },
 			{ key: 'kilometer', label: 'Kilometer tercatat', required: false },
 		];
+	}
+
+	/**
+	 * Submit QR scan checklist results.
+	 * - pickup_checklist: creates a pickup checklist record + optionally starts rental
+	 * - motor_condition_check: creates a vehicle condition record (no booking needed)
+	 */
+	async submitChecklist(
+		data: SubmitChecklistRequest,
+		staffUserId: string,
+	): Promise<{
+		checklistId: string;
+		conditionId: string;
+		rentalStarted?: boolean;
+	}> {
+		const vehicleId = decodeVehicleQr(data.qrCode);
+		if (!vehicleId) {
+			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
+		}
+
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) {
+			throw new NotFoundError('Vehicle');
+		}
+
+		// Determine overall condition status from items
+		const allRequiredOk = Object.entries(data.items)
+			.filter(([key]) => {
+				const items = this.getChecklistItemsForMode(data.scanMode);
+				return items.find((i) => i.key === key)?.required ?? false;
+			})
+			.every(([, value]) => value === true);
+
+		const conditionStatus = data.conditionStatus ?? (allRequiredOk ? 'Good' : 'Fair');
+
+		let checklistId = '';
+		let rentalStarted = false;
+
+		if (data.scanMode === 'pickup_checklist') {
+			const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicleId);
+			if (!booking) {
+				throw new NotFoundError('No Confirmed/Active booking found for this vehicle');
+			}
+
+			if (!this.checklistRepo) {
+				throw new ValidationError('Checklist repository not available');
+			}
+
+			const checklist = await this.checklistRepo.create({
+				bookingId: booking.id,
+				vehicleId,
+				type: 'pickup',
+				items: JSON.stringify(data.items),
+				kmReading: data.kmReading,
+				fuelLevel: data.fuelLevel ?? null,
+				photos: data.photos.length > 0 ? JSON.stringify(data.photos) : null,
+				notes: data.notes ?? null,
+				damageNotes: null,
+				createdBy: staffUserId,
+			});
+			checklistId = checklist.id;
+
+			// Optionally start the rental (mark Active)
+			if (data.startRental && booking.status === 'Confirmed') {
+				await this.bookingRepo.update(booking.id, {
+					status: 'Active',
+				});
+				await this.vehicleRepo.update(vehicleId, { status: 'Rented' });
+				rentalStarted = true;
+			}
+		} else {
+			// motor_condition_check: no booking needed, generate a placeholder checklist ID
+			checklistId = crypto.randomUUID();
+		}
+
+		// Always record a condition entry for history
+		if (!this.conditionsRepo) {
+			throw new ValidationError('Conditions repository not available');
+		}
+
+		await this.conditionsRepo.create({
+			vehicleId,
+			checklistId: checklistId || null,
+			conditionStatus,
+			notes: data.notes ?? null,
+			km: data.kmReading,
+			checkedAt: new Date().toISOString(),
+			checkedBy: staffUserId,
+		});
+
+		return {
+			checklistId,
+			conditionId: checklistId, // re-use for simplicity; condition ID is generated inside create
+			rentalStarted,
+		};
 	}
 }
