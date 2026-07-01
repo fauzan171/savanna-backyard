@@ -30,6 +30,7 @@ import type {
 	BookingStats,
 	BookingStatus,
 	PenaltyBreakdown,
+	QrScanResult,
 } from './bookings.types';
 import type {
 	CreateBookingRequest,
@@ -902,5 +903,105 @@ export class BookingsService {
 		const raw = await this.configRepo.getValue('damage_per_item');
 		const n = raw ? Number(raw) : NaN;
 		return Number.isFinite(n) ? n : 0;
+	}
+
+	// ── QR Scan flow ────────────────────────────────────────────────────────────
+
+	/**
+	 * Scan a vehicle QR code to determine the current context:
+	 * 1. If there is a Confirmed/Active booking for this vehicle and the
+	 *    current time is within 1 hour before to 1 hour after the booking
+	 *    startDate -> PICKUP_CHECKLIST (serah-terima motor).
+	 * 2. Otherwise -> MOTOR_CONDITION_CHECK (control / pengecekan kondisi).
+	 */
+	async scanQr(qrData: string, scanTimeIso: string): Promise<QrScanResult> {
+		const vehicleId = decodeVehicleQr(qrData);
+		if (!vehicleId) {
+			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
+		}
+
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) {
+			throw new NotFoundError('Vehicle');
+		}
+
+		const scanTime = new Date(scanTimeIso);
+		const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicleId);
+
+		const PICKUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+		let scanMode: QrScanResult['scanMode'] = 'motor_condition_check';
+		let message = 'Scan untuk pengecekan kondisi motor (control).';
+		let bookingSummary: QrScanResult['booking'] = null;
+
+		if (booking) {
+			const startDate = new Date(booking.startDate);
+			const diffMs = scanTime.getTime() - startDate.getTime();
+
+			if (diffMs >= -PICKUP_WINDOW_MS && diffMs <= PICKUP_WINDOW_MS) {
+				scanMode = 'pickup_checklist';
+				message = 'Scan untuk serah-terima motor (pickup checklist).';
+			}
+
+			// Always include booking info when a relevant booking exists
+			const customer = await this.customerRepo.findById(booking.customerId);
+			bookingSummary = {
+				id: booking.id,
+				bookingNumber: booking.bookingNumber,
+				customerName: customer?.name ?? 'Unknown',
+				customerPhone: customer?.phone ?? '-',
+				startDate: booking.startDate,
+				endDate: booking.endDate,
+				status: booking.status as BookingStatus,
+				paymentType: booking.paymentType ?? 'full',
+			};
+		}
+
+		return {
+			scanMode,
+			vehicle: {
+				id: vehicle.id,
+				name: vehicle.name,
+				plateNumber: vehicle.plateNumber,
+				type: vehicle.type,
+			},
+			booking: bookingSummary,
+			checklistItems: this.getChecklistItemsForMode(scanMode),
+			message,
+		};
+	}
+
+	private getChecklistItemsForMode(mode: QrScanResult['scanMode']): {
+		key: string;
+		label: string;
+		required: boolean;
+	}[] {
+		if (mode === 'pickup_checklist') {
+			return [
+				{ key: 'fuel_level', label: 'Bensin cukup / terisi', required: true },
+				{ key: 'tire_condition', label: 'Ban dalam kondisi baik (tekanan + keausan)', required: true },
+				{ key: 'brake_function', label: 'Rem depan & belakang berfungsi normal', required: true },
+				{ key: 'lights_function', label: 'Lampu depan, belakang, & sein menyala', required: true },
+				{ key: 'horn_mirror', label: 'Klakson & spion lengkap dan berfungsi', required: true },
+				{ key: 'oil_level', label: 'Oli mesin cukup', required: true },
+				{ key: 'body_condition', label: 'Body motor tidak ada kerusakan baru', required: true },
+				{ key: 'helmet_count', label: 'Helm disediakan sesuai jumlah (2)', required: true },
+				{ key: 'raincoat', label: 'Jas hujan tersedia', required: false },
+				{ key: 'phone_holder', label: 'Holder HP tersedia', required: false },
+			];
+		}
+
+		// motor_condition_check
+		return [
+			{ key: 'engine_start', label: 'Mesin hidup normal tanpa suara aneh', required: true },
+			{ key: 'brake_function', label: 'Rem depan & belakang berfungsi normal', required: true },
+			{ key: 'tire_condition', label: 'Ban tidak aus / bocor', required: true },
+			{ key: 'lights_function', label: 'Lampu & sein menyala', required: true },
+			{ key: 'oil_level', label: 'Oli mesin dalam batas normal', required: true },
+			{ key: 'chain_belt', label: 'Rantai / V-belt kencang & tidak aus', required: true },
+			{ key: 'fuel_level', label: 'Bensin cukup untuk operasional', required: true },
+			{ key: 'body_scratches', label: 'Tidak ada goresan / kerusakan baru', required: false },
+			{ key: 'kilometer', label: 'Kilometer tercatat', required: false },
+		];
 	}
 }

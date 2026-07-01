@@ -19,6 +19,9 @@ interface VehicleQrCardProps {
  * Client-side QR generator for a vehicle. Encodes the compact `SVN:{vehicleId}`
  * form, which the customer ScanPage (savana) decodes. No backend endpoint — the
  * QR is just an identifier printed and attached to the bike.
+ *
+ * The QR includes a white margin around the code so it isn't too tight when
+ * printed or downloaded, and the download PNG includes a visible white border.
  */
 export function VehicleQrCard({ vehicleId, vehicleName }: VehicleQrCardProps) {
 	const [open, setOpen] = useState(false);
@@ -42,14 +45,14 @@ export function VehicleQrCard({ vehicleId, vehicleName }: VehicleQrCardProps) {
 	const printQr = () => {
 		const url = getCanvasDataUrl();
 		if (!url) return;
-		const w = window.open('', '_blank', 'width=480,height=640');
+		const w = window.open('', '_blank', 'width=520,height=680');
 		if (!w) return;
 		w.document.write(`
 			<html><head><title>QR - ${vehicleName}</title></head>
-			<body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui,sans-serif">
-				<h2 style="margin:0 0 8px">${vehicleName}</h2>
-				<img src="${url}" width="300" height="300" alt="QR code" />
-				<p style="font-family:monospace;color:#555;margin-top:8px">${qrValue}</p>
+			<body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:system-ui,sans-serif;background:#fff">
+				<h2 style="margin:0 0 16px">${vehicleName}</h2>
+				<img src="${url}" width="320" height="320" alt="QR code" style="border:12px solid #fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1)" />
+				<p style="font-family:monospace;color:#555;margin-top:12px">${qrValue}</p>
 				<p style="color:#888;font-size:12px">Savanna Bromo — Scan to confirm pickup</p>
 			</body></html>
 		`);
@@ -75,8 +78,8 @@ export function VehicleQrCard({ vehicleId, vehicleName }: VehicleQrCardProps) {
 					</DialogHeader>
 
 					<div className="flex flex-col items-center gap-4 py-2">
-						<div ref={canvasWrapRef} className="rounded-lg border bg-white p-4">
-							<QRCodeCanvas value={qrValue} size={240} level="M" />
+						<div ref={canvasWrapRef} className="rounded-xl border bg-white p-6 shadow-sm">
+							<QRCodeCanvas value={qrValue} size={240} level="M" includeMargin={true} />
 						</div>
 						<p className="text-xs text-muted-foreground font-mono break-all">{qrValue}</p>
 

@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray, lt, gt, not, sql } from 'drizzle-orm';
+import { eq, and, or, desc, inArray, lt, gt, not, sql } from 'drizzle-orm';
 import {
 	bookings,
 	bookingAddons,
@@ -360,7 +360,7 @@ export class BookingsRepository {
 
 	/**
 	 * Confirmed bookings whose rental start time has arrived.
-	 * Used by the scheduled cron to auto-transition Confirmed → Active.
+	 * Used by the scheduled cron to auto-transition Confirmed -> Active.
 	 */
 	async getConfirmedReadyToActivate(): Promise<Booking[]> {
 		const now = new Date().toISOString();
@@ -373,6 +373,24 @@ export class BookingsRepository {
 			));
 	}
 
+	/**
+	 * Find the nearest Confirmed (or Active) booking for a given vehicle.
+	 * Used by the QR scan endpoint to decide whether the scan is for
+	 * pickup checklist or motor condition check.
+	 */
+	async findUpcomingConfirmedByVehicle(vehicleId: string): Promise<Booking | null> {
+		const rows = await this.db
+			.select()
+			.from(bookings)
+			.where(and(
+				eq(bookings.vehicleId, vehicleId),
+				or(eq(bookings.status, 'Confirmed'), eq(bookings.status, 'Active')),
+				sql`${bookings.startDate} >= datetime('now', '-1 days')`,
+			))
+			.orderBy(bookings.startDate)
+			.limit(1);
+		return rows[0] ?? null;
+	}
 	/**
 	 * Active bookings whose end time has passed (overdue).
 	 * Used by the scheduled cron to auto-complete and calculate late fees.

@@ -213,6 +213,14 @@ const markPenaltyPaidHandler = async (c: Context<BookingsEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const scanQrHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const body = getValidatedBody<{ qrCode: string; scanTime?: string }>(c);
+	const scanTime = body.scanTime ?? new Date().toISOString();
+	const result = await service.scanQr(body.qrCode, scanTime);
+	return c.json({ success: true, data: result });
+};
+
 // Factory function to create bookings router
 export function createBookingsRouter(): Hono<BookingsEnv> {
 	const router = new Hono<BookingsEnv>();
@@ -231,6 +239,9 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 
 	// Scan vehicle QR to resolve the active rental (admin return processing)
 	router.post('/scan-return', validateBody(scanReturnSchema), scanReturnHandler);
+
+	// Scan vehicle QR to determine pickup checklist vs motor condition check
+	router.post('/scan-qr', scanQrHandler);
 
 	// Get booking by number
 	router.get('/number/:bookingNumber', getBookingByNumberHandler);
