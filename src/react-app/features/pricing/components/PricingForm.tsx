@@ -12,14 +12,23 @@ interface PricingFormProps {
 }
 
 export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: PricingFormProps) {
+	// ponytail: backend stores features/notIncluded as JSON.stringify([...]) in a text column;
+	// normalize array OR JSON string to a comma-joined display string (PRIC-02).
+	const toText = (v: unknown): string => {
+		if (Array.isArray(v)) return v.join(', ');
+		if (typeof v === 'string' && v.trim().startsWith('[')) {
+			try { const parsed = JSON.parse(v); return Array.isArray(parsed) ? parsed.join(', ') : v; } catch { return v; }
+		}
+		return typeof v === 'string' ? v : '';
+	};
 	const { register, handleSubmit } = useForm<CreatePricingRequest & { featuresText: string; notIncludedText: string }>({
 		defaultValues: {
 			name: initialData?.name ?? '',
 			description: initialData?.description ?? '',
 			dailyPrice: initialData?.dailyPrice ?? 0,
 			multiDayPrice: initialData?.multiDayPrice ?? 0,
-			featuresText: initialData?.features ? (typeof initialData.features === 'string' ? initialData.features : initialData.features.join(', ')) : '',
-			notIncludedText: initialData?.notIncluded ? (typeof initialData.notIncluded === 'string' ? initialData.notIncluded : initialData.notIncluded.join(', ')) : '',
+			featuresText: toText(initialData?.features),
+			notIncludedText: toText(initialData?.notIncluded),
 			highlighted: initialData?.highlighted ?? false,
 			icon: initialData?.icon ?? '',
 			sortOrder: initialData?.sortOrder ?? 0,
