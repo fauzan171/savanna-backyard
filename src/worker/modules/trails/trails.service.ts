@@ -1,5 +1,5 @@
 import { TrailsRepository } from './trails.repository';
-import { NotFoundError } from '@/worker/core/types/errors';
+import { NotFoundError, ConflictError } from '@/worker/core/types/errors';
 
 export class TrailsService {
 	constructor(private repo: TrailsRepository) {}
@@ -15,6 +15,11 @@ export class TrailsService {
 	}
 
 	async create(data: any) {
+		const existing = await this.repo.getById(data.id);
+		if (existing) {
+			throw new ConflictError('Trail ID sudah terdaftar');
+		}
+
 		const now = new Date().toISOString();
 		return this.repo.create({
 			...data,

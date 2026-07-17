@@ -7,6 +7,7 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useTrails, useToggleTrail, useCreateTrail } from '../hooks/useTrails';
 import { TrailForm } from '../components/TrailForm';
 import type { CreateTrailRequest } from '../api/trails';
+import { toast } from '@/react-app/hooks/useToast';
 
 const difficultyColor: Record<string, string> = {
 	Easy: 'bg-green-100 text-green-700',
@@ -23,9 +24,13 @@ export default function TrailsPage() {
 	const createMutation = useCreateTrail();
 
 	const handleCreate = async (data: CreateTrailRequest) => {
-		const result = await createMutation.mutateAsync(data);
-		setIsCreateOpen(false);
-		if (result.data?.id) navigate(`/trails/${result.data.id}`);
+		try {
+			const result = await createMutation.mutateAsync(data);
+			setIsCreateOpen(false);
+			if (result.data?.id) navigate(`/trails/${result.data.id}`);
+		} catch (error) {
+			toast({ variant: 'destructive', description: (error as Error).message });
+		}
 	};
 
 	return (
