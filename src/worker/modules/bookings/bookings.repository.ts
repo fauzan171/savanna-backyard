@@ -301,7 +301,7 @@ export class BookingsRepository {
 	): Promise<Booking[]> {
 		const conditions = [
 			eq(bookings.vehicleId, vehicleId),
-			inArray(bookings.status, ['Confirmed', 'Active']),
+			inArray(bookings.status, ['Pending', 'Confirmed', 'Active']),
 			// End date exclusive overlap: existing.start < new.end AND existing.end > new.start
 			lt(bookings.startDate, endDate),
 			gt(bookings.endDate, startDate),

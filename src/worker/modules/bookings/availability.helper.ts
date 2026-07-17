@@ -53,8 +53,9 @@ export async function findConflictingBookings(
 	endDate: string,
 	excludeBookingId?: string
 ): Promise<ConflictingBooking[]> {
-	// Only check against confirmed and active bookings
-	const conflictingStatuses: Booking['status'][] = ['Confirmed', 'Active'];
+	// Pending bookings also hold the slot (BK-05: two pending bookings for the same
+	// vehicle + overlapping dates must conflict).
+	const conflictingStatuses: Booking['status'][] = ['Pending', 'Confirmed', 'Active'];
 
 	const conditions = [
 		eq(bookings.vehicleId, vehicleId),
