@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/react-app/components
 import { useBooking } from '../hooks/useBookings';
 import { getAvailableActions, type CompleteRentalRequest } from '../types/booking.types';
 import { PenaltyPanel } from '../components/PenaltyPanel';
+import { EditBookingButton } from '../components/EditBookingDialog';
 import {
 	Dialog,
 	DialogContent,
@@ -80,6 +81,7 @@ export function BookingDetailPage() {
 				title={`Booking ${booking.bookingNumber}`}
 				actions={
 					<div className="flex gap-2">
+						<EditBookingButton booking={booking} />
 						{availableActions.map((action) => (
 							<ActionDialog
 								key={action.action}
