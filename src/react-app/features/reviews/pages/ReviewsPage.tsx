@@ -7,6 +7,7 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useReviews, useToggleReview, useCreateReview } from '../hooks/useReviews';
 import { ReviewForm } from '../components/ReviewForm';
 import type { CreateReviewRequest } from '../api/reviews';
+import { toast } from '@/react-app/hooks/useToast';
 
 export default function ReviewsPage() {
 	const navigate = useNavigate();
@@ -16,8 +17,12 @@ export default function ReviewsPage() {
 	const createMutation = useCreateReview();
 
 	const handleCreate = async (data: CreateReviewRequest) => {
-		await createMutation.mutateAsync(data);
-		setIsCreateOpen(false);
+		try {
+			await createMutation.mutateAsync(data);
+			setIsCreateOpen(false);
+		} catch (error) {
+			toast({ variant: 'destructive', description: (error as Error).message });
+		}
 	};
 
 	return (
