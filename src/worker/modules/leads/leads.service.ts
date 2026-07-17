@@ -188,6 +188,14 @@ export class LeadsService {
     return this.toResponse(lead);
   }
 
+  async delete(id: string): Promise<void> {
+    const existing = await this.leadRepo.findById(id);
+    if (!existing) {
+      throw new NotFoundError("Lead");
+    }
+    await this.leadRepo.delete(id);
+  }
+
   async assignToUser(id: string, userId: string | null): Promise<LeadResponse> {
     const existing = await this.leadRepo.findById(id);
     if (!existing) {

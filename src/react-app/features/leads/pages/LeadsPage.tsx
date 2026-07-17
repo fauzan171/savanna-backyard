@@ -9,19 +9,23 @@ import {
   DialogTitle,
 } from "@/react-app/components/ui/dialog";
 import { PageHeader } from "@/react-app/components/layout/page-header";
-import { useLeads, useCreateLead } from "../hooks/useLeads";
+import { useLeads, useCreateLead, useDeleteLead } from "../hooks/useLeads";
 import { LeadTable } from "../components/LeadTable";
 import { LeadForm } from "../components/LeadForm";
+import { ConfirmationDialog } from "@/react-app/components/ui/confirmation-dialog";
+import { toast } from "@/react-app/hooks/useToast";
 import type { Lead, LeadFormData } from "../types/lead.types";
 
 export default function LeadsPage() {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [convertLead, setConvertLead] = useState<Lead | null>(null);
+  const [deleteLead, setDeleteLead] = useState<Lead | null>(null);
 
   // Queries and mutations
   const { data, isLoading } = useLeads({ page: 1, limit: 25 });
   const createMutation = useCreateLead();
+  const deleteMutation = useDeleteLead();
 
   const handleCreate = async (formData: LeadFormData) => {
     try {
@@ -31,7 +35,22 @@ export default function LeadsPage() {
         navigate(`/leads/${result.data.id}`);
       }
     } catch (error) {
-      console.log(error);
+      toast({ variant: "destructive", description: (error as Error).message });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteLead) return;
+    try {
+      await deleteMutation.mutateAsync(deleteLead.id);
+      toast({ title: "Lead dihapus" });
+      setDeleteLead(null);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Gagal menghapus lead",
+        description: (error as Error).message,
+      });
     }
   };
 
@@ -61,6 +80,7 @@ export default function LeadsPage() {
         isLoading={isLoading}
         onConvert={handleConvert}
         onRowClick={handleRowClick}
+        onDelete={setDeleteLead}
       />
 
       {/* Create Dialog */}
@@ -99,6 +119,18 @@ export default function LeadsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Delete confirmation */}
+      <ConfirmationDialog
+        open={!!deleteLead}
+        onOpenChange={(open) => !open && setDeleteLead(null)}
+        title="Hapus Lead"
+        description={`Yakin hapus lead "${deleteLead?.name}"? Tindakan ini tidak dapat dibatalkan.`}
+        confirmLabel="Hapus"
+        variant="danger"
+        onConfirm={handleDelete}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }

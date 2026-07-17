@@ -19,6 +19,7 @@ describe('LeadsService', () => {
 			updateStatus: vi.fn(),
 			appendNote: vi.fn(),
 			getStats: vi.fn(),
+			delete: vi.fn(),
 		} as unknown as LeadsRepository;
 
 		leadsService = new LeadsService(mockLeadRepo);
@@ -861,6 +862,20 @@ describe('LeadsService', () => {
 			const result = await leadsService.checkExists('nonexistent-id');
 
 			expect(result).toBe(false);
+		});
+	});
+
+	describe('delete (LEAD-03)', () => {
+		it('deletes when lead exists', async () => {
+			vi.mocked(mockLeadRepo.findById).mockResolvedValue(createTestLead());
+			await leadsService.delete('l1');
+			expect(mockLeadRepo.delete).toHaveBeenCalledWith('l1');
+		});
+
+		it('throws NotFound when lead missing', async () => {
+			vi.mocked(mockLeadRepo.findById).mockResolvedValue(null);
+			await expect(leadsService.delete('missing')).rejects.toThrow();
+			expect(mockLeadRepo.delete).not.toHaveBeenCalled();
 		});
 	});
 });

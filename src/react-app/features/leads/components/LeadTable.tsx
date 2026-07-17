@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { MoreHorizontal, Eye, ArrowRight } from 'lucide-react';
+import { MoreHorizontal, Eye, ArrowRight, Trash2 } from 'lucide-react';
 import { DataTable } from '@/react-app/components/ui/table';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
@@ -19,6 +19,7 @@ interface LeadTableProps {
 	isLoading?: boolean;
 	onConvert?: (lead: Lead) => void;
 	onRowClick?: (lead: Lead) => void;
+	onDelete?: (lead: Lead) => void;
 }
 
 const statusConfig: Record<LeadStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
@@ -35,7 +36,7 @@ const priorityConfig: Record<LeadPriority, { color: string; label: string }> = {
 	Cold: { color: 'text-blue-500', label: 'Cold' },
 };
 
-export function LeadTable({ data, isLoading, onConvert, onRowClick }: LeadTableProps) {
+export function LeadTable({ data, isLoading, onConvert, onRowClick, onDelete }: LeadTableProps) {
 	const columns: ColumnDef<Lead>[] = useMemo(
 		() => [
 			{
@@ -129,12 +130,24 @@ export function LeadTable({ data, isLoading, onConvert, onRowClick }: LeadTableP
 									</DropdownMenuItem>
 								</>
 							)}
+							{onDelete && (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										className="text-destructive"
+										onClick={() => onDelete(row.original)}
+									>
+										<Trash2 className="mr-2 size-4" />
+										Delete
+									</DropdownMenuItem>
+								</>
+							)}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				),
 			},
 		],
-		[onConvert]
+		[onConvert, onDelete]
 	);
 
 	const renderCard = (lead: Lead) => (

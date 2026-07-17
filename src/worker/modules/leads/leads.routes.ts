@@ -81,6 +81,13 @@ const updateLeadHandler = async (c: Context<LeadsEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const deleteLeadHandler = async (c: Context<LeadsEnv>) => {
+	const service = c.get('leadsService');
+	const id = c.req.param('id');
+	await service.delete(id);
+	return c.json({ success: true, data: null });
+};
+
 const updateStatusHandler = async (c: Context<LeadsEnv>) => {
 	const service = c.get('leadsService');
 	const id = c.req.param('id');
@@ -131,6 +138,7 @@ export function createLeadsRouter(): Hono<LeadsEnv> {
 	router.get('/:id', getLeadByIdHandler);
 	router.post('/', validateBody(createLeadSchema), createLeadHandler);
 	router.patch('/:id', validateBody(updateLeadSchema), updateLeadHandler);
+	router.delete('/:id', deleteLeadHandler);
 	router.patch('/:id/status', validateBody(updateLeadStatusSchema), updateStatusHandler);
 	router.post('/:id/notes', validateBody(addNoteSchema), addNoteHandler);
 	router.post('/:id/assign', validateBody(assignLeadSchema), assignLeadHandler);
