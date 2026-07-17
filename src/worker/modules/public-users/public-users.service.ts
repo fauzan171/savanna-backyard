@@ -5,13 +5,17 @@ import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import { PaymentGatewayFactory } from '@/worker/core/services/payment-gateway/factory';
 import type { WhatsAppProvider } from '@/worker/core/services/providers';
 import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
-import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
+import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest, DevLoginRequest } from './public-users.dto';
 import type { PublicUser, Booking } from '@/worker/core/database/schema';
 
 const REF_EXPIRY_MIN = 5;
 const OTP_EXPIRY_MIN = 5;
 const MAX_INIT_PER_HOUR = 3;
 const MAX_OTP_ATTEMPTS = 5;
+// ponytail: fixed dev OTP for stub mode so the OTP flow is fully testable without
+// reading server logs. Only used when whatsapp provider = 'stub' (dev default).
+// Prod runs on Fonnte → random OTP via genOtp(). Remove when real WA is wired.
+const DEV_OTP = '123456';
 
 export interface PublicAccountInfo {
 	id: string;
@@ -89,6 +93,24 @@ async function sha256Hex(input: string): Promise<string> {
 	return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Deterministic, non-dialable phone sentinel for developer accounts.
+ * `public_users.phone` is NOT NULL + UNIQUE and is the login identity for real
+ * users; dev accounts have no phone, so we derive a stable 15-digit value from
+ * the email. The `000` prefix is a namespace no real E.164 number uses, keeping
+ * dev rows identifiable and collision-free with real users. Same email → same
+ * sentinel → same account on every login (idempotent, persisted in DB).
+ */
+async function devPhoneFor(email: string): Promise<string> {
+	const hex = await sha256Hex(email);
+	// Fold the full 256-bit hash into a base-10 number, take 12 digits, zero-pad.
+	let n = 0n;
+	for (let i = 0; i < hex.length; i++) {
+		n = (n * 16n + BigInt(parseInt(hex[i]!, 16))) % 10n ** 12n;
+	}
+	return '000' + n.toString().padStart(12, '0');
+}
+
 /** Extract the message text from a provider-specific inbound payload. */
 function extractText(body: unknown): string | null {
 	if (!body || typeof body !== 'object') return null;
@@ -123,6 +145,7 @@ export class PublicUsersService {
 		refCode: string;
 		waMeUrl: string;
 		expiresAt: string;
+		devOtp?: string;
 	}> {
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 		const recent = await this.repo.countRecentVerificationByPhone(data.phone, oneHourAgo);
@@ -149,18 +172,21 @@ export class PublicUsersService {
 
 		// In stub/dev mode, simulate the inbound step so OTP generation still happens
 		// without a real WhatsApp round-trip (keeps the flow testable end-to-end).
+		// Surface the dev OTP so the client can auto-verify without server logs.
+		let devOtp: string | undefined;
 		if (this.whatsapp.name === 'stub') {
-			await this.handleWhatsappInbound({ message: `Ref: ${refCode}` });
+			const simulated = await this.handleWhatsappInbound({ message: `Ref: ${refCode}` });
+			devOtp = simulated.otp;
 		}
 
-		return { refCode, waMeUrl, expiresAt };
+		return { refCode, waMeUrl, expiresAt, devOtp };
 	}
 
 	/**
 	 * Inbound WhatsApp handler: parse the ref code, generate an OTP, store its hash,
 	 * and reply the OTP via WhatsApp. Invoked by the /webhooks/whatsapp route.
 	 */
-	async handleWhatsappInbound(body: unknown): Promise<{ handled: boolean }> {
+	async handleWhatsappInbound(body: unknown): Promise<{ handled: boolean; otp?: string }> {
 		const text = extractText(body);
 		if (!text) return { handled: false };
 		const ref = extractRefCode(text);
@@ -169,7 +195,8 @@ export class PublicUsersService {
 		const code = await this.repo.findActiveVerificationByRef(ref);
 		if (!code || !code.phone) return { handled: false };
 
-		const otp = genOtp();
+		const isStub = this.whatsapp.name === 'stub';
+		const otp = isStub ? DEV_OTP : genOtp();
 		const otpHash = await sha256Hex(otp);
 		const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 		await this.repo.updateVerification(code.id, { otpHash, expiresAt: otpExpiresAt });
@@ -181,7 +208,8 @@ export class PublicUsersService {
 		if (!result.success) {
 			console.error('[phone-otp] WhatsApp send failed:', result.error);
 		}
-		return { handled: true };
+		// Only surface the plaintext OTP in stub mode (dev). Real provider sends via WA.
+		return { handled: true, otp: isStub ? otp : undefined };
 	}
 
 	/**
@@ -218,6 +246,43 @@ export class PublicUsersService {
 				phone: data.phone,
 				name: null,
 				email: null,
+				phoneVerified: true,
+				deviceFingerprint: null,
+				avatarUrl: null,
+				isActive: true,
+			});
+		} else if (!user.phoneVerified) {
+			user = await this.repo.update(user.id, { phoneVerified: true });
+		}
+
+		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
+		return { user: toAccountInfo(user), token };
+	}
+
+	/**
+	 * Developer login by email (no OTP). Gated by an allowlist passed from the
+	 * route (sourced from DEVELOPER_ALLOWLIST env). Find-or-creates the account
+	 * keyed by email, using a deterministic sentinel phone to satisfy the
+	 * NOT NULL + UNIQUE phone constraint. Issues the same public-user JWT as the
+	 * OTP flow, so every downstream path (middleware, /me, bookings) works unchanged.
+	 */
+	async devLogin(data: DevLoginRequest, allowlist: string[]): Promise<{
+		user: PublicAccountInfo;
+		token: string;
+	}> {
+		const email = data.email.trim().toLowerCase();
+		// ponytail: fail-closed allowlist; empty/missing allowlist = no dev login at all.
+		if (!allowlist.includes(email)) {
+			throw new ValidationError('Email tidak terdaftar untuk login developer.');
+		}
+
+		let user = await this.repo.findByEmail(email);
+		if (!user) {
+			const phone = await devPhoneFor(email);
+			user = await this.repo.create({
+				phone,
+				name: email.split('@')[0] || 'Developer',
+				email,
 				phoneVerified: true,
 				deviceFingerprint: null,
 				avatarUrl: null,

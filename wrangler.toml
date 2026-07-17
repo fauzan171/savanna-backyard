@@ -42,6 +42,11 @@ PAYMENT_GATEWAY_VENDOR = "xendit"
 EMAIL_FROM = "Savanna Bromo <noreply@savannabromo.com>"
 # RESEND_API_KEY - set via: npx wrangler secret put RESEND_API_KEY
 
+# Developer email login allowlist (comma-separated). Enables POST /public/auth/dev/login
+# without OTP. Prod stays disabled when unset; to enable, set via:
+#   npx wrangler secret put DEVELOPER_ALLOWLIST   (e.g. dev@savanna.com,admin@savanna.com)
+# Locally (.dev.vars) defaults to dev@savanna.com when ENVIRONMENT != production.
+
 # R2 Storage for file uploads
 [[r2_buckets]]
 binding = "UPLOADS"

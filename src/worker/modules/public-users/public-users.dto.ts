@@ -20,6 +20,12 @@ export const updateProfileSchema = z.object({
 });
 export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
 
+// Developer email login — gated by DEVELOPER_ALLOWLIST env, no OTP. For internal/dev access only.
+export const devLoginSchema = z.object({
+	email: z.string().email('Valid email is required'),
+});
+export type DevLoginRequest = z.infer<typeof devLoginSchema>;
+
 // Confirm pickup by scanning the vehicle QR code (customer-side)
 export const confirmPickupSchema = z.object({
 	qrCode: z.string().min(1, 'QR code is required'),

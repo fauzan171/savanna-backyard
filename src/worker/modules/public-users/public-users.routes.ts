@@ -15,10 +15,12 @@ import {
 	phoneVerifySchema,
 	updateProfileSchema,
 	confirmPickupSchema,
+	devLoginSchema,
 	type PhoneInitRequest,
 	type PhoneVerifyRequest,
 	type UpdateProfileRequest,
 	type ConfirmPickupRequest,
+	type DevLoginRequest,
 } from './public-users.dto';
 
 type PublicUsersVariables = {
@@ -82,6 +84,30 @@ const phoneVerifyHandler = async (c: Context<PublicUsersEnv>) => {
 	return c.json({ success: true, message: 'Logged in', data: { user: result.user } });
 };
 
+/**
+ * Developer email login. Allowlist comes from DEVELOPER_ALLOWLIST env (comma-separated).
+ * ponytail: in dev (ENVIRONMENT !== production) with no allowlist configured, fall back
+ * to a single dev@savanna.com entry so local/staging works out of the box. Prod with no
+ * env = fully disabled (fail-closed in the service).
+ */
+function resolveDevAllowlist(env: Env): string[] {
+	const raw = env.DEVELOPER_ALLOWLIST?.trim();
+	if (raw) {
+		return raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+	}
+	return env.ENVIRONMENT === 'production' ? [] : ['dev@savanna.com'];
+}
+
+const devLoginHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const body = getValidatedBody<DevLoginRequest>(c);
+	const allowlist = resolveDevAllowlist(c.env);
+	const result = await service.devLogin(body, allowlist);
+	console.log(`[dev-login] developer login: ${body.email}`);
+	setPublicUserCookie(c, result.token);
+	return c.json({ success: true, message: 'Logged in', data: { user: result.user } });
+};
+
 // ---- Account (cookie-authenticated) ----
 const meHandler = async (c: Context<PublicUsersEnv>) => {
 	const pu = c.get('publicUser');
@@ -140,6 +166,7 @@ export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	// Login (no cookie yet)
 	router.post('/phone/init', validateBody(phoneInitSchema), phoneInitHandler);
 	router.post('/phone/verify', validateBody(phoneVerifySchema), phoneVerifyHandler);
+	router.post('/dev/login', validateBody(devLoginSchema), devLoginHandler);
 
 	// /me: graceful fallback — returns null when no valid public-user token
 	// (guests, or admin cookies that are ignored by optionalPublicUserAuth)

@@ -26,6 +26,11 @@ export class PublicUsersRepository {
 		return u ?? null;
 	}
 
+	async findByEmail(email: string): Promise<PublicUser | null> {
+		const [u] = await this.db.select().from(publicUsers).where(eq(publicUsers.email, email)).limit(1);
+		return u ?? null;
+	}
+
 	async create(data: Omit<NewPublicUser, 'id' | 'createdAt' | 'updatedAt'>): Promise<PublicUser> {
 		const id = crypto.randomUUID();
 		const now = new Date().toISOString();

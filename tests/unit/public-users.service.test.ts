@@ -41,6 +41,7 @@ describe('PublicUsersService (phone-only login)', () => {
 	beforeEach(() => {
 		repo = {
 			findByPhone: vi.fn(),
+			findByEmail: vi.fn(),
 			findById: vi.fn(),
 			create: vi.fn(),
 			update: vi.fn(),
@@ -163,6 +164,60 @@ describe('PublicUsersService (phone-only login)', () => {
 			const res = await service.updateProfile('user-1', { name: 'Budi' });
 			expect(repo.update).toHaveBeenCalledWith('user-1', { name: 'Budi' });
 			expect(res.name).toBe('Budi');
+		});
+	});
+
+	describe('devLogin (email allowlist)', () => {
+		it('[P0] should reject emails not in the allowlist (fail-closed)', async () => {
+			await expect(service.devLogin({ email: 'intruder@evil.com' }, ['dev@savanna.com'])).rejects.toThrow(ValidationError);
+			expect(repo.findByEmail).not.toHaveBeenCalled();
+			expect(repo.create).not.toHaveBeenCalled();
+		});
+
+		it('[P0] should reject everything when allowlist is empty', async () => {
+			await expect(service.devLogin({ email: 'dev@savanna.com' }, [])).rejects.toThrow(ValidationError);
+		});
+
+		it('[P0] should find-or-create a dev account with a stable sentinel phone and mint a JWT', async () => {
+			vi.mocked(repo.findByEmail).mockResolvedValue(null);
+			vi.mocked(repo.create).mockImplementation(async (data) => makeUser({ ...data, id: 'dev-user-id' }) as PublicUser);
+
+			const result = await service.devLogin({ email: 'Dev@Savanna.com' }, ['dev@savanna.com']);
+
+			// email normalized to lowercase before allowlist check + storage
+			expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({
+				email: 'dev@savanna.com',
+				phone: expect.stringMatching(/^000\d{12}$/),
+				phoneVerified: true,
+				isActive: true,
+			}));
+			expect(result.token).toBe('jwt-token');
+			expect(jwt.sign).toHaveBeenCalledWith({ userId: 'dev-user-id', type: 'public' });
+		});
+
+		it('[P0] should reuse an existing dev account (same email → same account, no re-create)', async () => {
+			vi.mocked(repo.findByEmail).mockResolvedValue(makeUser({ id: 'dev-1', email: 'dev@savanna.com' }));
+
+			await service.devLogin({ email: 'dev@savanna.com' }, ['dev@savanna.com']);
+
+			expect(repo.create).not.toHaveBeenCalled();
+			expect(jwt.sign).toHaveBeenCalledWith({ userId: 'dev-1', type: 'public' });
+		});
+
+		it('[P0] should produce the same sentinel phone for the same email across calls (deterministic)', async () => {
+			vi.mocked(repo.findByEmail).mockResolvedValue(null);
+			let captured = '';
+			vi.mocked(repo.create).mockImplementation(async (data) => {
+				captured = data.phone!;
+				return makeUser({ ...data }) as PublicUser;
+			});
+			await service.devLogin({ email: 'dev@savanna.com' }, ['dev@savanna.com']);
+			const first = captured;
+
+			vi.mocked(repo.findByEmail).mockResolvedValue(null);
+			await service.devLogin({ email: 'dev@savanna.com' }, ['dev@savanna.com']);
+			expect(captured).toBe(first);
+			expect(first).toMatch(/^000\d{12}$/);
 		});
 	});
 
