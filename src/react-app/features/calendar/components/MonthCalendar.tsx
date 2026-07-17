@@ -197,7 +197,7 @@ export function MonthCalendar({ data }: { data: CalendarMatrixResult }) {
 	const ROW_MIN_H = DATE_HEADER_H + MAX_LANES * LANE_H + 12;
 
 	return (
-		<div className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
+		<div className="relative flex h-full flex-col overflow-hidden rounded-lg border border-border bg-background shadow-sm">
 			{/* Weekday header */}
 			<div className="grid grid-cols-7 border-b border-border">
 				{WEEKDAYS.map((day) => (
