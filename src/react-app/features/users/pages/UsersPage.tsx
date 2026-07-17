@@ -6,16 +6,27 @@ import { Input } from '@/react-app/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useUsers, useCreateUser, useToggleUser } from '../hooks/useUsers';
+import { toast } from '@/react-app/hooks/useToast';
 import type { CreateUserRequest } from '../api/users';
 
 function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
 	const createMutation = useCreateUser();
-	const { register, handleSubmit, reset } = useForm<CreateUserRequest>();
+	const {
+		register,
+		handleSubmit,
+		reset,
+		formState: { errors },
+	} = useForm<CreateUserRequest>();
 
 	const onSubmit = async (data: CreateUserRequest) => {
-		await createMutation.mutateAsync(data);
-		reset();
-		onOpenChange(false);
+		try {
+			await createMutation.mutateAsync(data);
+			reset();
+			onOpenChange(false);
+			toast({ title: 'User dibuat' });
+		} catch (error) {
+			toast({ variant: 'destructive', title: 'Gagal membuat user', description: (error as Error).message });
+		}
 	};
 
 	return (
@@ -23,10 +34,34 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 			<DialogContent>
 				<DialogHeader><DialogTitle>Create Staff User</DialogTitle></DialogHeader>
 				<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-					<div><label className="text-sm font-medium">Name</label><Input {...register('name', { required: true })} /></div>
-					<div><label className="text-sm font-medium">Email</label><Input type="email" {...register('email', { required: true })} /></div>
-					<div><label className="text-sm font-medium">Password</label><Input type="password" {...register('password', { required: true, minLength: 8 })} /></div>
-					<div><label className="text-sm font-medium">Role</label>
+					<div className="space-y-1">
+						<label className="text-sm font-medium">Name</label>
+						<Input {...register('name', { required: 'Name is required', minLength: { value: 2, message: 'Min 2 characters' } })} />
+						{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+					</div>
+					<div className="space-y-1">
+						<label className="text-sm font-medium">Email</label>
+						<Input type="email" {...register('email', { required: 'Email is required', pattern: { value: /^\S+@\S+\.\S+$/, message: 'Invalid email' } })} />
+						{errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+					</div>
+					<div className="space-y-1">
+						<label className="text-sm font-medium">Password</label>
+						<Input
+							type="password"
+							{...register('password', {
+								required: 'Password is required',
+								minLength: { value: 8, message: 'Min 8 characters' },
+								validate: {
+									hasLetter: (v) => /[A-Za-z]/.test(v) || 'Must contain a letter',
+									hasNumber: (v) => /[0-9]/.test(v) || 'Must contain a number',
+								},
+							})}
+						/>
+						{errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+						<p className="text-xs text-muted-foreground">Min 8 karakter, huruf & angka.</p>
+					</div>
+					<div className="space-y-1">
+						<label className="text-sm font-medium">Role</label>
 						<select {...register('role')} className="w-full border rounded-md px-3 py-2 text-sm">
 							<option value="STAFF">Staff</option>
 							<option value="SUPER_ADMIN">Super Admin</option>
