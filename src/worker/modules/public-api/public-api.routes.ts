@@ -9,12 +9,10 @@ import { publicApiRateLimit } from '@/worker/core/middleware/rate-limit';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import { cors } from 'hono/cors';
 import {
-	submitLeadSchema,
 	checkAvailabilityQuerySchema,
 	getVehicleTypesQuerySchema,
 	createPublicBookingSchema,
 	getPublicReviewsQuerySchema,
-	type SubmitLeadRequest,
 	type CheckAvailabilityQuery,
 	type CreatePublicBookingRequest,
 	type GetPublicReviewsQuery,
@@ -37,13 +35,6 @@ export const publicApiServicesMiddleware = () => async (c: Context<PublicApiEnv>
 };
 
 // Route handlers
-const submitLeadHandler = async (c: Context<PublicApiEnv>) => {
-	const service = c.get('publicApiService');
-	const body = getValidatedBody<SubmitLeadRequest>(c);
-	const result = await service.submitLead(body);
-	return c.json({ success: true, message: 'Lead submitted successfully', data: result }, 201);
-};
-
 const checkAvailabilityHandler = async (c: Context<PublicApiEnv>) => {
 	const service = c.get('publicApiService');
 	const query = getValidatedQuery<CheckAvailabilityQuery>(c);
@@ -156,7 +147,6 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	router.use('*', apiKeyMiddleware());
 
 	// Existing routes
-	router.post('/leads', validateBody(submitLeadSchema), submitLeadHandler);
 	router.get('/availability', validateQuery(checkAvailabilityQuerySchema), checkAvailabilityHandler);
 	router.get('/vehicle-types', validateQuery(getVehicleTypesQuerySchema), getVehicleTypesHandler);
 	router.get('/vehicles/by-code/:code', getVehicleByCodeHandler);

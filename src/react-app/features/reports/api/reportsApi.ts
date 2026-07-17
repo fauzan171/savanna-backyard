@@ -5,7 +5,6 @@ import type {
 	DateRangeParams,
 	RevenueReport,
 	FleetUtilizationReport,
-	LeadSourceReport,
 	PaymentReport,
 	CustomerReport,
 } from '../types/reports.types';
@@ -25,15 +24,6 @@ export const reportsApi = {
 	getFleetUtilization: (params?: ReportQueryParams) =>
 		api.get<ApiSuccessResponse<FleetUtilizationReport>>(
 			`${BASE_PATH}/fleet-utilization`,
-			params as Record<string, string>
-		),
-
-	/**
-	 * Get lead source report
-	 */
-	getLeadSources: (params?: DateRangeParams) =>
-		api.get<ApiSuccessResponse<LeadSourceReport>>(
-			`${BASE_PATH}/lead-sources`,
 			params as Record<string, string>
 		),
 

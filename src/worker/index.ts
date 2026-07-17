@@ -4,7 +4,6 @@ import { errorHandler, handleError } from './core/middleware/error-handler';
 import { createAuthRouter } from './modules/auth/auth.routes';
 import { createCustomersRouter } from './modules/customers/customers.routes';
 import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
-import { createLeadsRouter } from './modules/leads/leads.routes';
 import { createPaymentsRouter } from './modules/payments/payments.routes';
 import { createBookingsRouter } from './modules/bookings/bookings.routes';
 import { createMaintenanceRouter } from './modules/maintenance/maintenance.routes';
@@ -88,9 +87,6 @@ v1Routes.route('/customers', createCustomersRouter() as unknown as Hono<{ Bindin
 
 // Vehicle management routes
 v1Routes.route('/vehicles', createVehiclesRouter() as unknown as Hono<{ Bindings: Env }>);
-
-// Leads management routes
-v1Routes.route('/leads', createLeadsRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Bookings management routes
 v1Routes.route('/bookings', createBookingsRouter() as unknown as Hono<{ Bindings: Env }>);

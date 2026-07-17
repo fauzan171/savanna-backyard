@@ -5,7 +5,6 @@ import {
 } from 'react-router-dom';
 import {
 	LayoutDashboard,
-	Users,
 	FileText,
 	CreditCard,
 	Bike,
@@ -75,12 +74,6 @@ const defaultNavItems: NavItem[] = [
 		label: 'Dashboard',
 		href: '/',
 		icon: <LayoutDashboard className="size-5" />,
-	},
-	{
-		label: 'Leads',
-		href: '/leads',
-		icon: <Users className="size-5" />,
-		badge: 'New',
 	},
 	{
 		label: 'Bookings',

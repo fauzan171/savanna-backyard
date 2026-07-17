@@ -6,7 +6,6 @@ import type {
 	DateRangeParams,
 	RevenueReport,
 	FleetUtilizationReport,
-	LeadSourceReport,
 	PaymentReport,
 	CustomerReport,
 } from '../types/reports.types';
@@ -16,7 +15,6 @@ export const reportsKeys = {
 	all: ['reports'] as const,
 	revenue: (params?: ReportQueryParams) => [...reportsKeys.all, 'revenue', params] as string[],
 	fleetUtilization: (params?: ReportQueryParams) => [...reportsKeys.all, 'fleet', params] as string[],
-	leadSources: (params?: DateRangeParams) => [...reportsKeys.all, 'leads', params] as string[],
 	payments: (params?: DateRangeParams) => [...reportsKeys.all, 'payments', params] as string[],
 	customers: (params?: DateRangeParams) => [...reportsKeys.all, 'customers', params] as string[],
 };
@@ -63,30 +61,6 @@ export function useFleetUtilizationReport(params?: ReportQueryParams) {
 				...report,
 				byVehicle: report.byVehicle ?? [],
 				byType: report.byType ?? [],
-				trend: report.trend ?? [],
-			};
-		},
-	});
-}
-
-/**
- * Hook for lead source report
- */
-export function useLeadSourceReport(params?: DateRangeParams) {
-	return useQuery({
-		queryKey: reportsKeys.leadSources(params),
-		queryFn: () =>
-			api.get<ApiSuccessResponse<LeadSourceReport>>(
-				'/v1/reports/lead-sources',
-				params as Record<string, string>
-			),
-		select: (data) => {
-			const report = data.data;
-			if (!report) return report;
-			return {
-				...report,
-				bySource: report.bySource ?? [],
-				byStatus: report.byStatus ?? [],
 				trend: report.trend ?? [],
 			};
 		},

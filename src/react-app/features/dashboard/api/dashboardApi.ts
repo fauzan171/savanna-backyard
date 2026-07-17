@@ -3,7 +3,6 @@ import type { ApiSuccessResponse } from '@/react-app/features/shared/types/api.t
 import type {
 	DashboardOverview,
 	RevenueStats,
-	LeadStats,
 	FleetStats,
 	PaymentStats,
 	ActivitiesResult,
@@ -24,12 +23,6 @@ export const dashboardApi = {
 	 */
 	getRevenue: (params?: DashboardQueryParams) =>
 		api.get<ApiSuccessResponse<RevenueStats>>(`${BASE_PATH}/revenue`, params as Record<string, string>),
-
-	/**
-	 * Get lead statistics
-	 */
-	getLeads: (params?: DashboardQueryParams) =>
-		api.get<ApiSuccessResponse<LeadStats>>(`${BASE_PATH}/leads`, params as Record<string, string>),
 
 	/**
 	 * Get fleet statistics

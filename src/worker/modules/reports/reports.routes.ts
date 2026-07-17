@@ -44,17 +44,6 @@ const fleetUtilizationColumns = [
 	{ header: 'Revenue (IDR)', key: 'revenue' as const },
 ];
 
-const leadSourceColumns = [
-	{ header: 'Source', key: 'source' as const },
-	{ header: 'Total Leads', key: 'total' as const },
-	{ header: 'Converted', key: 'converted' as const },
-	{ header: 'Lost', key: 'lost' as const },
-	{ header: 'In Progress', key: 'inProgress' as const },
-	{ header: 'Conversion Rate (%)', key: 'conversionRate' as const },
-	{ header: 'Avg Days to Convert', key: 'avgDaysToConvert' as const },
-	{ header: 'Revenue (IDR)', key: 'revenue' as const },
-];
-
 const paymentReportColumns = [
 	{ header: 'Method', key: 'method' as const },
 	{ header: 'Total Amount (IDR)', key: 'total' as const },
@@ -122,29 +111,6 @@ const fleetUtilizationReportHandler = async (c: any) => {
 };
 
 /**
- * GET /api/v1/reports/lead-sources
- * Generate lead source analysis report
- */
-const leadSourcesReportHandler = async (c: any) => {
-	const service = c.get('statisticsService') as StatisticsService;
-	const query = c.req.query();
-	const format = query.format ?? 'json';
-
-	const report = await service.getLeadSourceReport({
-		startDate: query.startDate,
-		endDate: query.endDate,
-	});
-
-	if (format === 'csv') {
-		const csv = generateCsv(report.bySource, leadSourceColumns);
-		const filename = generateCsvFilename('lead-sources-report', query.startDate, query.endDate);
-		return c.text(csv, 200, getCsvResponseHeaders(filename));
-	}
-
-	return c.json({ success: true, data: report });
-};
-
-/**
  * GET /api/v1/reports/payments
  * Generate payment report
  */
@@ -202,7 +168,6 @@ export function createReportsRouter(): Hono<ReportsEnv> {
 	// Report endpoints
 	router.get('/revenue', revenueReportHandler);
 	router.get('/fleet-utilization', fleetUtilizationReportHandler);
-	router.get('/lead-sources', leadSourcesReportHandler);
 	router.get('/payments', paymentsReportHandler);
 	router.get('/customers', customersReportHandler);
 

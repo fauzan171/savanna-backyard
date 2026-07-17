@@ -33,12 +33,6 @@ export interface DashboardOverview {
 			direction: 'up' | 'down' | 'neutral';
 		};
 	};
-	leads: {
-		new: number;
-		converted: number;
-		conversionRate: number;
-		followUpsDue: number;
-	};
 	fleet: {
 		total: number;
 		available: number;
@@ -77,28 +71,6 @@ export interface RevenueStats {
 		revenue: number;
 		percentage: number;
 	}>;
-}
-
-export interface LeadStats {
-	period: {
-		start: string;
-		end: string;
-	};
-	summary: {
-		total: number;
-		converted: number;
-		lost: number;
-		inProgress: number;
-		conversionRate: number;
-	};
-	byStatus: Record<string, number>;
-	bySource: Array<{
-		source: string;
-		count: number;
-		converted: number;
-		conversionRate: number;
-	}>;
-	byPriority: Record<string, number>;
 }
 
 export interface FleetStats {
@@ -177,13 +149,6 @@ export interface ActivitiesResult {
 		expectedTime: string;
 		isLate: boolean;
 	}>;
-	followUpReminders: Array<{
-		leadId: string;
-		customerName: string;
-		phone: string;
-		priority: string;
-		daysOverdue: number;
-	}>;
 	pendingPayments: Array<{
 		paymentId: string;
 		bookingNumber: string;
@@ -261,39 +226,6 @@ export interface FleetUtilizationReport {
 		vehicleName: string;
 		utilizationRate: number;
 		revenue: number;
-	}>;
-}
-
-export interface LeadSourceReport {
-	reportInfo: ReportInfo;
-	summary: {
-		totalLeads: number;
-		converted: number;
-		lost: number;
-		inProgress: number;
-		overallConversionRate: number;
-	};
-	bySource: Array<{
-		source: string;
-		total: number;
-		converted: number;
-		lost: number;
-		inProgress: number;
-		conversionRate: number;
-		avgDaysToConvert: number;
-		revenue: number;
-	}>;
-	byPriority: Array<{
-		priority: string;
-		total: number;
-		converted: number;
-		conversionRate: number;
-	}>;
-	trend: Array<{
-		week: string;
-		newLeads: number;
-		converted: number;
-		conversionRate: number;
 	}>;
 }
 

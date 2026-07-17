@@ -8,14 +8,12 @@ import type {
 	PeriodFilter,
 	DashboardOverview,
 	RevenueStats,
-	LeadStats,
 	FleetStats,
 	PaymentStats,
 	ActivitiesResult,
 	ReportInfo,
 	RevenueReport,
 	FleetUtilizationReport,
-	LeadSourceReport,
 	PaymentReport,
 	CustomerReport,
 } from './statistics.types';
@@ -84,17 +82,15 @@ export class StatisticsService {
 	async getOverview(query: PeriodFilter): Promise<DashboardOverview> {
 		const { startDate, endDate } = this.getDateRangeFromPeriod(query.period ?? 'today');
 
-		const [totalRevenue, bookingCounts, leadCounts, vehicleCounts, paymentAmounts, activeBookings, todayPickups, todayReturns, followUpReminders] =
+		const [totalRevenue, bookingCounts, vehicleCounts, paymentAmounts, activeBookings, todayPickups, todayReturns] =
 			await Promise.all([
 				this.repo.getTotalRevenue(startDate, endDate),
 				this.repo.getBookingCountsByStatus(startDate, endDate),
-				this.repo.getLeadCountsByStatus(startDate, endDate),
 				this.repo.getVehicleCountsByStatus(),
 				this.repo.getPaymentAmountsByStatus(startDate, endDate),
 				this.repo.getActiveBookingsCount(),
 				this.repo.getTodayPickups(),
 				this.repo.getTodayReturns(),
-				this.repo.getFollowUpReminders(),
 			]);
 
 		return {
@@ -107,12 +103,6 @@ export class StatisticsService {
 					value: null, // Deferred
 					direction: 'neutral',
 				},
-			},
-			leads: {
-				new: leadCounts.byStatus['New'] ?? 0,
-				converted: leadCounts.converted,
-				conversionRate: leadCounts.total > 0 ? Math.round((leadCounts.converted / leadCounts.total) * 100) : 0,
-				followUpsDue: followUpReminders.length,
 			},
 			fleet: {
 				total: vehicleCounts.total,
@@ -160,39 +150,6 @@ export class StatisticsService {
 			},
 			breakdown,
 			byVehicleType,
-		};
-	}
-
-	/**
-	 * Get lead statistics
-	 */
-	async getLeadStats(query: DateRangeQuery): Promise<LeadStats> {
-		const startDate = query.startDate;
-		const endDate = query.endDate;
-
-		const [leadCounts, bySource, byPriority] = await Promise.all([
-			this.repo.getLeadCountsByStatus(startDate, endDate),
-			this.repo.getLeadsBySource(startDate, endDate),
-			this.repo.getLeadsByPriority(startDate, endDate),
-		]);
-
-		const inProgress = (leadCounts.byStatus['New'] ?? 0) + (leadCounts.byStatus['Contacted'] ?? 0) + (leadCounts.byStatus['Negotiating'] ?? 0);
-
-		return {
-			period: {
-				start: startDate ?? 'all',
-				end: endDate ?? 'now',
-			},
-			summary: {
-				total: leadCounts.total,
-				converted: leadCounts.converted,
-				lost: leadCounts.byStatus['Lost'] ?? 0,
-				inProgress,
-				conversionRate: leadCounts.total > 0 ? Math.round((leadCounts.converted / leadCounts.total) * 100) : 0,
-			},
-			byStatus: leadCounts.byStatus,
-			bySource,
-			byPriority,
 		};
 	}
 
@@ -298,10 +255,9 @@ export class StatisticsService {
 	async getActivities(): Promise<ActivitiesResult> {
 		const today = new Date().toISOString().split('T')[0];
 
-		const [todayPickups, todayReturns, followUpReminders, overduePayments] = await Promise.all([
+		const [todayPickups, todayReturns, overduePayments] = await Promise.all([
 			this.repo.getTodayPickups(),
 			this.repo.getTodayReturns(),
-			this.repo.getFollowUpReminders(),
 			this.repo.getOverduePayments(),
 		]);
 
@@ -322,15 +278,6 @@ export class StatisticsService {
 				vehicleName: r.vehicleName,
 				expectedTime: '17:00', // Default return time
 				isLate: false, // Will be determined by actual return time
-			})),
-			followUpReminders: followUpReminders.map((r) => ({
-				leadId: r.leadId,
-				customerName: r.customerName,
-				phone: r.phone,
-				priority: r.priority,
-				daysOverdue: r.followUpDate
-					? Math.floor((Date.now() - new Date(r.followUpDate).getTime()) / (1000 * 60 * 60 * 24))
-					: 0,
 			})),
 			pendingPayments: overduePayments.slice(0, 10).map((p) => ({
 				paymentId: p.id,
@@ -431,62 +378,6 @@ export class StatisticsService {
 				utilizationRate: v.utilizationRate,
 				revenue: v.revenue,
 			})),
-		};
-	}
-
-	/**
-	 * Get lead source report
-	 */
-	async getLeadSourceReport(query: DateRangeQuery): Promise<LeadSourceReport> {
-		const startDate = query.startDate ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-		const endDate = query.endDate ?? new Date().toISOString().split('T')[0];
-
-		const [leadCounts, bySource, bySourceDetailed, byPriorityDetailed, revenueBySource, trend] = await Promise.all([
-			this.repo.getLeadCountsByStatus(startDate, endDate),
-			this.repo.getLeadsBySource(startDate, endDate),
-			this.repo.getLeadsBySourceDetailed(startDate, endDate),
-			this.repo.getLeadsByPriorityDetailed(startDate, endDate),
-			this.repo.getRevenueByLeadSource(startDate, endDate),
-			this.repo.getLeadWeeklyTrend(startDate, endDate),
-		]);
-
-		const inProgress = (leadCounts.byStatus['New'] ?? 0) + (leadCounts.byStatus['Contacted'] ?? 0) + (leadCounts.byStatus['Negotiating'] ?? 0);
-
-		// Build a lookup from the detailed source data
-		const sourceDetailMap = new Map(bySourceDetailed.map(s => [s.source, s]));
-
-		// Extend bySource with additional fields from detailed data
-		const bySourceExtended = bySource.map((s) => {
-			const detail = sourceDetailMap.get(s.source);
-			return {
-				source: s.source,
-				total: s.count,
-				converted: s.converted,
-				lost: detail?.lost ?? 0,
-				inProgress: detail?.inProgress ?? 0,
-				conversionRate: s.conversionRate,
-				avgDaysToConvert: 0, // Deferred - requires converted_at timestamp analysis
-				revenue: revenueBySource[s.source] ?? 0,
-			};
-		});
-
-		return {
-			reportInfo: this.getReportInfo('Lead Source Analysis Report', startDate, endDate),
-			summary: {
-				totalLeads: leadCounts.total,
-				converted: leadCounts.converted,
-				lost: leadCounts.byStatus['Lost'] ?? 0,
-				inProgress,
-				overallConversionRate: leadCounts.total > 0 ? Math.round((leadCounts.converted / leadCounts.total) * 10000) / 100 : 0,
-			},
-			bySource: bySourceExtended,
-			byPriority: byPriorityDetailed.map(p => ({
-				priority: p.priority,
-				total: p.total,
-				converted: p.converted,
-				conversionRate: p.conversionRate,
-			})),
-			trend,
 		};
 	}
 

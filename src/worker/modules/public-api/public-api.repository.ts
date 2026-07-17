@@ -1,17 +1,9 @@
 import { eq, and, or, gte, lte, like, sql, asc, inArray } from 'drizzle-orm';
-import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
+import { vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Vehicle, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
 export class PublicApiRepository {
 	constructor(private db: Database) {}
-
-	// Lead operations
-	async createLead(data: Omit<NewLead, 'id'>): Promise<Lead> {
-		const id = crypto.randomUUID();
-		await this.db.insert(leads).values({ id, ...data });
-		const lead = await this.db.select().from(leads).where(eq(leads.id, id)).limit(1);
-		return lead[0]!;
-	}
 
 	// Vehicle operations
 	async getAvailableVehicles(type?: string): Promise<Vehicle[]> {

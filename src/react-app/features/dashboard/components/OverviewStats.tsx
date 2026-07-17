@@ -1,4 +1,4 @@
-import { Users, Car, FileText, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, Car, DollarSign, TrendingUp } from 'lucide-react';
 import { StatCard } from '@/react-app/components/ui/stat-card';
 import type { DashboardOverview } from '../types/dashboard.types';
 
@@ -24,12 +24,6 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 	};
 
 	const stats = [
-		{
-			title: 'Total Leads',
-			value: data?.leads?.new ?? 0,
-			icon: <FileText className="h-4 w-4" />,
-			description: `${data?.leads?.converted ?? 0} converted this period`,
-		},
 		{
 			title: 'Active Bookings',
 			value: data?.activeBookings ?? 0,

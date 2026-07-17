@@ -4,7 +4,6 @@ import type { ApiSuccessResponse } from '@/react-app/features/shared/types/api.t
 import type {
 	DashboardOverview,
 	RevenueStats,
-	LeadStats,
 	FleetStats,
 	PaymentStats,
 	ActivitiesResult,
@@ -16,7 +15,6 @@ export const dashboardKeys = {
 	all: ['dashboard'] as const,
 	overview: (params?: DashboardQueryParams) => [...dashboardKeys.all, 'overview', params] as string[],
 	revenue: (params?: DashboardQueryParams) => [...dashboardKeys.all, 'revenue', params] as string[],
-	leads: (params?: DashboardQueryParams) => [...dashboardKeys.all, 'leads', params] as string[],
 	fleet: (params?: DashboardQueryParams) => [...dashboardKeys.all, 'fleet', params] as string[],
 	payments: (params?: DashboardQueryParams) => [...dashboardKeys.all, 'payments', params] as string[],
 	activities: (limit?: number) => [...dashboardKeys.all, 'activities', limit] as string[],
@@ -40,17 +38,6 @@ export function useDashboardRevenue(params?: DashboardQueryParams) {
 	return useQuery({
 		queryKey: dashboardKeys.revenue(params),
 		queryFn: () => api.get<ApiSuccessResponse<RevenueStats>>('/v1/dashboard/revenue', params as Record<string, string>),
-		select: (data) => data.data,
-	});
-}
-
-/**
- * Hook for lead statistics
- */
-export function useDashboardLeads(params?: DashboardQueryParams) {
-	return useQuery({
-		queryKey: dashboardKeys.leads(params),
-		queryFn: () => api.get<ApiSuccessResponse<LeadStats>>('/v1/dashboard/leads', params as Record<string, string>),
 		select: (data) => data.data,
 	});
 }

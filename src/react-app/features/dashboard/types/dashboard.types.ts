@@ -21,12 +21,6 @@ export interface DashboardOverview {
 			direction: 'up' | 'down' | 'neutral';
 		};
 	};
-	leads: {
-		new: number;
-		converted: number;
-		conversionRate: number;
-		followUpsDue: number;
-	};
 	fleet: {
 		total: number;
 		available: number;
@@ -67,39 +61,6 @@ export interface RevenueStats {
 		date: string;
 		amount: number;
 		cumulative: number;
-	}>;
-}
-
-// ============================================
-// LEAD STATS
-// ============================================
-
-export interface LeadStats {
-	period: string;
-	summary: {
-		total: number;
-		new: number;
-		contacted: number;
-		qualified: number;
-		converted: number;
-		lost: number;
-		conversionRate: number;
-	};
-	bySource: Array<{
-		source: string;
-		count: number;
-		converted: number;
-		conversionRate: number;
-	}>;
-	byStatus: Array<{
-		status: string;
-		count: number;
-		percentage: number;
-	}>;
-	trend: Array<{
-		date: string;
-		new: number;
-		converted: number;
 	}>;
 }
 
@@ -177,10 +138,10 @@ export interface PaymentStats {
 
 export interface Activity {
 	id: string;
-	type: 'booking_created' | 'booking_started' | 'booking_completed' | 'booking_cancelled' | 'payment_received' | 'lead_converted' | 'maintenance_started' | 'maintenance_completed';
+	type: 'booking_created' | 'booking_started' | 'booking_completed' | 'booking_cancelled' | 'payment_received' | 'maintenance_started' | 'maintenance_completed';
 	title: string;
 	description: string;
-	entityType: 'booking' | 'payment' | 'lead' | 'maintenance' | 'vehicle' | 'customer';
+	entityType: 'booking' | 'payment' | 'maintenance' | 'vehicle' | 'customer';
 	entityId: string;
 	entityReference: string;
 	performedBy: {

@@ -2,13 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import {
-	submitLeadSchema,
 	checkAvailabilityQuerySchema,
 	getVehicleTypesQuerySchema,
 } from '@/worker/modules/public-api/public-api.dto';
 import { ValidationError, UnauthorizedError, AppError } from '@/worker/core/types/errors';
 import type {
-	SubmitLeadRequest,
 	CheckAvailabilityQuery,
 	GetVehicleTypesQuery,
 } from '@/worker/modules/public-api/public-api.dto';
@@ -44,250 +42,6 @@ describe('Public API Integration Tests', () => {
 	});
 
 	describe('Validation Middleware Integration', () => {
-		describe('Submit Lead Validation', () => {
-			beforeEach(() => {
-				app.use('/public/leads', validateBody(submitLeadSchema));
-				app.post('/public/leads', (c) => {
-					const body = getValidatedBody(c) as SubmitLeadRequest;
-					return c.json({ success: true, data: body });
-				});
-			});
-
-			// ============================================
-			// P0: Validation Tests
-			// ============================================
-
-			it('[P0] should accept valid lead data', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-					}),
-				});
-
-				expect(res.status).toBe(200);
-				const body = await res.json() as { success: boolean; data: SubmitLeadRequest };
-				expect(body.success).toBe(true);
-				expect(body.data.name).toBe('Jane Smith');
-			});
-
-			it('[P0] should reject missing name', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						phone: '+6281234567890',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P0] should reject missing phone', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P0] should reject name too short', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'J',
-						phone: '+6281234567890',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P0] should reject phone too short', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '123',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			// ============================================
-			// P1: Edge Cases
-			// ============================================
-
-			it('[P1] should accept optional email', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						email: 'jane@example.com',
-					}),
-				});
-
-				expect(res.status).toBe(200);
-				const body = await res.json() as { success: boolean; data: SubmitLeadRequest };
-				expect(body.data.email).toBe('jane@example.com');
-			});
-
-			it('[P1] should reject invalid email format', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						email: 'not-an-email',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P1] should accept all valid sources', async () => {
-				const sources = ['WhatsApp', 'Instagram', 'Facebook', 'TikTok', 'Website', 'WalkIn'];
-
-				for (const source of sources) {
-					const res = await app.request('/public/leads', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							name: 'Jane Smith',
-							phone: '+6281234567890',
-							source,
-						}),
-					});
-
-					expect(res.status).toBe(200);
-				}
-			});
-
-			it('[P1] should reject invalid source', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						source: 'InvalidSource',
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P1] should accept optional message', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						message: 'Interested in renting a trail bike',
-					}),
-				});
-
-				expect(res.status).toBe(200);
-			});
-
-			it('[P1] should reject message too long', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						message: 'a'.repeat(1001),
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P1] should accept preferredDates object', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						preferredDates: {
-							start: '2026-03-15',
-							end: '2026-03-18',
-						},
-					}),
-				});
-
-				expect(res.status).toBe(200);
-			});
-
-			it('[P1] should reject invalid date format in preferredDates', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						preferredDates: {
-							start: '03-15-2026',
-							end: '2026-03-18',
-						},
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-
-			it('[P1] should accept vehicleInterest in preferredDates', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						preferredDates: {
-							start: '2026-03-15',
-							end: '2026-03-18',
-							vehicleInterest: 'TrailBike',
-						},
-					}),
-				});
-
-				expect(res.status).toBe(200);
-			});
-
-			it('[P1] should reject invalid vehicleInterest', async () => {
-				const res = await app.request('/public/leads', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						name: 'Jane Smith',
-						phone: '+6281234567890',
-						preferredDates: {
-							start: '2026-03-15',
-							end: '2026-03-18',
-							vehicleInterest: 'InvalidType',
-						},
-					}),
-				});
-
-				expect(res.status).toBe(400);
-			});
-		});
-
 		describe('Check Availability Query Validation', () => {
 			beforeEach(() => {
 				app.use('/public/availability', validateQuery(checkAvailabilityQuerySchema));
@@ -413,19 +167,6 @@ describe('Public API Integration Tests', () => {
 
 	describe('Response Format Integration', () => {
 		beforeEach(() => {
-			// Submit Lead Response
-			app.post('/public/leads', (c) => {
-				return c.json({
-					success: true,
-					message: 'Lead submitted successfully',
-					data: {
-						id: 'lead-123',
-						status: 'New',
-						createdAt: new Date().toISOString(),
-					},
-				}, 201);
-			});
-
 			// Check Availability Response
 			app.get('/public/availability', (c) => {
 				return c.json({
@@ -509,20 +250,6 @@ describe('Public API Integration Tests', () => {
 		// ============================================
 		// P0: Response Format Tests
 		// ============================================
-
-		it('[P0] should return success response format for submit lead', async () => {
-			const res = await app.request('/public/leads', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: 'Test', phone: '+6281234567890' }),
-			});
-
-			expect(res.status).toBe(201);
-			const body = await res.json() as { success: boolean; message: string; data: { id: string } };
-			expect(body.success).toBe(true);
-			expect(body.message).toBe('Lead submitted successfully');
-			expect(body.data.id).toBeDefined();
-		});
 
 		it('[P0] should return success response format for availability', async () => {
 			const res = await app.request('/public/availability');

@@ -25,10 +25,6 @@ import { VehicleAvailabilityPage } from '@/react-app/features/vehicles';
 // Calendar Page
 import { CalendarPage } from '@/react-app/features/calendar';
 
-// Leads Pages
-import LeadsPage from '@/react-app/features/leads/pages/LeadsPage';
-import LeadDetailPage from '@/react-app/features/leads/pages/LeadDetailPage';
-
 // Booking Pages
 import { BookingsPage, BookingDetailPage } from '@/react-app/features/bookings';
 
@@ -46,7 +42,6 @@ import {
 	ReportsPage,
 	RevenueReportPage,
 	FleetReportPage,
-	LeadSourceReportPage,
 	PaymentReportPage,
 	CustomerReportPage,
 } from '@/react-app/features/reports';
@@ -96,10 +91,6 @@ export const routes: RouteObject[] = [
 							// Fleet calendar matrix
 							{ path: 'calendar', element: <CalendarPage /> },
 
-							// Leads routes
-							{ path: 'leads', element: <LeadsPage /> },
-							{ path: 'leads/:id', element: <LeadDetailPage /> },
-
 							// Booking routes
 							{ path: 'bookings', element: <BookingsPage /> },
 							{ path: 'bookings/:id', element: <BookingDetailPage /> },
@@ -121,7 +112,6 @@ export const routes: RouteObject[] = [
 							{ path: 'reports', element: <ReportsPage /> },
 							{ path: 'reports/revenue', element: <RevenueReportPage /> },
 							{ path: 'reports/fleet', element: <FleetReportPage /> },
-							{ path: 'reports/leads', element: <LeadSourceReportPage /> },
 							{ path: 'reports/payments', element: <PaymentReportPage /> },
 							{ path: 'reports/customers', element: <CustomerReportPage /> },
 

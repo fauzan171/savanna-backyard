@@ -1,7 +1,7 @@
 /**
  * Test factory functions for creating test data
  */
-import type { Customer, Vehicle, Lead, Booking, Payment, BookingAddon, User, MaintenanceRecord, SystemConfiguration } from '@/worker/core/database/schema';
+import type { Customer, Vehicle, Booking, Payment, BookingAddon, User, MaintenanceRecord, SystemConfiguration } from '@/worker/core/database/schema';
 
 let idCounter = 0;
 const generateId = () => `test-${++idCounter}-${Date.now()}`;
@@ -39,25 +39,6 @@ export function createTestVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
 		status: 'Available',
 		totalKm: 1000,
 		photoUrl: null,
-		createdAt: new Date().toISOString(),
-		updatedAt: new Date().toISOString(),
-		...overrides,
-	};
-}
-
-export function createTestLead(overrides: Partial<Lead> = {}): Lead {
-	return {
-		id: generateId(),
-		name: 'Test Lead',
-		phone: '+6281234567891',
-		email: 'lead@example.com',
-		notes: null,
-		source: 'WhatsApp',
-		status: 'New',
-		priority: 'Warm',
-		assignedTo: null,
-		followUpDate: null,
-		convertedAt: null,
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 		...overrides,

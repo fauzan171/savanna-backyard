@@ -5,7 +5,6 @@ import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/fa
 import { calculateTwelveHourBlocks } from '@/worker/modules/bookings/availability.helper';
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
 import type {
-  SubmitLeadRequest,
   CheckAvailabilityQuery,
   CreatePublicBookingRequest,
 } from "./public-api.dto";
@@ -70,29 +69,7 @@ export class PublicApiService {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
-  // 1. Submit Lead
-  async submitLead(
-    data: SubmitLeadRequest,
-  ): Promise<{ id: string; status: string; createdAt: string }> {
-    const source = data.source || "Website";
-    const lead = await this.repo.createLead({
-      name: data.name,
-      phone: data.phone,
-      email: data.email || null,
-      notes: data.message || null,
-      source,
-      status: "New",
-      priority: "Warm",
-      assignedTo: null,
-      followUpDate: null,
-      preferredStart: data.preferredDates?.start || null,
-      preferredEnd: data.preferredDates?.end || null,
-      vehicleInterest: data.preferredDates?.vehicleInterest || null,
-    });
-    return { id: lead.id, status: lead.status, createdAt: lead.createdAt };
-  }
-
-  // 2. Check Availability
+  // 1. Check Availability
   async checkAvailability(query: CheckAvailabilityQuery): Promise<{
     requestedPeriod: { startDate: string; endDate: string };
     availableVehicles: Array<{

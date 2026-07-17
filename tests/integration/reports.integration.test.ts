@@ -33,17 +33,6 @@ const fleetUtilizationColumns = [
 	{ header: 'Revenue (IDR)', key: 'revenue' as const },
 ];
 
-const leadSourceColumns = [
-	{ header: 'Source', key: 'source' as const },
-	{ header: 'Total Leads', key: 'total' as const },
-	{ header: 'Converted', key: 'converted' as const },
-	{ header: 'Lost', key: 'lost' as const },
-	{ header: 'In Progress', key: 'inProgress' as const },
-	{ header: 'Conversion Rate (%)', key: 'conversionRate' as const },
-	{ header: 'Avg Days to Convert', key: 'avgDaysToConvert' as const },
-	{ header: 'Revenue (IDR)', key: 'revenue' as const },
-];
-
 const paymentReportColumns = [
 	{ header: 'Method', key: 'method' as const },
 	{ header: 'Total Amount (IDR)', key: 'total' as const },
@@ -78,10 +67,6 @@ describe('Reports Integration Tests', () => {
 			getActiveBookingsCount: vi.fn(),
 			getTodayPickups: vi.fn(),
 			getTodayReturns: vi.fn(),
-			getLeadCountsByStatus: vi.fn(),
-			getLeadsBySource: vi.fn(),
-			getLeadsByPriority: vi.fn(),
-			getFollowUpReminders: vi.fn(),
 			getVehicleCountsByStatus: vi.fn(),
 			getVehiclesByType: vi.fn(),
 			getTopVehicles: vi.fn(),
@@ -146,24 +131,6 @@ describe('Reports Integration Tests', () => {
 			if (format === 'csv') {
 				const csv = generateCsv(report.byVehicle, fleetUtilizationColumns);
 				const filename = generateCsvFilename('fleet-utilization-report', query.startDate, query.endDate);
-				return c.text(csv, 200, getCsvResponseHeaders(filename));
-			}
-
-			return c.json({ success: true, data: report });
-		});
-
-		app.get('/api/v1/reports/lead-sources', async (c) => {
-			const query = c.req.query();
-			const format = query.format ?? 'json';
-
-			const report = await mockStatisticsService.getLeadSourceReport({
-				startDate: query.startDate,
-				endDate: query.endDate,
-			});
-
-			if (format === 'csv') {
-				const csv = generateCsv(report.bySource, leadSourceColumns);
-				const filename = generateCsvFilename('lead-sources-report', query.startDate, query.endDate);
 				return c.text(csv, 200, getCsvResponseHeaders(filename));
 			}
 
@@ -491,119 +458,6 @@ describe('Reports Integration Tests', () => {
 			expect(res.status).toBe(200);
 			const body = await res.json() as { success: boolean; data: { underutilized: unknown[] } };
 			expect(body.data.underutilized).toHaveLength(2);
-		});
-	});
-
-	// ============================================
-	// GET /api/v1/reports/lead-sources
-	// ============================================
-
-	describe('GET /api/v1/reports/lead-sources', () => {
-		// ============================================
-		// P0: Critical Scenarios (JSON format)
-		// ============================================
-
-		it('[P0] should return lead source report in JSON format', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadSourceReport').mockResolvedValue({
-				reportInfo: {
-					title: 'Lead Source Analysis Report',
-					period: { start: '2026-02-01', end: '2026-02-28' },
-					generatedAt: '2026-02-28T10:00:00Z',
-				},
-				summary: {
-					totalLeads: 100,
-					converted: 30,
-					lost: 10,
-					inProgress: 60,
-					overallConversionRate: 30,
-				},
-				bySource: [
-					{ source: 'WhatsApp', total: 40, converted: 15, lost: 3, inProgress: 22, conversionRate: 37.5, avgDaysToConvert: 2.5, revenue: 15000000 },
-					{ source: 'Instagram', total: 30, converted: 8, lost: 4, inProgress: 18, conversionRate: 26.67, avgDaysToConvert: 3.2, revenue: 8000000 },
-				],
-				byPriority: [
-					{ priority: 'Hot', total: 20, converted: 12, conversionRate: 60 },
-					{ priority: 'Warm', total: 50, converted: 15, conversionRate: 30 },
-					{ priority: 'Cold', total: 30, converted: 3, conversionRate: 10 },
-				],
-				trend: [
-					{ week: '2026-W05', newLeads: 25, converted: 8, conversionRate: 32 },
-				],
-			});
-
-			const res = await app.request('/api/v1/reports/lead-sources?startDate=2026-02-01&endDate=2026-02-28');
-
-			expect(res.status).toBe(200);
-			expect(res.headers.get('content-type')).toContain('application/json');
-			const body = await res.json() as { success: boolean; data: { reportInfo: { title: string }; summary: { overallConversionRate: number }; bySource: unknown[] } };
-			expect(body.success).toBe(true);
-			expect(body.data.reportInfo.title).toBe('Lead Source Analysis Report');
-			expect(body.data.summary.overallConversionRate).toBe(30);
-			expect(body.data.bySource).toHaveLength(2);
-		});
-
-		it('[P0] should return lead source report in CSV format', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadSourceReport').mockResolvedValue({
-				reportInfo: { title: 'Lead Source Analysis Report', period: { start: '2026-02-01', end: '2026-02-28' }, generatedAt: '2026-02-28T10:00:00Z' },
-				summary: { totalLeads: 100, converted: 30, lost: 10, inProgress: 60, overallConversionRate: 30 },
-				bySource: [
-					{ source: 'WhatsApp', total: 40, converted: 15, lost: 3, inProgress: 22, conversionRate: 37.5, avgDaysToConvert: 2.5, revenue: 15000000 },
-				],
-				byPriority: [],
-				trend: [],
-			});
-
-			const res = await app.request('/api/v1/reports/lead-sources?startDate=2026-02-01&endDate=2026-02-28&format=csv');
-
-			expect(res.status).toBe(200);
-			expect(res.headers.get('content-type')).toBe('text/csv; charset=utf-8');
-			expect(res.headers.get('content-disposition')).toContain('lead-sources-report');
-
-			const text = await res.text();
-			expect(text).toContain('Source,Total Leads,Converted,Lost,In Progress');
-			expect(text).toContain('WhatsApp');
-		});
-
-		// ============================================
-		// P1: Edge Cases
-		// ============================================
-
-		it('[P1] should handle empty sources', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadSourceReport').mockResolvedValue({
-				reportInfo: { title: 'Lead Source Analysis Report', period: { start: '2026-02-01', end: '2026-02-28' }, generatedAt: '2026-02-28T10:00:00Z' },
-				summary: { totalLeads: 0, converted: 0, lost: 0, inProgress: 0, overallConversionRate: 0 },
-				bySource: [],
-				byPriority: [],
-				trend: [],
-			});
-
-			const res = await app.request('/api/v1/reports/lead-sources?startDate=2026-02-01&endDate=2026-02-28');
-
-			expect(res.status).toBe(200);
-			const body = await res.json() as { success: boolean; data: { bySource: unknown[]; summary: { totalLeads: number } } };
-			expect(body.data.bySource).toHaveLength(0);
-			expect(body.data.summary.totalLeads).toBe(0);
-		});
-
-		it('[P1] should include priority breakdown', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadSourceReport').mockResolvedValue({
-				reportInfo: { title: 'Lead Source Analysis Report', period: { start: '2026-02-01', end: '2026-02-28' }, generatedAt: '2026-02-28T10:00:00Z' },
-				summary: { totalLeads: 100, converted: 30, lost: 10, inProgress: 60, overallConversionRate: 30 },
-				bySource: [],
-				byPriority: [
-					{ priority: 'Hot', total: 20, converted: 12, conversionRate: 60 },
-					{ priority: 'Warm', total: 50, converted: 15, conversionRate: 30 },
-					{ priority: 'Cold', total: 30, converted: 3, conversionRate: 10 },
-				],
-				trend: [],
-			});
-
-			const res = await app.request('/api/v1/reports/lead-sources?startDate=2026-02-01&endDate=2026-02-28');
-
-			expect(res.status).toBe(200);
-			const body = await res.json() as { success: boolean; data: { byPriority: { priority: string; conversionRate: number }[] } };
-			expect(body.data.byPriority).toHaveLength(3);
-			expect(body.data.byPriority[0].conversionRate).toBe(60);
 		});
 	});
 
