@@ -358,6 +358,14 @@ describe('LeadsService', () => {
 				expect(result.source).toBe(source);
 			}
 		});
+
+		it('[P1] should reject duplicate phone (LEAD-E02/LEAD-05)', async () => {
+			vi.mocked(mockLeadRepo.findByPhone).mockResolvedValue(createTestLead({ phone: '+6281399997777' }));
+			await expect(
+				leadsService.create({ name: 'Dup', phone: '+6281399997777', source: 'Website' })
+			).rejects.toThrow('Nomor telepon sudah terdaftar');
+			expect(mockLeadRepo.create).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('update', () => {
