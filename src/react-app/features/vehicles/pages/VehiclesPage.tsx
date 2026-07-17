@@ -9,6 +9,7 @@ import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
 import { VehicleQrCard } from '../components/VehicleQrCard';
 import type { Vehicle, VehicleFormData } from '../types/vehicle.types';
+import { toast } from '@/react-app/hooks/useToast';
 
 export default function VehiclesPage() {
 	const navigate = useNavigate();
@@ -28,7 +29,11 @@ export default function VehiclesPage() {
 				setQrVehicle({ id: result.data.id, name: formData.name } as Vehicle);
 			}
 		} catch (error) {
-			console.log(error)
+			toast({
+				variant: 'destructive',
+				title: 'Gagal menyimpan kendaraan',
+				description: (error as Error).message,
+			});
 		}
 	};
 
