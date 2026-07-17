@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/lib/sanitize';
 
 // Create lead schema
 export const createLeadSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+	name: z.string().min(2, 'Name must be at least 2 characters').max(100).transform(sanitizeText),
 	phone: z.string().min(5, 'Phone must be at least 5 characters'),
 	email: z.string().email('Invalid email address').optional().nullable(),
 	notes: z.string().max(2000).optional().nullable(),
@@ -14,7 +15,7 @@ export const createLeadSchema = z.object({
 
 // Update lead schema
 export const updateLeadSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
+	name: z.string().min(2).max(100).optional().transform((v) => (v == null ? v : sanitizeText(v))),
 	phone: z.string().min(5).optional(),
 	email: z.string().email().optional().nullable(),
 	notes: z.string().max(2000).optional().nullable(),

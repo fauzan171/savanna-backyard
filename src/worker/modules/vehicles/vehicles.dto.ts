@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { urlOrPath } from '@/worker/core/schemas/url';
+import { sanitizeText } from '@/worker/core/lib/sanitize';
 
 // Create vehicle schema
 export const createVehicleSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+	name: z.string().min(2, 'Name must be at least 2 characters').max(100).transform(sanitizeText),
 	plateNumber: z.string().min(1, 'Plate number is required').max(20),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']),
 	brand: z.string().max(50).optional().nullable(),
@@ -17,7 +18,7 @@ export const createVehicleSchema = z.object({
 
 // Update vehicle schema (all fields optional except plateNumber and dailyRateIdr which have defaults)
 export const updateVehicleSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
+	name: z.string().min(2).max(100).optional().transform((v) => (v == null ? v : sanitizeText(v))),
 	plateNumber: z.string().min(1).max(20).optional(),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
 	brand: z.string().max(50).optional().nullable(),

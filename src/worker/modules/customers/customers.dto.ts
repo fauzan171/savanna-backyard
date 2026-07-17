@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { urlOrPath } from '@/worker/core/schemas/url';
+import { sanitizeText } from '@/worker/core/lib/sanitize';
 
 // Create customer schema
 export const createCustomerSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+	name: z.string().min(2, 'Name must be at least 2 characters').max(100).transform(sanitizeText),
 	phone: z.string().min(5, 'Phone must be at least 5 characters'),
 	email: z.string().email('Invalid email address').optional().nullable(),
 	address: z.string().max(500).optional().nullable(),
@@ -15,7 +16,7 @@ export const createCustomerSchema = z.object({
 
 // Update customer schema (all fields optional)
 export const updateCustomerSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
+	name: z.string().min(2).max(100).optional().transform((v) => (v == null ? v : sanitizeText(v))),
 	phone: z.string().min(5).optional(),
 	email: z.string().email().optional().nullable(),
 	address: z.string().max(500).optional().nullable(),
