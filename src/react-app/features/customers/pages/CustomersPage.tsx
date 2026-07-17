@@ -9,6 +9,7 @@ import { useCustomers, useCreateCustomer, useSetBlacklist } from '../hooks/useCu
 import { CustomerTable } from '../components/CustomerTable';
 import { CustomerForm } from '../components/CustomerForm';
 import type { Customer, CustomerFormData, SetBlacklistRequest } from '../types/customer.types';
+import { toast } from '@/react-app/hooks/useToast';
 
 export default function CustomersPage() {
 	const navigate = useNavigate();
@@ -30,7 +31,10 @@ export default function CustomersPage() {
 				navigate(`/customers/${result.data.id}`);
 			}
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				variant: 'destructive',
+				description: (error as Error).message,
+			});
 		}
 	};
 
@@ -47,7 +51,10 @@ export default function CustomersPage() {
 			setBlacklistCustomer(null);
 			setBlacklistReason('');
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				variant: 'destructive',
+				description: (error as Error).message,
+			});
 		}
 	};
 

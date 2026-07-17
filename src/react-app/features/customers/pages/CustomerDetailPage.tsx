@@ -9,6 +9,7 @@ import { useCustomer, useUpdateCustomer, useSetBlacklist } from '../hooks/useCus
 import { CustomerDetail } from '../components/CustomerDetail';
 import { CustomerForm } from '../components/CustomerForm';
 import type { CustomerFormData, SetBlacklistRequest } from '../types/customer.types';
+import { toast } from '@/react-app/hooks/useToast';
 
 export default function CustomerDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -26,7 +27,10 @@ export default function CustomerDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				variant: 'destructive',
+				description: (error as Error).message,
+			});
 		}
 	};
 
@@ -43,7 +47,10 @@ export default function CustomerDetailPage() {
 			setShowBlacklistDialog(false);
 			setBlacklistReason('');
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				variant: 'destructive',
+				description: (error as Error).message,
+			});
 		}
 	};
 

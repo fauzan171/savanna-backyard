@@ -17,7 +17,10 @@ import type { Customer, CustomerFormData } from '../types/customer.types';
 
 const customerFormSchema = z.object({
 	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-	phone: z.string().min(5, 'Phone number is required'),
+	phone: z
+		.string()
+		.min(5, 'Phone number is required')
+		.regex(/^[0-9+\-\s]+$/, 'Phone must contain only digits, +, spaces or dashes'),
 	email: z.string().email('Invalid email address').optional().or(z.literal('')),
 	address: z.string().optional(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().or(z.literal('')),

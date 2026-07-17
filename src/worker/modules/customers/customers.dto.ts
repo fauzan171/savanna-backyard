@@ -5,7 +5,7 @@ import { sanitizeText } from '@/worker/core/lib/sanitize';
 // Create customer schema
 export const createCustomerSchema = z.object({
 	name: z.string().min(2, 'Name must be at least 2 characters').max(100).transform(sanitizeText),
-	phone: z.string().min(5, 'Phone must be at least 5 characters'),
+	phone: z.string().min(5, 'Phone must be at least 5 characters').regex(/^[0-9+\-\s]+$/, 'Phone must contain only digits, +, spaces or dashes'),
 	email: z.string().email('Invalid email address').optional().nullable(),
 	address: z.string().max(500).optional().nullable(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
@@ -17,7 +17,7 @@ export const createCustomerSchema = z.object({
 // Update customer schema (all fields optional)
 export const updateCustomerSchema = z.object({
 	name: z.string().min(2).max(100).optional().transform((v) => (v == null ? v : sanitizeText(v))),
-	phone: z.string().min(5).optional(),
+	phone: z.string().min(5).regex(/^[0-9+\-\s]+$/).optional(),
 	email: z.string().email().optional().nullable(),
 	address: z.string().max(500).optional().nullable(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
