@@ -3,7 +3,6 @@ import {
 	CalendarCheck,
 	XCircle,
 	DollarSign,
-	UserCheck,
 	Wrench,
 	CheckCircle,
 	Car,
@@ -25,7 +24,6 @@ const activityIcons: Record<Activity['type'], React.ReactNode> = {
 	booking_completed: <CheckCircle className="h-4 w-4" />,
 	booking_cancelled: <XCircle className="h-4 w-4" />,
 	payment_received: <DollarSign className="h-4 w-4" />,
-	lead_converted: <UserCheck className="h-4 w-4" />,
 	maintenance_started: <Wrench className="h-4 w-4" />,
 	maintenance_completed: <CheckCircle className="h-4 w-4" />,
 };
@@ -36,7 +34,6 @@ const activityBadgeVariants: Record<Activity['type'], 'default' | 'success' | 'e
 	booking_completed: 'success',
 	booking_cancelled: 'error',
 	payment_received: 'success',
-	lead_converted: 'success',
 	maintenance_started: 'warning',
 	maintenance_completed: 'success',
 };
@@ -44,7 +41,6 @@ const activityBadgeVariants: Record<Activity['type'], 'default' | 'success' | 'e
 const entityRoutes: Record<Activity['entityType'], string> = {
 	booking: '/bookings',
 	payment: '/payments',
-	lead: '/leads',
 	maintenance: '/maintenance',
 	vehicle: '/vehicles',
 	customer: '/customers',

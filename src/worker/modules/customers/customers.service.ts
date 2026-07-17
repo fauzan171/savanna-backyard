@@ -68,6 +68,12 @@ export class CustomersService {
 	}
 
 	async create(data: CreateCustomerRequest): Promise<CustomerResponse> {
+		// Check if phone already exists
+		const existingByPhone = await this.customerRepo.findByPhone(data.phone);
+		if (existingByPhone) {
+			throw new ConflictError('Nomor telepon sudah terdaftar');
+		}
+
 		// Check if email already exists (if provided)
 		if (data.email) {
 			const existingByEmail = await this.customerRepo.findByEmail(data.email);
@@ -103,6 +109,14 @@ export class CustomersService {
 			const existingByEmail = await this.customerRepo.findByEmail(data.email);
 			if (existingByEmail) {
 				throw new ConflictError('Email already exists');
+			}
+		}
+
+		// Check phone uniqueness if changing phone
+		if (data.phone && data.phone !== existing.phone) {
+			const existingByPhone = await this.customerRepo.findByPhone(data.phone);
+			if (existingByPhone) {
+				throw new ConflictError('Nomor telepon sudah terdaftar');
 			}
 		}
 

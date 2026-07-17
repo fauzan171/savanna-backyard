@@ -3,6 +3,7 @@ import { authMiddleware } from '@/worker/core/middleware/auth';
 import { createDb } from '@/worker/core/database';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { SettingsService } from './settings.service';
+import { validateSettingValue } from './settings.dto';
 
 type SettingsVariables = {
 	settingsService: SettingsService;
@@ -50,7 +51,20 @@ const bulkUpdateHandler = async (c: Context<SettingsEnv>) => {
 	if (!body.settings || !Array.isArray(body.settings)) {
 		return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'settings array required' } }, 400);
 	}
-	const result = await service.bulkUpdate(body.settings, user.userId);
+	// Validate each setting value per-key before persisting
+	const normalized: { key: string; value: string }[] = [];
+	for (const item of body.settings) {
+		if (!item || typeof item.key !== 'string' || item.value == null) {
+			return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'each setting needs { key, value }' } }, 400);
+		}
+		try {
+			normalized.push({ key: item.key, value: validateSettingValue(item.key, item.value) });
+		} catch (err) {
+			const message = (err as Error).message;
+			return c.json({ success: false, message, error: { code: 'VALIDATION_ERROR', message } }, 400);
+		}
+	}
+	const result = await service.bulkUpdate(normalized, user.userId);
 	return c.json({ success: true, data: result });
 };
 
@@ -67,10 +81,17 @@ const updateByKeyHandler = async (c: Context<SettingsEnv>) => {
 	} catch {
 		return c.json({ success: false, message: 'Invalid JSON', error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON' } }, 400);
 	}
-	if (!body.value) {
+	if (body.value == null || body.value === '') {
 		return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'value is required' } }, 400);
 	}
-	const result = await service.update(key, body.value, user.userId);
+	let normalized: string;
+	try {
+		normalized = validateSettingValue(key, body.value);
+	} catch (err) {
+		const message = (err as Error).message;
+		return c.json({ success: false, message, error: { code: 'VALIDATION_ERROR', message } }, 400);
+	}
+	const result = await service.update(key, normalized, user.userId);
 	return c.json({ success: true, data: result });
 };
 

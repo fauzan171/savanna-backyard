@@ -53,8 +53,9 @@ export async function findConflictingBookings(
 	endDate: string,
 	excludeBookingId?: string
 ): Promise<ConflictingBooking[]> {
-	// Only check against confirmed and active bookings
-	const conflictingStatuses: Booking['status'][] = ['Confirmed', 'Active'];
+	// Pending bookings also hold the slot (BK-05: two pending bookings for the same
+	// vehicle + overlapping dates must conflict).
+	const conflictingStatuses: Booking['status'][] = ['Pending', 'Confirmed', 'Active'];
 
 	const conditions = [
 		eq(bookings.vehicleId, vehicleId),
@@ -107,14 +108,30 @@ export async function checkVehicleAvailability(
 }
 
 /**
- * Calculate the number of days in a rental period
+ * Calculate the number of 12-hour blocks in a rental period
+ * Minimum 1 block (12 hours). E.g., 2026-06-28 to 2026-06-29 = 2 blocks (24h).
  */
 export function calculateDays(startDate: string, endDate: string): number {
+	return calculateTwelveHourBlocks(startDate, endDate);
+}
+
+/**
+ * Calculate 12-hour rental blocks.
+ * Uses ceil rounding: a13-hour rental = 2 blocks.
+ */
+export const HOURS_PER_BLOCK = 12;
+
+export function calculateTwelveHourBlocks(startDate: string, endDate: string): number {
 	const start = new Date(startDate);
 	const end = new Date(endDate);
-	const diffTime = end.getTime() - start.getTime();
-	const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-	return Math.max(1, diffDays); // Minimum 1 day
+	const diffHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+	const blocks = Math.ceil(diffHours / HOURS_PER_BLOCK);
+	return Math.max(1, blocks); // Minimum 1 block
+}
+
+/** Hourly rate derived from the stored dailyRate (which now means rate per12-hour block) */
+export function getHourlyRate(dailyRate: number): number {
+	return dailyRate / HOURS_PER_BLOCK;
 }
 
 /**
@@ -144,8 +161,9 @@ function generateNanoid(length: number): string {
 }
 
 /**
- * Calculate late fee
- * Formula: daysLate * dailyRate * LATE_FEE_MULTIPLIER
+ * Calculate late fee in hours (was daily).
+ * Formula: hoursLate * hourlyRate * LATE_FEE_MULTIPLIER
+ * hourlyRate = dailyRate / 12
  */
 export const LATE_FEE_MULTIPLIER = 1.5;
 
@@ -153,16 +171,17 @@ export function calculateLateFee(
 	dailyRate: number,
 	endDate: string,
 	actualReturnDate: string
-): { daysLate: number; lateFee: number } {
+): { daysLate: number; lateFee: number; hoursLate: number } {
 	const end = new Date(endDate);
 	const actual = new Date(actualReturnDate);
-	const diffTime = actual.getTime() - end.getTime();
-	const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+	const diffMs = actual.getTime() - end.getTime();
+	const hoursLate = Math.ceil(diffMs / (1000 * 60 * 60));
 
-	if (diffDays <= 0) {
-		return { daysLate: 0, lateFee: 0 };
+	if (hoursLate <= 0) {
+		return { daysLate: 0, lateFee: 0, hoursLate: 0 };
 	}
 
-	const lateFee = diffDays * dailyRate * LATE_FEE_MULTIPLIER;
-	return { daysLate: diffDays, lateFee };
+	const hourlyRate = getHourlyRate(dailyRate);
+	const lateFee = hoursLate * hourlyRate * LATE_FEE_MULTIPLIER;
+	return { daysLate: Math.ceil(hoursLate / 24), lateFee, hoursLate };
 }

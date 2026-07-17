@@ -41,6 +41,8 @@ declare namespace Cloudflare {
 		EMAIL_FROM?: string;
 		/** Shared secret verifying inbound WhatsApp webhooks (x-whatsapp-token header / ?token=). Unset = accept in stub/dev. */
 		WHATSAPP_WEBHOOK_TOKEN?: string;
+		/** Comma-separated developer emails allowed to use /public/auth/dev/login (no OTP). Empty in production = disabled. */
+		DEVELOPER_ALLOWLIST?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

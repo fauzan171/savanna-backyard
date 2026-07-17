@@ -1,17 +1,9 @@
 import { eq, and, or, gte, lte, like, sql, asc, inArray } from 'drizzle-orm';
-import { leads, vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Lead, type Vehicle, type NewLead, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
+import { vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Vehicle, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
 export class PublicApiRepository {
 	constructor(private db: Database) {}
-
-	// Lead operations
-	async createLead(data: Omit<NewLead, 'id'>): Promise<Lead> {
-		const id = crypto.randomUUID();
-		await this.db.insert(leads).values({ id, ...data });
-		const lead = await this.db.select().from(leads).where(eq(leads.id, id)).limit(1);
-		return lead[0]!;
-	}
 
 	// Vehicle operations
 	async getAvailableVehicles(type?: string): Promise<Vehicle[]> {
@@ -29,6 +21,14 @@ export class PublicApiRepository {
 	async getVehicleById(id: string): Promise<Vehicle | null> {
 		const result = await this.db.select().from(vehicles).where(eq(vehicles.id, id)).limit(1);
 		return result[0] ?? null;
+	}
+
+	/** Get vehicle by QR code value (SVN:{vehicleId}) — for public scan */
+	async getVehicleByCode(code: string): Promise<Vehicle | null> {
+		// Strip SVN: prefix if present
+		const vehicleId = code.startsWith('SVN:') ? code.slice(4) : code;
+		if (!vehicleId) return null;
+		return this.getVehicleById(vehicleId);
 	}
 
 	// Check if vehicle is available for date range (no conflicting bookings)

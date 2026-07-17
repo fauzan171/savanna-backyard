@@ -1,12 +1,5 @@
 import { ConfigRepository } from '../../repositories/config.repository';
-import { TokenInfoGoogleProvider, type GoogleOAuthProvider } from './google-oauth.provider';
 import { StubWhatsAppProvider, FonnteWhatsAppProvider, type WhatsAppProvider } from './whatsapp.provider';
-
-/** Build the Google OAuth provider from settings (client id may be empty in dev). */
-export async function createGoogleOAuthProvider(configRepo: ConfigRepository): Promise<GoogleOAuthProvider> {
-	const clientId = (await configRepo.getValue('google_oauth_client_id')) ?? '';
-	return new TokenInfoGoogleProvider(clientId);
-}
 
 /** Build the WhatsApp provider from settings; defaults to the stub (dev) when unset. */
 export async function createWhatsAppProvider(configRepo: ConfigRepository): Promise<WhatsAppProvider> {
@@ -19,5 +12,4 @@ export async function createWhatsAppProvider(configRepo: ConfigRepository): Prom
 	return new StubWhatsAppProvider();
 }
 
-export type { GoogleOAuthProvider, GoogleUserInfo } from './google-oauth.provider';
 export type { WhatsAppProvider, WhatsAppSendResult } from './whatsapp.provider';

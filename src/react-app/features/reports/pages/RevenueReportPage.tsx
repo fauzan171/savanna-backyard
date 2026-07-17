@@ -56,7 +56,7 @@ export default function RevenueReportPage() {
 				<ExportButton
 					reportType="revenue"
 					params={params}
-					disabled={isLoading || !report}
+					disabled={isLoading}
 				/>
 			</div>
 

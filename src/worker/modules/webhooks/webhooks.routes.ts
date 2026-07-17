@@ -4,7 +4,7 @@ import { WebhooksService } from './webhooks.service';
 import { EmailService } from '@/worker/core/services/email.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
-import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
+import { createWhatsAppProvider } from '@/worker/core/services/providers';
 import { PublicUsersRepository } from '@/worker/modules/public-users/public-users.repository';
 import { PublicUsersService } from '@/worker/modules/public-users/public-users.service';
 
@@ -76,14 +76,18 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 	const webhookToken = c.env.XENDIT_WEBHOOK_TOKEN ?? '';
 
 	if (!webhookToken) {
-		console.error('XENDIT_WEBHOOK_TOKEN not configured');
-		return c.json({ success: false, message: 'Webhook token not configured' }, 500);
+		console.error('[Xendit Webhook] XENDIT_WEBHOOK_TOKEN not configured. Run: npx wrangler secret put XENDIT_WEBHOOK_TOKEN');
+		return c.json({ success: false, message: 'Webhook token not configured. Server admin: set XENDIT_WEBHOOK_TOKEN via wrangler secret put.' }, 500);
 	}
 
 	// Verify X-CALLBACK-TOKEN header
 	const callbackToken = c.req.header('x-callback-token') ?? '';
+	if (!callbackToken) {
+		console.error('[Xendit Webhook] Missing X-Callback-Token header');
+		return c.json({ success: false, message: 'Missing X-Callback-Token header' }, 401);
+	}
 	if (callbackToken !== webhookToken) {
-		console.error('Invalid Xendit webhook signature');
+		console.error('[Xendit Webhook] Invalid X-Callback-Token. Expected token length:', webhookToken.length, 'Received token length:', callbackToken.length);
 		return c.json({ success: false, message: 'Invalid signature' }, 401);
 	}
 
@@ -97,7 +101,18 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 	}
 
 	const service = new WebhooksService(createDb(c.env.DB), emailService);
-	await service.handleXenditNotification(data);
+
+	// Run the notification handler in the background so we return 200 to Xendit immediately.
+	// Xendit has a webhook timeout; slow email sending must not block the HTTP response.
+	// Idempotency guards (existing payment check by invoiceId) make this safe to retry.
+	const handlePromise = service.handleXenditNotification(data);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const waitUntil = (c as any).executionCtx?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
+	if (waitUntil) {
+		waitUntil(handlePromise);
+	} else {
+		await handlePromise;
+	}
 
 	return c.json({ success: true, message: 'OK' });
 };
@@ -131,9 +146,8 @@ const whatsappInboundHandler = async (c: Context<WebhookEnv>) => {
 	const configRepo = new ConfigRepository(db);
 	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const repo = new PublicUsersRepository(db);
-	const google = await createGoogleOAuthProvider(configRepo);
 	const whatsapp = await createWhatsAppProvider(configRepo);
-	const service = new PublicUsersService(repo, jwtService, google, whatsapp, configRepo);
+	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo);
 
 	await service.handleWhatsappInbound(data);
 	return c.json({ success: true, message: 'OK' });

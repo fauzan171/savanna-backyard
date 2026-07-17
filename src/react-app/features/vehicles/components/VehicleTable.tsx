@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { MoreHorizontal, Wrench, Eye } from 'lucide-react';
+import { MoreHorizontal, Wrench, Eye, QrCode, Trash2 } from 'lucide-react';
 import { DataTable } from '@/react-app/components/ui/table';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
@@ -19,11 +19,14 @@ interface VehicleTableProps {
 	isLoading?: boolean;
 	onStatusChange?: (vehicle: Vehicle) => void;
 	onRowClick?: (vehicle: Vehicle) => void;
+	onQrClick?: (vehicle: Vehicle) => void;
+	onDelete?: (vehicle: Vehicle) => void;
 }
 
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
 	Available: { variant: 'success', label: 'Available' },
 	Rented: { variant: 'info', label: 'Rented' },
+	Cleaning: { variant: 'default', label: 'Cleaning' },
 	Maintenance: { variant: 'warning', label: 'Maintenance' },
 	Inactive: { variant: 'default', label: 'Inactive' },
 };
@@ -36,7 +39,7 @@ const typeLabels: Record<string, string> = {
 	Other: 'Other',
 };
 
-export function VehicleTable({ data, isLoading, onStatusChange, onRowClick }: VehicleTableProps) {
+export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQrClick, onDelete }: VehicleTableProps) {
 	const columns: ColumnDef<Vehicle>[] = useMemo(
 		() => [
 			{
@@ -119,12 +122,33 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick }: Ve
 								<Wrench className="mr-2 size-4" />
 								Change Status
 							</DropdownMenuItem>
+							{onQrClick && (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem onClick={() => onQrClick(row.original)}>
+										<QrCode className="mr-2 size-4" />
+										Generate QR
+									</DropdownMenuItem>
+								</>
+							)}
+							{onDelete && (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										className="text-destructive"
+										onClick={() => onDelete(row.original)}
+									>
+										<Trash2 className="mr-2 size-4" />
+										Delete
+									</DropdownMenuItem>
+								</>
+							)}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				),
 			},
 		],
-		[onStatusChange]
+		[onStatusChange, onQrClick, onDelete]
 	);
 
 	const renderCard = (vehicle: Vehicle) => (

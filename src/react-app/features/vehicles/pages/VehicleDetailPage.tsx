@@ -10,6 +10,7 @@ import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus } from '../hooks/u
 import { useBookings } from '@/react-app/features/bookings/hooks/useBookings';
 import { VehicleDetail } from '../components/VehicleDetail';
 import { VehicleForm } from '../components/VehicleForm';
+import { VehicleQrCard } from '../components/VehicleQrCard';
 import type { VehicleFormData, VehicleStatus } from '../types/vehicle.types';
 
 const formatCurrency = (amount: number) =>
@@ -109,6 +110,17 @@ export default function VehicleDetailPage() {
 				onEdit={() => setIsEditDialogOpen(true)}
 				onStatusChange={() => setIsStatusDialogOpen(true)}
 			/>
+
+			{/* QR code generation */}
+			<div className="rounded-lg border p-5 flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<h3 className="text-base font-semibold">Pickup QR Code</h3>
+					<p className="text-sm text-muted-foreground">
+						Generate &amp; print the QR customers scan on pickup day to confirm they received the bike.
+					</p>
+				</div>
+				<VehicleQrCard vehicleId={vehicle.id} vehicleName={vehicle.name} />
+			</div>
 
 			{/* Availability & Bookings Section */}
 			<div className="rounded-lg border p-5 space-y-4">

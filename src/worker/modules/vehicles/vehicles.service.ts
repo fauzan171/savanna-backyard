@@ -11,6 +11,8 @@ import type {
   VehicleWithDetails,
   AvailabilityResult,
   CalendarResult,
+  CalendarMatrixResult,
+  CalendarMatrixCell,
 } from "./vehicles.types";
 import type {
   CreateVehicleRequest,
@@ -18,6 +20,7 @@ import type {
   UpdateStatusRequest,
   ListVehiclesQuery,
   AvailabilityQuery,
+  CalendarMatrixQuery,
 } from "./vehicles.dto";
 import type { Vehicle } from "@/worker/core/database/schema";
 
@@ -39,6 +42,7 @@ export class VehiclesService {
       year: vehicle.year,
       dailyRateIdr: vehicle.dailyRateIdr,
       dailyRateUsd: vehicle.dailyRateUsd,
+      description: vehicle.description,
       status: vehicle.status,
       totalKm: vehicle.totalKm,
       photoUrl: vehicle.photoUrl,
@@ -91,6 +95,7 @@ export class VehiclesService {
       year: data.year ?? null,
       dailyRateIdr: data.dailyRateIdr,
       dailyRateUsd: data.dailyRateUsd ?? null,
+      description: data.description ?? null,
       photoUrl: data.photoUrl ?? null,
       status: "Available",
       totalKm: 0,
@@ -125,6 +130,7 @@ export class VehiclesService {
       year: data.year,
       dailyRateIdr: data.dailyRateIdr,
       dailyRateUsd: data.dailyRateUsd,
+      description: data.description,
       totalKm: data.totalKm,
       photoUrl: data.photoUrl,
     });
@@ -172,6 +178,23 @@ export class VehiclesService {
         createdAt: new Date().toISOString(),
       },
     };
+  }
+
+  async delete(id: string): Promise<void> {
+    const existing = await this.vehicleRepo.findById(id);
+    if (!existing) throw new NotFoundError("Vehicle");
+
+    // Refuse if there are active/upcoming bookings referencing this vehicle
+    if (this.bookingRepo) {
+      const activeCount = await this.bookingRepo.countActiveByVehicle(id);
+      if (activeCount > 0) {
+        throw new ConflictError(
+          "Cannot delete vehicle with active or upcoming bookings"
+        );
+      }
+    }
+
+    await this.vehicleRepo.delete(id);
   }
 
   async checkAvailability(
@@ -299,35 +322,213 @@ export class VehiclesService {
     return { vehicleId, month, calendar };
   }
 
-  async checkAvailabilityForDates(
-    vehicleId: string,
-    startDate: string,
-    endDate: string,
-  ): Promise<boolean> {
-    const vehicle = await this.vehicleRepo.findById(vehicleId);
-    if (!vehicle) return false;
+  /**
+   * Admin fleet calendar matrix: every vehicle (row) × every day of the month
+   * (column), each cell marked available/booked/maintenance/inactive with the
+   * booking summary attached when booked.
+   */
+  async getCalendarMatrix(query: CalendarMatrixQuery): Promise<CalendarMatrixResult> {
+    const [year, monthNum] = query.month.split("-").map(Number);
+    const pad = (n: number) => String(n).padStart(2, "0");
 
-    if (vehicle.status === "Maintenance" || vehicle.status === "Inactive")
-      return false;
+    const monthStart = `${query.month}-01`;
+    const endDateExclusive =
+      monthNum === 12 ? `${year + 1}-01-01` : `${year}-${pad(monthNum + 1)}-01`;
 
-    if (this.maintenanceRepo) {
-      const mConflicts = await this.maintenanceRepo.findConflictingMaintenance(
-        vehicleId,
-        startDate,
-        endDate,
-      );
-      if (mConflicts.length > 0) return false;
+    const daysInMonth = new Date(year, monthNum, 0).getDate();
+    const allDays: string[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      allDays.push(`${query.month}-${pad(d)}`);
     }
 
-    if (this.bookingRepo) {
-      const bConflicts = await this.bookingRepo.findConflictingBookings(
-        vehicleId,
-        startDate,
-        endDate,
-      );
-      if (bConflicts.length > 0) return false;
+    const { items: fleet } = await this.vehicleRepo.list({
+      page: 1,
+      limit: 1000,
+      type: query.type,
+      status: query.status,
+    });
+
+    const rangeBookings = this.bookingRepo
+      ? await this.bookingRepo.findBookingsInRangeWithCustomer(monthStart, endDateExclusive)
+      : [];
+
+    const vehicles: CalendarMatrixResult["vehicles"] = [];
+    for (const v of fleet) {
+      const dates: Record<string, CalendarMatrixCell> = {};
+      const baseStatus: CalendarMatrixCell["status"] =
+        v.status === "Inactive"
+          ? "inactive"
+          : v.status === "Maintenance"
+            ? "maintenance"
+            : "available";
+      for (const day of allDays) {
+        dates[day] = { status: baseStatus };
+      }
+
+      // Overlay scheduled maintenance windows (only relevant for otherwise-available vehicles)
+      if (this.maintenanceRepo && baseStatus === "available") {
+        const conflicts = await this.maintenanceRepo.findConflictingMaintenance(
+          v.id,
+          monthStart,
+          endDateExclusive,
+        );
+        for (const m of conflicts) {
+          const mEnd = m.endDate ?? "9999-12-31";
+          for (const day of allDays) {
+            if (day >= m.startDate && day <= mEnd) {
+              dates[day] = { status: "maintenance" };
+            }
+          }
+        }
+      }
+
+      // Overlay bookings (booked takes precedence over maintenance for display)
+      const vBookings = rangeBookings.filter((b) => b.vehicleId === v.id);
+      for (const b of vBookings) {
+        for (const day of allDays) {
+          if (day >= b.startDate && day <= b.endDate) {
+            dates[day] = {
+              status: "booked",
+              booking: {
+                id: b.id,
+                bookingNumber: b.bookingNumber,
+                customerName: b.customerName,
+                customerPhone: b.customerPhone,
+              },
+            };
+          }
+        }
+      }
+
+      vehicles.push({
+        id: v.id,
+        name: v.name,
+        type: v.type,
+        plateNumber: v.plateNumber,
+        status: v.status,
+        dates,
+      });
     }
 
-    return true;
+    return { month: query.month, vehicles };
   }
+
+	async checkAvailabilityForDates(
+		vehicleId: string,
+		startDate: string,
+		endDate: string,
+	): Promise<boolean> {
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) return false;
+
+		if (vehicle.status === "Maintenance" || vehicle.status === "Inactive")
+			return false;
+
+		if (this.maintenanceRepo) {
+			const mConflicts = await this.maintenanceRepo.findConflictingMaintenance(
+				vehicleId,
+				startDate,
+				endDate,
+			);
+			if (mConflicts.length > 0) return false;
+		}
+
+		if (this.bookingRepo) {
+			const bConflicts = await this.bookingRepo.findConflictingBookings(
+				vehicleId,
+				startDate,
+				endDate,
+			);
+			if (bConflicts.length > 0) return false;
+		}
+
+		return true;
+	}
+
+	async getAvailabilityTimeline(): Promise<{
+		vehicles: {
+			id: string;
+			name: string;
+			type: string;
+			plateNumber: string;
+			status: string;
+			currentBooking: {
+				bookingNumber: string;
+				customerName: string;
+				endDate: string;
+			} | null;
+			nextAvailableDate: string | null;
+		}[];
+		summary: {
+			total: number;
+			available: number;
+			rented: number;
+			maintenance: number;
+			inactive: number;
+		};
+	}> {
+		const { items: allVehicles } = await this.vehicleRepo.list({ page: 1, limit: 1000 });
+		const today = new Date().toISOString().split('T')[0]!;
+
+		const summary = { total: 0, available: 0, rented: 0, maintenance: 0, inactive: 0 };
+		const vehicles: {
+			id: string;
+			name: string;
+			type: string;
+			plateNumber: string;
+			status: string;
+			currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null;
+			nextAvailableDate: string | null;
+		}[] = [];
+
+		for (const v of allVehicles) {
+			summary.total++;
+			if (v.status === 'Available') summary.available++;
+			else if (v.status === 'Maintenance') summary.maintenance++;
+			else if (v.status === 'Inactive') summary.inactive++;
+			else if (v.status === 'Rented') summary.rented++;
+
+			// Find current/next booking for this vehicle
+			let currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null = null;
+			let nextAvailableDate: string | null = null;
+
+			if (this.bookingRepo) {
+				const todayBookings = await this.bookingRepo.findConflictingBookings(v.id, today, today);
+				if (todayBookings.length > 0) {
+					const b = todayBookings[0]!;
+					currentBooking = {
+						bookingNumber: b.bookingNumber,
+						customerName: 'Customer',
+						endDate: b.endDate,
+					};
+					// Next available is day after endDate
+					const endDate = new Date(b.endDate);
+					endDate.setDate(endDate.getDate() + 1);
+					nextAvailableDate = endDate.toISOString().split('T')[0]!;
+				} else {
+					// Find next upcoming booking
+					const futureDate = new Date();
+					futureDate.setMonth(futureDate.getMonth() + 1);
+					const futureEnd = futureDate.toISOString().split('T')[0]!;
+					const upcoming = await this.bookingRepo.findConflictingBookings(v.id, today, futureEnd);
+					if (upcoming.length > 0) {
+						// Vehicle is available now but has upcoming booking
+						nextAvailableDate = upcoming[0]!.startDate;
+					}
+				}
+			}
+
+			vehicles.push({
+				id: v.id,
+				name: v.name,
+				type: v.type,
+				plateNumber: v.plateNumber,
+				status: v.status,
+				currentBooking,
+				nextAvailableDate,
+			});
+		}
+
+		return { vehicles, summary };
+	}
 }

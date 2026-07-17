@@ -5,7 +5,6 @@ import {
 } from 'react-router-dom';
 import {
 	LayoutDashboard,
-	Users,
 	FileText,
 	CreditCard,
 	Bike,
@@ -22,6 +21,9 @@ import {
 	Star,
 	Map,
 	UserCog,
+	CalendarDays,
+	Shirt,
+	Car,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -74,12 +76,6 @@ const defaultNavItems: NavItem[] = [
 		icon: <LayoutDashboard className="size-5" />,
 	},
 	{
-		label: 'Leads',
-		href: '/leads',
-		icon: <Users className="size-5" />,
-		badge: 'New',
-	},
-	{
 		label: 'Bookings',
 		href: '/bookings',
 		icon: <FileText className="size-5" />,
@@ -88,6 +84,10 @@ const defaultNavItems: NavItem[] = [
 		label: 'Payments',
 		href: '/payments',
 		icon: <CreditCard className="size-5" />,
+		children: [
+			{ label: 'All Payments', href: '/payments' },
+			{ label: 'Dashboard', href: '/payments/dashboard' },
+		],
 	},
 	{
 		label: 'Vehicles',
@@ -95,9 +95,24 @@ const defaultNavItems: NavItem[] = [
 		icon: <Bike className="size-5" />,
 	},
 	{
+		label: 'Availability',
+		href: '/vehicles/availability',
+		icon: <Car className="size-5" />,
+	},
+	{
+		label: 'Calendar',
+		href: '/calendar',
+		icon: <CalendarDays className="size-5" />,
+	},
+	{
 		label: 'Customers',
 		href: '/customers',
 		icon: <UserCircle className="size-5" />,
+	},
+	{
+		label: 'Equipment',
+		href: '/equipment',
+		icon: <Shirt className="size-5" />,
 	},
 	{
 		label: 'Maintenance',
@@ -162,10 +177,10 @@ function SidebarItem({ item, collapsed, onItemClick }: SidebarItemProps) {
 			className={({ isActive }) =>
 				cn(
 					'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-					'hover:bg-muted hover:text-foreground',
+					'hover:bg-accent hover:text-accent-foreground',
 					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
 					isActive
-						? 'bg-primary/10 text-primary hover:bg-primary/15'
+						? 'bg-primary/15 text-primary font-semibold'
 						: 'text-muted-foreground',
 					collapsed && 'justify-center px-2'
 				)
@@ -233,13 +248,13 @@ function Sidebar({
 	const sidebarContent = (
 		<div
 			className={cn(
-				'flex h-full flex-col bg-card border-r border-border transition-all duration-300',
+				'flex h-full flex-col bg-card border-r border-border shadow-lg md:shadow-none transition-all duration-300',
 				collapsed ? 'w-16' : 'w-64',
 				className
 			)}
 		>
 			{/* Logo Header */}
-			<div className="flex h-16 items-center justify-between border-b border-border px-4">
+			<div className="flex h-16 items-center justify-between border-b border-border px-4 bg-card">
 				{!collapsed && (
 					<Link to="/" className="flex items-center gap-2">
 						{logo || (
@@ -257,7 +272,7 @@ function Sidebar({
 			</div>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto p-3 space-y-1">
+			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted">
 				{items.map((item) => (
 					<SidebarItem
 						key={item.href}
@@ -270,7 +285,7 @@ function Sidebar({
 
 			{/* Footer Items */}
 			{footerItems.length > 0 && (
-				<div className="border-t border-border p-3 space-y-1">
+				<div className="border-t border-border p-3 space-y-1 bg-card">
 					{footerItems.map((item) => (
 						<SidebarItem
 							key={item.href}
@@ -305,11 +320,11 @@ function Sidebar({
 
 	return (
 		<>
-			{/* Mobile Menu Button */}
+		{/* Mobile Menu Button */}
 			<Button
 				variant="ghost"
 				size="icon"
-				className="md:hidden fixed top-4 left-4 z-50"
+				className="md:hidden fixed top-3 left-3 z-[51] h-10 w-10 bg-card border border-border shadow-md"
 				onClick={() => handleMobileOpenChange(!mobileOpen)}
 			>
 				{mobileOpen ? (
@@ -334,7 +349,7 @@ function Sidebar({
 			{/* Mobile: Slide-in drawer */}
 			<div
 				className={cn(
-					'md:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300',
+					'md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-2xl transform transition-transform duration-300',
 					mobileOpen ? 'translate-x-0' : '-translate-x-full'
 				)}
 			>

@@ -1,10 +1,10 @@
 import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
-import { ValidationError } from "@/worker/core/types/errors";
+import { ValidationError, ConflictError } from "@/worker/core/types/errors";
 import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
+import { calculateTwelveHourBlocks } from '@/worker/modules/bookings/availability.helper';
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
 import type {
-  SubmitLeadRequest,
   CheckAvailabilityQuery,
   CreatePublicBookingRequest,
 } from "./public-api.dto";
@@ -29,8 +29,11 @@ function safeJsonParseStringArray(value: string | null | undefined): string[] {
 }
 
 /** Parse a 'YYYY-MM-DD' string into a UTC Date (timezone-safe). */
+/** Parse a YYYY-MM-DD or ISO 8601 datetime string into a UTC Date. */
 function parseDateStr(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
+  // Strip time portion if present (ISO 8601: "2026-06-28T02:00:00+07:00" -> "2026-06-28")
+  const datePart = value.includes('T') ? value.split('T')[0]! : value;
+  const [y, m, d] = datePart.split('-').map(Number);
   return new Date(Date.UTC(y!, m! - 1, d!));
 }
 
@@ -66,29 +69,7 @@ export class PublicApiService {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
   }
 
-  // 1. Submit Lead
-  async submitLead(
-    data: SubmitLeadRequest,
-  ): Promise<{ id: string; status: string; createdAt: string }> {
-    const source = data.source || "Website";
-    const lead = await this.repo.createLead({
-      name: data.name,
-      phone: data.phone,
-      email: data.email || null,
-      notes: data.message || null,
-      source,
-      status: "New",
-      priority: "Warm",
-      assignedTo: null,
-      followUpDate: null,
-      preferredStart: data.preferredDates?.start || null,
-      preferredEnd: data.preferredDates?.end || null,
-      vehicleInterest: data.preferredDates?.vehicleInterest || null,
-    });
-    return { id: lead.id, status: lead.status, createdAt: lead.createdAt };
-  }
-
-  // 2. Check Availability
+  // 1. Check Availability
   async checkAvailability(query: CheckAvailabilityQuery): Promise<{
     requestedPeriod: { startDate: string; endDate: string };
     availableVehicles: Array<{
@@ -232,6 +213,49 @@ export class PublicApiService {
     };
   }
 
+  /** Get vehicle by QR/barcode code (SVN:{vehicleId}) for public scan */
+  async getVehicleByCode(code: string): Promise<{
+    id: string;
+    name: string;
+    type: string;
+    brand: string | null;
+    model: string | null;
+    year: number | null;
+    category: string | null;
+    plateNumber: string;
+    dailyRateIdr: number;
+    image: string | null;
+    specs: Record<string, string> | null;
+    description: string | null;
+    available: boolean;
+    displayName: string;
+  } | null> {
+    const vehicle = await this.repo.getVehicleByCode(code);
+    if (!vehicle) return null;
+
+    const parsedSpecs = safeJsonParse<Record<string, string> | null>(
+      typeof vehicle.specs === "string" ? vehicle.specs : null,
+      vehicle.specs ? { details: String(vehicle.specs) } : null,
+    );
+
+    return {
+      id: vehicle.id,
+      name: vehicle.name,
+      type: vehicle.type,
+      brand: vehicle.brand,
+      model: vehicle.model,
+      year: vehicle.year,
+      category: vehicle.category,
+      plateNumber: vehicle.plateNumber,
+      dailyRateIdr: vehicle.dailyRateIdr,
+      image: resolveUrl(vehicle.photoUrl, this.baseUrl),
+      specs: parsedSpecs,
+      description: vehicle.description,
+      available: vehicle.status === "Available",
+      displayName: this.getDisplayName(vehicle.type),
+    };
+  }
+
   // 5. Create Booking (public — no auth required, only API key)
   async createPublicBooking(
     data: CreatePublicBookingRequest,
@@ -243,6 +267,10 @@ export class PublicApiService {
   ): Promise<{
     bookingId: string;
     bookingNumber: string;
+    startDate: string;
+    endDate: string;
+    blocks: number;
+    vehicleName: string;
     paymentPageUrl: string | null;
     qrString: string | null;
     xenditInvoiceId: string | null;
@@ -270,8 +298,8 @@ export class PublicApiService {
       data.endDate,
     );
     if (!isAvailable)
-      throw new ValidationError(
-        "Vehicle is already booked for the selected dates",
+      throw new ConflictError(
+        "Vehicle is already booked for the selected dates. Please choose another vehicle or different dates.",
       );
 
     // Find or create customer
@@ -286,14 +314,11 @@ export class PublicApiService {
       });
     }
 
-    // Calculate base amount (vehicle)
-    const days = Math.ceil(
-      (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
-    const baseAmount = days * vehicle.dailyRateIdr;
+    // Calculate base amount using 12-hour blocks (not daily)
+    const blocks = calculateTwelveHourBlocks(data.startDate, data.endDate);
+    const baseAmount = blocks * vehicle.dailyRateIdr;
 
-    // ---- Equipment line items (per-day, same duration as the vehicle) ----
+    // ---- Equipment line items (per-block, same duration as the vehicle) ----
     let equipmentTotalAmount = 0;
     const equipmentRows: Array<{ equipmentId: string; quantity: number; unitPrice: number; totalPrice: number }> = [];
     const requestedEquipment = data.equipment ?? [];
@@ -306,7 +331,7 @@ export class PublicApiService {
         if (!item)
           throw new ValidationError(`Equipment not found or inactive: ${req.equipmentId}`);
         const unitPrice = item.dailyRateIdr;
-        const totalPrice = unitPrice * req.quantity * days;
+        const totalPrice = unitPrice * req.quantity * blocks;
         equipmentTotalAmount += totalPrice;
         equipmentRows.push({ equipmentId: item.id, quantity: req.quantity, unitPrice, totalPrice });
       }
@@ -374,18 +399,21 @@ export class PublicApiService {
         // Use the payment method from request, default to 'Gateway' (all methods)
         const paymentMethod = data.paymentMethod ?? 'Gateway';
 
+        // ---- Payment amount: DP creates invoice for dpAmount only, full creates for totalAmount.
+        //      The payment page shows exactly what the customer needs to pay — no ambiguity.
+        //      external_id = bookingNumber so the webhook can match it.
+        const invoiceAmount = paymentType === 'dp' ? dpAmount : totalAmount;
+
         const result = await gateway.createPayment({
-          amount: totalAmount,
+          amount: invoiceAmount,
           currency: 'IDR',
           method: paymentMethod,
           bookingId: booking.bookingNumber,
           customerEmail: customer.email ?? undefined,
           customerPhone: customer.phone,
-          description: `Rental ${vehicle.name} (${days} day${days > 1 ? "s" : ""})`,
-          // DP => one invoice for the full amount, allow_partial lets the customer pay
-          // at least the DP now and reopen the same invoice later for the remainder.
-          allowPartial: paymentType === 'dp',
-          minimumAmount: paymentType === 'dp' ? dpAmount : undefined,
+          description: paymentType === 'dp'
+            ? `DP Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""}) — DP ${dpAmount.toLocaleString('id-ID')}`
+            : `Rental ${vehicle.name} (${blocks} block${blocks > 1 ? "s" : ""})`,
         });
 
         if (result.success) {
@@ -413,6 +441,10 @@ export class PublicApiService {
     return {
       bookingId: booking.id,
       bookingNumber: booking.bookingNumber,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      blocks,
+      vehicleName: vehicle.name,
       paymentPageUrl,
       qrString,
       xenditInvoiceId,
@@ -629,12 +661,30 @@ export class PublicApiService {
   async getBookingStatus(bookingNumber: string): Promise<{
     bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
+    blocks: number;
     totalAmount: number; paidAt: string | null;
+    paymentPageUrl: string | null; qrString: string | null;
+    paymentType: string; dpAmount: number; remainingAmount: number;
+    isFullyPaid: boolean;
+    isPickupTime: boolean;
   } | null> {
     const booking = await this.repo.findBookingByNumber(bookingNumber);
     if (!booking) return null;
 
     const vehicle = await this.repo.getVehicleById(booking.vehicleId);
+
+    const paymentType = (booking as Record<string, unknown>).paymentType as string ?? 'full';
+    const dpAmount = ((booking as Record<string, unknown>).dpAmount as number) ?? 0;
+    const remainingAmount = ((booking as Record<string, unknown>).remainingAmount as number) ?? 0;
+    const isFullyPaid = booking.paymentStatus === 'settlement' || booking.fullyPaidAt !== null;
+    // NOTE: Do NOT use remainingAmount <= 0 here. Full-payment bookings initialize
+    // remainingAmount to 0 at creation time, so that would incorrectly report unpaid
+    // bookings as fully paid. Rely on paymentStatus/fullyPaidAt instead.
+
+    // isPickupTime = current time >= booking startDate (ISO 8601 datetime string)
+    const now = new Date();
+    const start = new Date(booking.startDate);
+    const isPickupTime = now >= start;
 
     return {
       bookingNumber: booking.bookingNumber,
@@ -643,8 +693,16 @@ export class PublicApiService {
       vehicleName: vehicle?.name ?? 'Unknown',
       startDate: booking.startDate,
       endDate: booking.endDate,
+      blocks: calculateTwelveHourBlocks(booking.startDate, booking.endDate),
       totalAmount: booking.totalAmount,
       paidAt: booking.paidAt,
+      paymentPageUrl: (booking as Record<string, unknown>).paymentPageUrl as string | null ?? null,
+      qrString: null,
+      paymentType,
+      dpAmount,
+      remainingAmount,
+      isFullyPaid,
+      isPickupTime,
     };
   }
 

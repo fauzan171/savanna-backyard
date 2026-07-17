@@ -4,7 +4,6 @@ import { errorHandler, handleError } from './core/middleware/error-handler';
 import { createAuthRouter } from './modules/auth/auth.routes';
 import { createCustomersRouter } from './modules/customers/customers.routes';
 import { createVehiclesRouter } from './modules/vehicles/vehicles.routes';
-import { createLeadsRouter } from './modules/leads/leads.routes';
 import { createPaymentsRouter } from './modules/payments/payments.routes';
 import { createBookingsRouter } from './modules/bookings/bookings.routes';
 import { createMaintenanceRouter } from './modules/maintenance/maintenance.routes';
@@ -26,6 +25,9 @@ import { createDb } from './core/database';
 import { ConfigRepository } from './core/repositories/config.repository';
 import { EmailService } from './core/services/email.service';
 import { NotificationService } from './core/services/notification.service';
+import { VehiclesRepository } from './modules/vehicles/vehicles.repository';
+import { BookingsRepository } from './modules/bookings/bookings.repository';
+import { calculateLateFee } from './modules/bookings/availability.helper';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -85,9 +87,6 @@ v1Routes.route('/customers', createCustomersRouter() as unknown as Hono<{ Bindin
 
 // Vehicle management routes
 v1Routes.route('/vehicles', createVehiclesRouter() as unknown as Hono<{ Bindings: Env }>);
-
-// Leads management routes
-v1Routes.route('/leads', createLeadsRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Bookings management routes
 v1Routes.route('/bookings', createBookingsRouter() as unknown as Hono<{ Bindings: Env }>);
@@ -176,6 +175,7 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
 
   const db = createDb(env.DB);
   const configRepo = new ConfigRepository(db);
+  const vehicleRepo = new VehiclesRepository(db);
   const emailService = new EmailService({
     apiKey: env.RESEND_API_KEY,
     fromEmail: env.EMAIL_FROM || 'Savanna Bromo <noreply@savannabromo.com>',
@@ -183,15 +183,73 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
   const notificationService = new NotificationService(db, emailService, configRepo);
 
   try {
-    // Run all notification jobs
+    // 1. Auto-release vehicles from Cleaning → Available
+    let cleanableVehicles = 0;
+    try {
+      const vehicles = await vehicleRepo.getCleanableVehicles();
+      for (const v of vehicles) {
+        await vehicleRepo.markCleaned(v.id);
+        console.log(`[Scheduled] Vehicle ${v.plateNumber} (${v.name}) auto-released from Cleaning → Available`);
+        cleanableVehicles++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error releasing cleaned vehicles:', error);
+    }
+
+    // 2. Run notification jobs
     const dailyReminders = await notificationService.runDailyReminders();
     const hourlyReminders = await notificationService.runHourlyReminders();
     const followups = await notificationService.runFollowups();
 
+    // 3. Booking status transitions: Confirmed → Active (rental start time arrived)
+    let activatedCount = 0;
+    try {
+      const bookingRepo = new BookingsRepository(db);
+      const readyToActivate = await bookingRepo.getConfirmedReadyToActivate();
+      for (const b of readyToActivate) {
+        await bookingRepo.update(b.id, {
+          status: 'Active',
+          pickupConfirmed: true,
+          pickupConfirmedAt: new Date().toISOString(),
+        });
+        console.log(`[Scheduled] Booking ${b.bookingNumber} auto-activated (Confirmed → Active)`);
+        activatedCount++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error activating bookings:', error);
+    }
+
+    // 4. Booking status transitions: Active → Completed (end time passed, overdue)
+    let completedCount = 0;
+    try {
+      const bookingRepo = new BookingsRepository(db);
+      const overdue = await bookingRepo.getActiveOverdue();
+      for (const b of overdue) {
+        const now = new Date().toISOString();
+        const { lateFee } = calculateLateFee(b.baseAmount, b.endDate, now);
+        const newTotal = b.baseAmount + (b.equipmentTotalAmount ?? 0) + lateFee;
+        await bookingRepo.update(b.id, {
+          status: 'Completed',
+          actualReturnDate: now,
+          lateFee,
+          totalAmount: newTotal,
+          returnConfirmed: true,
+          returnConfirmedAt: now,
+        });
+        console.log(`[Scheduled] Booking ${b.bookingNumber} auto-completed (Active → Completed, lateFee=${lateFee})`);
+        completedCount++;
+      }
+    } catch (error) {
+      console.error('[Scheduled] Error completing overdue bookings:', error);
+    }
+
     console.log('[Scheduled] All jobs completed:', {
+      cleanableVehicles,
       dailyReminders,
       hourlyReminders,
       followups,
+      activated: activatedCount,
+      overdueCompleted: completedCount,
     });
   } catch (error) {
     console.error('[Scheduled] Error running notification jobs:', error);

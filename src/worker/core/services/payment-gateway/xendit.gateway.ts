@@ -132,8 +132,12 @@ export class XenditGateway implements PaymentGateway {
 			const invoiceUrl = (data.invoice_url as string) ?? null;
 
 			// Extract QR string for inline QRIS rendering
+			// Xendit only returns qr_code when payment_method includes QRIS
 			const qrCode = data.qr_code as { qr_string?: string } | undefined;
 			const qrString = qrCode?.qr_string ?? undefined;
+			if (!qrString) {
+				console.log('[Xendit] No qr_string in response. qr_code field:', data.qr_code ?? 'absent');
+			}
 
 			return {
 				success: true,

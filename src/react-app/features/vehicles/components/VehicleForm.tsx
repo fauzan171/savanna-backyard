@@ -14,6 +14,7 @@ import {
 } from '@/react-app/components/ui/select';
 import { FormField } from '@/react-app/components/ui/form-field';
 import { FileUpload } from '@/react-app/components/ui/file-upload';
+import { Textarea } from '@/react-app/components/ui/textarea';
 import { api } from '@/react-app/lib/api-client';
 import type { Vehicle, VehicleFormData, VehicleType } from '../types/vehicle.types';
 
@@ -26,6 +27,7 @@ const vehicleFormSchema = z.object({
 	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),
 	dailyRateIdr: z.coerce.number().min(0, 'Rate must be positive'),
 	dailyRateUsd: z.coerce.number().min(0).optional().or(z.literal('')),
+	description: z.string().max(1000).optional().or(z.literal('')),
 	photoUrl: z.string().optional().or(z.literal('')),
 });
 
@@ -63,6 +65,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 			year: undefined,
 			dailyRateIdr: 0,
 			dailyRateUsd: undefined,
+			description: '',
 			photoUrl: '',
 		},
 	});
@@ -83,6 +86,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				year: vehicle.year ?? undefined,
 				dailyRateIdr: vehicle.dailyRateIdr,
 				dailyRateUsd: vehicle.dailyRateUsd ?? undefined,
+				description: vehicle.description ?? '',
 				photoUrl: vehicle.photoUrl ?? '',
 			});
 		}
@@ -113,6 +117,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 			model: data.model || undefined,
 			year: data.year || undefined,
 			dailyRateUsd: data.dailyRateUsd || undefined,
+			description: data.description || undefined,
 			photoUrl: data.photoUrl || undefined,
 		};
 		await onSubmit(cleanData);
@@ -223,6 +228,18 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 						<span className="text-xs text-muted-foreground">Current photo</span>
 					</div>
 				)}
+			</FormField>
+
+			<FormField label="Description" error={errors.description?.message}>
+				<Textarea
+					{...register('description')}
+					placeholder="Describe this vehicle - condition, features, best use, etc. This will be shown on the landing page."
+					rows={4}
+					disabled={isLoading || isSubmitting}
+				/>
+				<p className="text-xs text-muted-foreground mt-1">
+					Optional. Max 1000 characters. Shown on the public landing page vehicle detail.
+				</p>
 			</FormField>
 
 			<div className="flex justify-end gap-3 pt-4">

@@ -1,21 +1,27 @@
 import { PublicUsersRepository } from './public-users.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
-import type { GoogleOAuthProvider, WhatsAppProvider } from '@/worker/core/services/providers';
-import { ValidationError, UnauthorizedError, NotFoundError } from '@/worker/core/types/errors';
-import type { GoogleLoginRequest, PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest } from './public-users.dto';
+import { decodeVehicleQr } from '@/worker/core/lib/qr';
+import { PaymentGatewayFactory } from '@/worker/core/services/payment-gateway/factory';
+import type { WhatsAppProvider } from '@/worker/core/services/providers';
+import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
+import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest, DevLoginRequest } from './public-users.dto';
 import type { PublicUser, Booking } from '@/worker/core/database/schema';
 
 const REF_EXPIRY_MIN = 5;
 const OTP_EXPIRY_MIN = 5;
 const MAX_INIT_PER_HOUR = 3;
 const MAX_OTP_ATTEMPTS = 5;
+// ponytail: fixed dev OTP for stub mode so the OTP flow is fully testable without
+// reading server logs. Only used when whatsapp provider = 'stub' (dev default).
+// Prod runs on Fonnte → random OTP via genOtp(). Remove when real WA is wired.
+const DEV_OTP = '123456';
 
 export interface PublicAccountInfo {
 	id: string;
-	email: string;
-	name: string;
-	phone: string | null;
+	phone: string;
+	name: string | null;
+	email: string | null;
 	phoneVerified: boolean;
 	avatarUrl: string | null;
 }
@@ -39,9 +45,9 @@ export interface PublicBookingSummary {
 function toAccountInfo(u: PublicUser): PublicAccountInfo {
 	return {
 		id: u.id,
-		email: u.email,
-		name: u.name,
 		phone: u.phone,
+		name: u.name,
+		email: u.email,
 		phoneVerified: u.phoneVerified,
 		avatarUrl: u.avatarUrl,
 	};
@@ -87,6 +93,24 @@ async function sha256Hex(input: string): Promise<string> {
 	return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Deterministic, non-dialable phone sentinel for developer accounts.
+ * `public_users.phone` is NOT NULL + UNIQUE and is the login identity for real
+ * users; dev accounts have no phone, so we derive a stable 15-digit value from
+ * the email. The `000` prefix is a namespace no real E.164 number uses, keeping
+ * dev rows identifiable and collision-free with real users. Same email → same
+ * sentinel → same account on every login (idempotent, persisted in DB).
+ */
+async function devPhoneFor(email: string): Promise<string> {
+	const hex = await sha256Hex(email);
+	// Fold the full 256-bit hash into a base-10 number, take 12 digits, zero-pad.
+	let n = 0n;
+	for (let i = 0; i < hex.length; i++) {
+		n = (n * 16n + BigInt(parseInt(hex[i]!, 16))) % 10n ** 12n;
+	}
+	return '000' + n.toString().padStart(12, '0');
+}
+
 /** Extract the message text from a provider-specific inbound payload. */
 function extractText(body: unknown): string | null {
 	if (!body || typeof body !== 'object') return null;
@@ -108,47 +132,20 @@ export class PublicUsersService {
 	constructor(
 		private repo: PublicUsersRepository,
 		private jwtService: JwtService,
-		private google: GoogleOAuthProvider,
 		private whatsapp: WhatsAppProvider,
 		private configRepo: ConfigRepository,
 	) {}
 
-	/** Google OAuth login: verify id_token, upsert user, mint a public-user JWT. */
-	async googleLogin(data: GoogleLoginRequest): Promise<{
-		token: string;
-		user: PublicAccountInfo;
-		requiresPhoneVerification: boolean;
-	}> {
-		const info = await this.google.verifyIdToken(data.idToken);
-		let user = await this.repo.findByGoogleId(info.googleId);
-		if (!user) {
-			user = await this.repo.create({
-				googleId: info.googleId,
-				email: info.email,
-				name: info.name,
-				avatarUrl: info.avatarUrl,
-				phone: null,
-				phoneVerified: false,
-				deviceFingerprint: data.deviceFingerprint ?? null,
-				isActive: true,
-			});
-		}
-		if (!user.isActive) {
-			throw new UnauthorizedError('Account is deactivated');
-		}
-		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
-		return {
-			token,
-			user: toAccountInfo(user),
-			requiresPhoneVerification: !user.phoneVerified,
-		};
-	}
-
-	/** Start phone verification: create a short-lived ref code + wa.me deep link. */
-	async phoneInit(publicUserId: string, data: PhoneInitRequest): Promise<{
+	/**
+	 * Start phone login: create a short-lived Ref code + wa.me deep link. No account
+	 * needed yet — the user sends the Ref to the WhatsApp business number, the inbound
+	 * webhook generates the OTP, and they verify via phoneVerify (which logs them in).
+	 */
+	async phoneInit(data: PhoneInitRequest): Promise<{
 		refCode: string;
 		waMeUrl: string;
 		expiresAt: string;
+		devOtp?: string;
 	}> {
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 		const recent = await this.repo.countRecentVerificationByPhone(data.phone, oneHourAgo);
@@ -159,7 +156,7 @@ export class PublicUsersService {
 		const refCode = genRefCode();
 		const expiresAt = new Date(Date.now() + REF_EXPIRY_MIN * 60 * 1000).toISOString();
 		await this.repo.createVerificationCode({
-			publicUserId,
+			publicUserId: null,
 			phone: data.phone,
 			refCode,
 			otpHash: null,
@@ -170,23 +167,26 @@ export class PublicUsersService {
 		});
 
 		const businessNumber = (await this.configRepo.getValue('whatsapp_number')) ?? '';
-		const msg = encodeURIComponent(`Savanna Bromo - Verifikasi nomor. Ref: ${refCode}`);
+		const msg = encodeURIComponent(`Savanna Bromo - Login. Ref: ${refCode}`);
 		const waMeUrl = businessNumber ? `https://wa.me/${businessNumber}?text=${msg}` : '';
 
 		// In stub/dev mode, simulate the inbound step so OTP generation still happens
 		// without a real WhatsApp round-trip (keeps the flow testable end-to-end).
+		// Surface the dev OTP so the client can auto-verify without server logs.
+		let devOtp: string | undefined;
 		if (this.whatsapp.name === 'stub') {
-			await this.handleWhatsappInbound({ message: `Ref: ${refCode}` });
+			const simulated = await this.handleWhatsappInbound({ message: `Ref: ${refCode}` });
+			devOtp = simulated.otp;
 		}
 
-		return { refCode, waMeUrl, expiresAt };
+		return { refCode, waMeUrl, expiresAt, devOtp };
 	}
 
 	/**
 	 * Inbound WhatsApp handler: parse the ref code, generate an OTP, store its hash,
 	 * and reply the OTP via WhatsApp. Invoked by the /webhooks/whatsapp route.
 	 */
-	async handleWhatsappInbound(body: unknown): Promise<{ handled: boolean }> {
+	async handleWhatsappInbound(body: unknown): Promise<{ handled: boolean; otp?: string }> {
 		const text = extractText(body);
 		if (!text) return { handled: false };
 		const ref = extractRefCode(text);
@@ -195,7 +195,8 @@ export class PublicUsersService {
 		const code = await this.repo.findActiveVerificationByRef(ref);
 		if (!code || !code.phone) return { handled: false };
 
-		const otp = genOtp();
+		const isStub = this.whatsapp.name === 'stub';
+		const otp = isStub ? DEV_OTP : genOtp();
 		const otpHash = await sha256Hex(otp);
 		const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
 		await this.repo.updateVerification(code.id, { otpHash, expiresAt: otpExpiresAt });
@@ -207,12 +208,15 @@ export class PublicUsersService {
 		if (!result.success) {
 			console.error('[phone-otp] WhatsApp send failed:', result.error);
 		}
-		return { handled: true };
+		// Only surface the plaintext OTP in stub mode (dev). Real provider sends via WA.
+		return { handled: true, otp: isStub ? otp : undefined };
 	}
 
-	/** Verify the OTP entered by the user; on success consume the code + verify the phone. */
-	async phoneVerify(publicUserId: string, data: PhoneVerifyRequest): Promise<{
-		verified: boolean;
+	/**
+	 * Verify the OTP and log the user in: find-or-create the account by phone, mark it
+	 * phone-verified, and mint a public-user JWT. This is the login endpoint.
+	 */
+	async phoneVerify(data: PhoneVerifyRequest): Promise<{
 		user: PublicAccountInfo;
 		token: string;
 	}> {
@@ -234,13 +238,62 @@ export class PublicUsersService {
 		}
 
 		await this.repo.updateVerification(code.id, { consumed: true });
-		await this.repo.setPhoneVerified(publicUserId, data.phone);
 
-		const user = await this.repo.findById(publicUserId);
-		if (!user) throw new NotFoundError('Account');
+		// Find-or-create the account by phone (this is the login)
+		let user = await this.repo.findByPhone(data.phone);
+		if (!user) {
+			user = await this.repo.create({
+				phone: data.phone,
+				name: null,
+				email: null,
+				phoneVerified: true,
+				deviceFingerprint: null,
+				avatarUrl: null,
+				isActive: true,
+			});
+		} else if (!user.phoneVerified) {
+			user = await this.repo.update(user.id, { phoneVerified: true });
+		}
 
 		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
-		return { verified: true, user: toAccountInfo(user), token };
+		return { user: toAccountInfo(user), token };
+	}
+
+	/**
+	 * Developer login by email (no OTP). Gated by an allowlist passed from the
+	 * route (sourced from DEVELOPER_ALLOWLIST env). Find-or-creates the account
+	 * keyed by email, using a deterministic sentinel phone to satisfy the
+	 * NOT NULL + UNIQUE phone constraint. Issues the same public-user JWT as the
+	 * OTP flow, so every downstream path (middleware, /me, bookings) works unchanged.
+	 */
+	async devLogin(data: DevLoginRequest, allowlist: string[]): Promise<{
+		user: PublicAccountInfo;
+		token: string;
+	}> {
+		const email = data.email.trim().toLowerCase();
+		// ponytail: fail-closed allowlist; empty/missing allowlist = no dev login at all.
+		if (!allowlist.includes(email)) {
+			throw new ValidationError('Email tidak terdaftar untuk login developer.');
+		}
+
+		let user = await this.repo.findByEmail(email);
+		if (!user) {
+			const phone = await devPhoneFor(email);
+			user = await this.repo.create({
+				phone,
+				name: email.split('@')[0] || 'Developer',
+				email,
+				phoneVerified: true,
+				deviceFingerprint: null,
+				avatarUrl: null,
+				isActive: true,
+			});
+		} else if (!user.phoneVerified) {
+			user = await this.repo.update(user.id, { phoneVerified: true });
+		}
+
+		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
+		return { user: toAccountInfo(user), token };
 	}
 
 	async getMe(publicUserId: string): Promise<PublicAccountInfo> {
@@ -258,23 +311,68 @@ export class PublicUsersService {
 	}
 
 	async myBookings(publicUserId: string): Promise<PublicBookingSummary[]> {
-		const rows = await this.repo.listBookingsByPublicUser(publicUserId);
-		return rows.map(toBookingSummary);
+		const user = await this.repo.findById(publicUserId);
+
+		// Primary: bookings directly linked via publicUserId
+		const linked = await this.repo.listBookingsByPublicUser(publicUserId);
+
+		// Fallback: bookings where customer phone matches but publicUserId is still NULL
+		// (legacy bookings created before account linking was implemented)
+		let phoneMatched: Booking[] = [];
+		if (user?.phone) {
+			phoneMatched = await this.repo.listBookingsByPhone(user.phone);
+			// Auto-link any orphaned phone-matched bookings so they appear via the primary
+			// path next time (one-time migration per user)
+			if (phoneMatched.length > 0) {
+				await this.repo.linkBookingsByPhone(publicUserId, user.phone);
+			}
+		}
+
+		// Union (deduplicate by ID)
+		const seen = new Set<string>();
+		const all: Booking[] = [];
+		for (const b of [...linked, ...phoneMatched]) {
+			if (!seen.has(b.id)) {
+				seen.add(b.id);
+				all.push(b);
+			}
+		}
+
+		return all.map(toBookingSummary);
 	}
 
-	async myBookingDetail(publicUserId: string, bookingId: string): Promise<PublicBookingSummary> {
-		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+	async myBookingDetail(publicUserId: string, bookingIdOrNumber: string): Promise<PublicBookingSummary> {
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 		return toBookingSummary(b);
 	}
 
 	/**
-	 * Re-open the booking's payment to pay the remainder (DP -> full).
-	 * The Xendit invoice was created with allow_partial for the full amount, so the
-	 * customer reopens the SAME invoice_url to pay more. No new invoice is created
-	 * unless the original expired (follow-up: create a fresh invoice for the remainder).
+	 * Helper: try UUID lookup first, then fall back to bookingNumber.
+	 * Makes endpoints accept both formats for better DX.
 	 */
-	async payRemaining(publicUserId: string, bookingId: string): Promise<{
+	private async findBookingByIdOrNumberAndUser(
+		publicUserId: string,
+		bookingIdOrNumber: string,
+	): Promise<Booking | null> {
+		let b = await this.repo.findBookingByIdAndUser(bookingIdOrNumber, publicUserId);
+		if (!b) {
+			b = await this.repo.findBookingByNumberAndUser(bookingIdOrNumber, publicUserId);
+		}
+		return b;
+	}
+
+	/**
+	 * Pay the remainder for a DP booking by creating a fresh Xendit invoice.
+	 * The new invoice is for the `remainingAmount` only, with external_id =
+	 * `{bookingNumber}-remainder` so the webhook can distinguish it from the
+	 * original DP invoice.
+	 */
+	async payRemaining(
+		publicUserId: string,
+		bookingIdOrNumber: string,
+		gatewayConfig: { vendor: string; config: Record<string, string> },
+	): Promise<{
 		bookingId: string;
 		bookingNumber: string;
 		paymentStatus: string | null;
@@ -283,7 +381,7 @@ export class PublicUsersService {
 		totalAmount: number;
 		remainingAmount: number | null;
 	}> {
-		const b = await this.repo.findBookingByIdAndUser(bookingId, publicUserId);
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 
 		const isFullyPaid = b.paymentStatus === 'settlement' || b.fullyPaidAt !== null;
@@ -291,14 +389,87 @@ export class PublicUsersService {
 			throw new ValidationError('Booking is already fully paid');
 		}
 
+		const remaining = (b as Record<string, unknown>).remainingAmount as number ?? 0;
+		if (remaining <= 0) {
+			throw new ValidationError('No remaining amount to pay');
+		}
+
+		// Create a NEW invoice for the remainder amount
+		const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor as 'xendit' | 'ifortepay' | 'midtrans' | 'manual', gatewayConfig.config);
+		let paymentPageUrl = b.paymentPageUrl;
+		let newInvoiceId: string | null = null;
+
+		if (gateway.name !== 'manual') {
+			try {
+				const result = await gateway.createPayment({
+					amount: remaining,
+					currency: 'IDR',
+					method: 'Gateway',
+					bookingId: `${b.bookingNumber}-remainder`,
+					customerEmail: (b as Record<string, unknown>).customerEmail as string ?? undefined,
+					customerPhone: (b as Record<string, unknown>).customerPhone as string ?? undefined,
+					description: `Pelunasan ${b.bookingNumber} — sisa Rp ${remaining.toLocaleString('id-ID')}`,
+				});
+
+				if (result.success) {
+					paymentPageUrl = result.paymentUrl ?? b.paymentPageUrl;
+					newInvoiceId = result.transactionId ?? null;
+
+					// Save the new payment link + invoice id to the booking
+					await this.repo.updateBookingPaymentLink(b.id, {
+						...(paymentPageUrl ? { paymentPageUrl } : {}),
+						...(newInvoiceId ? { xenditInvoiceId: newInvoiceId } : {}),
+					});
+				} else {
+					console.error('[payRemaining] Failed to create remainder invoice:', result.error);
+				}
+			} catch (error) {
+				console.error('[payRemaining] Exception creating remainder invoice:', error);
+			}
+		}
+
 		return {
 			bookingId: b.id,
 			bookingNumber: b.bookingNumber,
 			paymentStatus: b.paymentStatus,
-			paymentPageUrl: b.paymentPageUrl,
-			xenditInvoiceId: b.xenditInvoiceId,
+			paymentPageUrl,
+			xenditInvoiceId: newInvoiceId ?? b.xenditInvoiceId,
 			totalAmount: b.totalAmount,
-			remainingAmount: b.remainingAmount,
+			remainingAmount: remaining,
 		};
+	}
+
+	/**
+	 * Confirm pickup by scanning the vehicle QR code. Soft-confirm: sets
+	 * pickupConfirmed + status=Active. Does NOT record startKm or flip the vehicle
+	 * to Rented — the admin's physical handover (pickup checklist + startRental)
+	 * still owns that. Kept here to avoid coupling the public-users service into
+	 * BookingsService.
+	 */
+	async confirmPickup(publicUserId: string, bookingIdOrNumber: string, qrCode: string): Promise<PublicBookingSummary> {
+		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
+		if (!b) throw new NotFoundError('Booking');
+
+		const scannedVehicleId = decodeVehicleQr(qrCode);
+		if (!scannedVehicleId) throw new ValidationError('QR code tidak valid');
+		if (b.vehicleId !== scannedVehicleId) {
+			throw new ValidationError('QR code tidak sesuai dengan kendaraan pada booking ini');
+		}
+		if (b.status !== 'Confirmed') {
+			throw new ValidationError(`Status booking "${b.status}" tidak memungkinkan konfirmasi pickup`);
+		}
+		if (b.pickupConfirmed) {
+			throw new ValidationError('Pickup sudah dikonfirmasi sebelumnya');
+		}
+
+		const paymentReady =
+			b.paymentStatus === 'settlement' ||
+			b.fullyPaidAt !== null;
+		if (!paymentReady) {
+			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran penuh sebelum pickup.');
+		}
+
+		const updated = await this.repo.confirmPickup(b.id);
+		return toBookingSummary(updated);
 	}
 }

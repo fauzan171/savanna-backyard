@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, QrCode } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { BookingTable } from '../components/BookingTable';
 import { BookingForm } from '../components/BookingForm';
+import { QrScannerModal } from '../components/QrScannerModal';
 import { useBookings, useCreateBooking } from '../hooks/useBookings';
 import type { Booking, BookingFormData, BookingFilters } from '../types/booking.types';
 import {
@@ -25,6 +26,7 @@ export function BookingsPage() {
 	const navigate = useNavigate();
 	const [filters, setFilters] = useState<BookingFilters>({});
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const [isScanOpen, setIsScanOpen] = useState(false);
 
 	const { data, isLoading } = useBookings(filters);
 	const createBooking = useCreateBooking();
@@ -54,10 +56,16 @@ export function BookingsPage() {
 				title="Bookings"
 				description="Manage vehicle rental bookings"
 				actions={
-					<Button onClick={() => setIsCreateOpen(true)}>
-						<Plus className="size-4 mr-2" />
-						New Booking
-					</Button>
+					<div className="flex gap-2">
+						<Button variant="outline" onClick={() => setIsScanOpen(true)}>
+							<QrCode className="size-4 mr-2" />
+							Scan QR
+						</Button>
+						<Button onClick={() => setIsCreateOpen(true)}>
+							<Plus className="size-4 mr-2" />
+							New Booking
+						</Button>
+					</div>
 				}
 			/>
 
@@ -108,6 +116,9 @@ export function BookingsPage() {
 					/>
 				</DialogContent>
 			</Dialog>
+
+			{/* QR Scanner Modal (admin scans vehicle to resolve active rental) */}
+			<QrScannerModal open={isScanOpen} onOpenChange={setIsScanOpen} />
 		</div>
 	);
 }

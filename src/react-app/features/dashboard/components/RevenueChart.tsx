@@ -38,7 +38,11 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 	return (
 		<ChartContainer
 			title="Revenue Trend"
-			description={data?.period ? `Period: ${data.period}` : undefined}
+			description={
+				data?.period
+					? `Period: ${typeof data.period === 'string' ? data.period : `${data.period.start} → ${data.period.end}`}`
+					: undefined
+			}
 			loading={isLoading}
 			empty={!data?.trend || data.trend.length === 0}
 			emptyMessage="No revenue data for the selected period"

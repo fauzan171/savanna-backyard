@@ -40,6 +40,10 @@ export const completeRentalSchema = z.object({
 	endKm: z.number().min(0),
 	returnNotes: z.string().max(1000).optional().nullable(),
 	damageNotes: z.string().max(1000).optional().nullable(),
+	// Optional admin override for the auto-calculated damage fee (flat damage_per_item x flipped items)
+	damageFeeOverride: z.number().min(0).optional().nullable(),
+	// Optional condition status to record for the vehicle after return
+	conditionStatus: z.enum(['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance']).optional(),
 });
 
 // Extend rental schema
@@ -54,6 +58,11 @@ export const extendRentalSchema = z.object({
 // Cancel booking schema
 export const cancelBookingSchema = z.object({
 	reason: z.string().min(1, 'Cancellation reason is required').max(500),
+});
+
+// Scan-return schema: admin scans the vehicle QR to resolve the active booking
+export const scanReturnSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
 });
 
 // Add addon schema
@@ -87,6 +96,23 @@ export const availabilityQuerySchema = z.object({
 	{ message: 'Start date must be before or equal to end date' }
 );
 
+// Submit QR scan checklist schema (pickup or motor condition check)
+export const submitChecklistSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
+	scanMode: z.enum(['pickup_checklist', 'motor_condition_check']),
+	items: z.record(z.boolean()).refine(
+		(v) => Object.keys(v).length > 0,
+		{ message: 'At least one checklist item is required' }
+	),
+	kmReading: z.number().min(0),
+	fuelLevel: z.number().int().min(0).max(100).optional().nullable(),
+	photos: z.array(z.string().url()).max(10).optional().default([]),
+	notes: z.string().max(2000).optional().nullable(),
+	conditionStatus: z.enum(['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance']).optional(),
+	// For pickup checklist: auto-start rental after checklist is submitted
+	startRental: z.boolean().default(true),
+});
+
 // Calendar query schema
 export const calendarQuerySchema = z.object({
 	month: z.string().regex(/^\d{4}-\d{2}$/, 'Invalid month format (YYYY-MM)'),
@@ -99,8 +125,10 @@ export type StartRentalRequest = z.infer<typeof startRentalSchema>;
 export type CompleteRentalRequest = z.infer<typeof completeRentalSchema>;
 export type ExtendRentalRequest = z.infer<typeof extendRentalSchema>;
 export type CancelBookingRequest = z.infer<typeof cancelBookingSchema>;
+export type ScanReturnRequest = z.infer<typeof scanReturnSchema>;
 export type AddAddonRequest = z.infer<typeof addAddonSchema>;
 export type ListBookingsQuery = z.infer<typeof listBookingsQuerySchema>;
 export type AvailabilityQuery = z.infer<typeof availabilityQuerySchema>;
+export type SubmitChecklistRequest = z.infer<typeof submitChecklistSchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 export type AddonInput = z.infer<typeof addonInputSchema>;

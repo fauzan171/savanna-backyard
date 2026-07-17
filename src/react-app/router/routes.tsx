@@ -20,16 +20,19 @@ import CustomerDetailPage from '@/react-app/features/customers/pages/CustomerDet
 // Vehicle Pages
 import VehiclesPage from '@/react-app/features/vehicles/pages/VehiclesPage';
 import VehicleDetailPage from '@/react-app/features/vehicles/pages/VehicleDetailPage';
+import { VehicleAvailabilityPage } from '@/react-app/features/vehicles';
 
-// Leads Pages
-import LeadsPage from '@/react-app/features/leads/pages/LeadsPage';
-import LeadDetailPage from '@/react-app/features/leads/pages/LeadDetailPage';
+// Calendar Page
+import { CalendarPage } from '@/react-app/features/calendar';
 
 // Booking Pages
 import { BookingsPage, BookingDetailPage } from '@/react-app/features/bookings';
 
 // Payment Pages
-import { PaymentsPage, PaymentDetailPage } from '@/react-app/features/payments';
+import { PaymentsPage, PaymentDetailPage, PaymentDashboardPage } from '@/react-app/features/payments';
+
+// Equipment Pages
+import { EquipmentPage, EquipmentDetailPage } from '@/react-app/features/equipment';
 
 // Maintenance Pages
 import { MaintenancePage, MaintenanceDetailPage } from '@/react-app/features/maintenance';
@@ -39,7 +42,6 @@ import {
 	ReportsPage,
 	RevenueReportPage,
 	FleetReportPage,
-	LeadSourceReportPage,
 	PaymentReportPage,
 	CustomerReportPage,
 } from '@/react-app/features/reports';
@@ -83,11 +85,11 @@ export const routes: RouteObject[] = [
 
 							// Vehicle routes
 							{ path: 'vehicles', element: <VehiclesPage /> },
+							{ path: 'vehicles/availability', element: <VehicleAvailabilityPage /> },
 							{ path: 'vehicles/:id', element: <VehicleDetailPage /> },
 
-							// Leads routes
-							{ path: 'leads', element: <LeadsPage /> },
-							{ path: 'leads/:id', element: <LeadDetailPage /> },
+							// Fleet calendar matrix
+							{ path: 'calendar', element: <CalendarPage /> },
 
 							// Booking routes
 							{ path: 'bookings', element: <BookingsPage /> },
@@ -95,7 +97,12 @@ export const routes: RouteObject[] = [
 
 							// Payment routes
 							{ path: 'payments', element: <PaymentsPage /> },
+							{ path: 'payments/dashboard', element: <PaymentDashboardPage /> },
 							{ path: 'payments/:id', element: <PaymentDetailPage /> },
+
+							// Equipment routes
+							{ path: 'equipment', element: <EquipmentPage /> },
+							{ path: 'equipment/:id', element: <EquipmentDetailPage /> },
 
 							// Maintenance routes
 							{ path: 'maintenance', element: <MaintenancePage /> },
@@ -105,7 +112,6 @@ export const routes: RouteObject[] = [
 							{ path: 'reports', element: <ReportsPage /> },
 							{ path: 'reports/revenue', element: <RevenueReportPage /> },
 							{ path: 'reports/fleet', element: <FleetReportPage /> },
-							{ path: 'reports/leads', element: <LeadSourceReportPage /> },
 							{ path: 'reports/payments', element: <PaymentReportPage /> },
 							{ path: 'reports/customers', element: <CustomerReportPage /> },
 

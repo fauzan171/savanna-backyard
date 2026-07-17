@@ -5,20 +5,22 @@ import { createDb } from '@/worker/core/database';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
-import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
-import { publicUserAuthMiddleware, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
+import { createWhatsAppProvider } from '@/worker/core/services/providers';
+import { publicUserAuthMiddleware, optionalPublicUserAuth, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { PublicUsersRepository } from './public-users.repository';
 import { PublicUsersService } from './public-users.service';
 import {
-	googleLoginSchema,
 	phoneInitSchema,
 	phoneVerifySchema,
 	updateProfileSchema,
-	type GoogleLoginRequest,
+	confirmPickupSchema,
+	devLoginSchema,
 	type PhoneInitRequest,
 	type PhoneVerifyRequest,
 	type UpdateProfileRequest,
+	type ConfirmPickupRequest,
+	type DevLoginRequest,
 } from './public-users.dto';
 
 type PublicUsersVariables = {
@@ -32,9 +34,8 @@ export const publicUsersServicesMiddleware = () => async (c: Context<PublicUsers
 	const configRepo = new ConfigRepository(db);
 	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const repo = new PublicUsersRepository(db);
-	const google = await createGoogleOAuthProvider(configRepo);
 	const whatsapp = await createWhatsAppProvider(configRepo);
-	const service = new PublicUsersService(repo, jwtService, google, whatsapp, configRepo);
+	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo);
 	c.set('publicUsersService', service);
 	c.set('jwtService', jwtService);
 	await next();
@@ -67,38 +68,54 @@ function clearPublicUserCookie(c: Context) {
 	});
 }
 
-const googleLoginHandler = async (c: Context<PublicUsersEnv>) => {
-	const service = c.get('publicUsersService');
-	const body = getValidatedBody<GoogleLoginRequest>(c);
-	const result = await service.googleLogin(body);
-	setPublicUserCookie(c, result.token);
-	return c.json({
-		success: true,
-		message: result.requiresPhoneVerification ? 'Phone verification required' : 'Logged in',
-		data: { user: result.user, requiresPhoneVerification: result.requiresPhoneVerification },
-	});
-};
-
+// ---- Login (phone + WhatsApp OTP) — no cookie required, these SET the cookie ----
 const phoneInitHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
-	const pu = c.get('publicUser');
 	const body = getValidatedBody<PhoneInitRequest>(c);
-	const result = await service.phoneInit(pu.publicUserId, body);
+	const result = await service.phoneInit(body);
 	return c.json({ success: true, message: 'Send the Ref code to our WhatsApp number', data: result });
 };
 
 const phoneVerifyHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
-	const pu = c.get('publicUser');
 	const body = getValidatedBody<PhoneVerifyRequest>(c);
-	const result = await service.phoneVerify(pu.publicUserId, body);
+	const result = await service.phoneVerify(body);
 	setPublicUserCookie(c, result.token);
-	return c.json({ success: true, message: 'Phone verified', data: { user: result.user } });
+	return c.json({ success: true, message: 'Logged in', data: { user: result.user } });
 };
 
-const meHandler = async (c: Context<PublicUsersEnv>) => {
+/**
+ * Developer email login. Allowlist comes from DEVELOPER_ALLOWLIST env (comma-separated).
+ * ponytail: in dev (ENVIRONMENT !== production) with no allowlist configured, fall back
+ * to a single dev@savanna.com entry so local/staging works out of the box. Prod with no
+ * env = fully disabled (fail-closed in the service).
+ */
+function resolveDevAllowlist(env: Env): string[] {
+	const raw = env.DEVELOPER_ALLOWLIST?.trim();
+	if (raw) {
+		return raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+	}
+	return env.ENVIRONMENT === 'production' ? [] : ['dev@savanna.com'];
+}
+
+const devLoginHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
+	const body = getValidatedBody<DevLoginRequest>(c);
+	const allowlist = resolveDevAllowlist(c.env);
+	const result = await service.devLogin(body, allowlist);
+	console.log(`[dev-login] developer login: ${body.email}`);
+	setPublicUserCookie(c, result.token);
+	return c.json({ success: true, message: 'Logged in', data: { user: result.user } });
+};
+
+// ---- Account (cookie-authenticated) ----
+const meHandler = async (c: Context<PublicUsersEnv>) => {
 	const pu = c.get('publicUser');
+	if (!pu) {
+		// No valid public-user token (guest, or admin token was ignored by optional middleware)
+		return c.json({ success: true, data: null });
+	}
+	const service = c.get('publicUsersService');
 	const user = await service.getMe(pu.publicUserId);
 	return c.json({ success: true, data: user });
 };
@@ -141,20 +158,19 @@ async function hashToken(token: string): Promise<string> {
 	return Array.from(new Uint8Array(hashBuffer), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Public-user auth router. Mounted under /api/v1/public/auth (inherits X-API-Key + CORS from the public router).
+// Public-user auth router. Mounted under /api/v1/public/auth (inherits X-API-Key + CORS).
 export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	const router = new Hono<PublicUsersEnv>();
 	router.use('*', publicUsersServicesMiddleware());
 
 	// Login (no cookie yet)
-	router.post('/google', validateBody(googleLoginSchema), googleLoginHandler);
+	router.post('/phone/init', validateBody(phoneInitSchema), phoneInitHandler);
+	router.post('/phone/verify', validateBody(phoneVerifySchema), phoneVerifyHandler);
+	router.post('/dev/login', validateBody(devLoginSchema), devLoginHandler);
 
-	// Phone verification (cookie-authenticated, phone may be unverified)
-	router.post('/phone/init', publicUserAuthMiddleware(), validateBody(phoneInitSchema), phoneInitHandler);
-	router.post('/phone/verify', publicUserAuthMiddleware(), validateBody(phoneVerifySchema), phoneVerifyHandler);
-
-	// Account (cookie-authenticated)
-	router.get('/me', publicUserAuthMiddleware(), meHandler);
+	// /me: graceful fallback — returns null when no valid public-user token
+	// (guests, or admin cookies that are ignored by optionalPublicUserAuth)
+	router.get('/me', optionalPublicUserAuth(), meHandler);
 	router.put('/profile', publicUserAuthMiddleware(), validateBody(updateProfileSchema), profileHandler);
 	router.post('/logout', publicUserAuthMiddleware(), logoutHandler);
 
@@ -179,8 +195,34 @@ const myBookingDetailHandler = async (c: Context<PublicUsersEnv>) => {
 const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
-	const result = await service.payRemaining(pu.publicUserId, c.req.param('bookingId'));
-	return c.json({ success: true, message: 'Reopen the invoice to pay the remainder', data: result });
+
+	// Build payment gateway config from env vars for remainder invoice creation
+	const vendor = c.env.PAYMENT_GATEWAY_VENDOR ?? 'xendit';
+	let gatewayConfig: { vendor: string; config: Record<string, string> };
+	if (vendor === 'xendit') {
+		gatewayConfig = {
+			vendor,
+			config: { apiKey: c.env.XENDIT_API_KEY ?? '', webhookToken: c.env.XENDIT_WEBHOOK_TOKEN ?? '', isProduction: c.env.ENVIRONMENT === 'production' ? 'true' : 'false' },
+		};
+	} else if (vendor === 'ifortepay') {
+		gatewayConfig = {
+			vendor,
+			config: { merchantId: c.env.IFORTEPAY_MERCHANT_ID ?? '', secretUnboundId: c.env.IFORTEPAY_SECRET_UNBOUND_ID ?? '', hashKey: c.env.IFORTEPAY_HASH_KEY ?? '', callbackUrl: c.env.IFORTEPAY_CALLBACK_URL ?? '', successRedirectUrl: c.env.IFORTEPAY_SUCCESS_REDIRECT_URL ?? '', failedRedirectUrl: c.env.IFORTEPAY_FAILED_REDIRECT_URL ?? '' },
+		};
+	} else {
+		gatewayConfig = { vendor, config: {} };
+	}
+
+	const result = await service.payRemaining(pu.publicUserId, c.req.param('bookingId'), gatewayConfig);
+	return c.json({ success: true, message: 'Remainder payment invoice created', data: result });
+};
+
+const confirmPickupHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const body = getValidatedBody<ConfirmPickupRequest>(c);
+	const result = await service.confirmPickup(pu.publicUserId, c.req.param('id'), body.qrCode);
+	return c.json({ success: true, message: 'Pickup confirmed', data: result });
 };
 
 export function createPublicMeRouter(): Hono<PublicUsersEnv> {
@@ -190,8 +232,10 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 
 	router.get('/bookings', myBookingsHandler);
 	router.get('/bookings/:id', myBookingDetailHandler);
-	// Pay the remainder requires a verified phone (anti-abuse)
+	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
+	// Confirm pickup via QR scan (requires a verified account)
+	router.post('/bookings/:id/confirm-pickup', requirePhoneVerified(), validateBody(confirmPickupSchema), confirmPickupHandler);
 
 	return router;
 }

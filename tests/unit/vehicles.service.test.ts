@@ -22,6 +22,8 @@ describe('VehiclesService', () => {
 			findByStatus: vi.fn(),
 			getAvailableVehicles: vi.fn(),
 			checkExists: vi.fn(),
+			delete: vi.fn(),
+			countActiveByVehicle: vi.fn(),
 		} as unknown as VehiclesRepository;
 
 		vehiclesService = new VehiclesService(mockVehicleRepo);
@@ -862,6 +864,20 @@ describe('VehiclesService', () => {
 			// Note: This will return true because booking conflict checking is not yet implemented
 			// When booking module is ready, this should check actual booking dates
 			expect(result).toBe(true);
+		});
+	});
+
+	describe('delete (VEH-07)', () => {
+		it('deletes when vehicle exists and no active bookings', async () => {
+			vi.mocked(mockVehicleRepo.findById).mockResolvedValue(createTestVehicle());
+			await vehiclesService.delete('v1');
+			expect(mockVehicleRepo.delete).toHaveBeenCalledWith('v1');
+		});
+
+		it('throws NotFound when vehicle missing', async () => {
+			vi.mocked(mockVehicleRepo.findById).mockResolvedValue(null);
+			await expect(vehiclesService.delete('missing')).rejects.toThrow();
+			expect(mockVehicleRepo.delete).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -70,6 +70,7 @@ async function getGateway(
       (await configRepo.getValue("midtrans_is_production")) ?? "false";
   } else if (vendor === "xendit") {
     config.apiKey = (await configRepo.getValue("xendit_api_key")) ?? "";
+    config.webhookToken = (await configRepo.getValue("xendit_webhook_token")) ?? "";
     config.isProduction =
       (await configRepo.getValue("xendit_is_production")) ?? "false";
   }
@@ -130,23 +131,42 @@ const handleWebhookHandler = async (c: Context<PaymentsEnv>) => {
     const service = c.get("paymentsService");
     const data = payload as Record<string, string>;
 
+    // Resolve booking number: Xendit uses `external_id`, Midtrans uses `order_id`
+    const bookingNumber = vendor === "xendit"
+      ? (data.external_id ?? "")
+      : (data.order_id ?? "");
+
+    if (!bookingNumber) {
+      console.error(`Webhook missing booking identifier for vendor ${vendor}`);
+      return c.json({ success: false, error: { code: "MISSING_ORDER_ID", message: "Missing booking identifier" } }, 400);
+    }
+
     const db = createDb(c.env.DB);
     const bookingsRepo = new BookingsRepository(db);
-    const booking = await bookingsRepo.findByBookingNumber(data.order_id);
+    const booking = await bookingsRepo.findByBookingNumber(bookingNumber);
 
     if (booking) {
+      // Resolve payment method based on vendor
+      let method: "QRIS" | "Gateway" | "BankTransfer" | "Cash" = "BankTransfer";
+      if (vendor === "xendit") {
+        method = data.payment_method === "QRIS" ? "QRIS" : "Gateway";
+      } else {
+        // Midtrans
+        method = data.payment_type === "qris" ? "QRIS" : "BankTransfer";
+      }
+
       try {
         const created = await service.create({
           bookingId: booking.id,
           amount: webhookResult.amount,
           currency: "IDR",
-          method: data.payment_type === "qris" ? "QRIS" : "BankTransfer",
+          method,
           transactionReference: webhookResult.transactionId,
         });
 
         if (webhookResult.status === "Verified") {
           await service.verify(created.id, "system", {
-            notes: "Auto-verified via Midtrans webhook",
+            notes: `Auto-verified via ${vendor} webhook`,
           });
         }
       } catch (e) {
@@ -239,6 +259,12 @@ const getBookingPaymentSummaryHandler = async (c: Context<PaymentsEnv>) => {
   return c.json({ success: true, data: result });
 };
 
+const getBookingPaymentSummariesHandler = async (c: Context<PaymentsEnv>) => {
+  const service = c.get("paymentsService");
+  const result = await service.getBookingPaymentSummaries();
+  return c.json({ success: true, data: result });
+};
+
 // Factory function to create payments router
 export function createPaymentsRouter(): Hono<PaymentsEnv> {
   const router = new Hono<PaymentsEnv>();
@@ -260,6 +286,9 @@ export function createPaymentsRouter(): Hono<PaymentsEnv> {
 
   // Get payment statistics
   router.get("/stats", getPaymentStatsHandler);
+
+  // Get booking payment summaries (dashboard view)
+  router.get("/booking-summaries", getBookingPaymentSummariesHandler);
 
   // List payments (with pagination and filters)
   router.get("/", validateQuery(listPaymentsQuerySchema), listPaymentsHandler);

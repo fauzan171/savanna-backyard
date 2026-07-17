@@ -86,52 +86,6 @@ export interface FleetUtilizationReport {
 }
 
 // ============================================
-// LEAD SOURCE REPORT
-// ============================================
-
-export interface LeadSourceReport {
-	reportInfo?: {
-		title: string;
-		period: { start: string; end: string };
-		generatedAt: string;
-	};
-	summary: {
-		totalLeads: number;
-		converted: number;
-		lost?: number;
-		inProgress?: number;
-		// backend pakai overallConversionRate
-		overallConversionRate?: number;
-		// fallback jika backend berubah
-		conversionRate?: number;
-	};
-	bySource: Array<{
-		source: string;
-		count: number;
-		converted: number;
-		conversionRate: number;
-		percentage?: number;
-	}>;
-	// backend pakai byPriority, bukan byStatus
-	byPriority?: Array<{
-		priority: string;
-		total: number;
-		converted: number;
-		conversionRate: number;
-	}>;
-	byStatus?: Array<{
-		status: string;
-		count: number;
-		percentage: number;
-	}>;
-	trend: Array<{
-		date: string;
-		new: number;
-		converted: number;
-	}>;
-}
-
-// ============================================
 // PAYMENT REPORT
 // ============================================
 

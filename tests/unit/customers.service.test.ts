@@ -301,6 +301,14 @@ describe('CustomersService', () => {
 				})
 			);
 		});
+
+		it('[P1] should reject duplicate phone (CUST-03/CUST-06/CUST-E03)', async () => {
+			vi.mocked(mockCustomerRepo.findByPhone).mockResolvedValue(createTestCustomer({ phone: '+6281234567890' }));
+			await expect(
+				customersService.create({ name: 'Dup', phone: '+6281234567890' })
+			).rejects.toThrow('Nomor telepon sudah terdaftar');
+			expect(mockCustomerRepo.create).not.toHaveBeenCalled();
+		});
 	});
 
 	describe('update', () => {

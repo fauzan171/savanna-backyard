@@ -5,6 +5,7 @@ import { Input } from '@/react-app/components/ui/input';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useSettings, useBulkUpdateSettings } from '../hooks/useSettings';
 import type { Setting } from '../api/settings';
+import { toast } from '@/react-app/hooks/useToast';
 
 const SETTING_GROUPS = [
 	{
@@ -40,7 +41,12 @@ export default function SettingsPage() {
 
 	const handleSave = async () => {
 		const updates = Object.entries(formValues).map(([key, value]) => ({ key, value }));
-		await bulkUpdate.mutateAsync(updates);
+		try {
+			await bulkUpdate.mutateAsync(updates);
+			toast({ title: 'Pengaturan tersimpan' });
+		} catch (error) {
+			toast({ variant: 'destructive', title: 'Gagal menyimpan', description: (error as Error).message });
+		}
 	};
 
 	if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;

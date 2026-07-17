@@ -3,7 +3,7 @@ import { PublicApiService } from '@/worker/modules/public-api/public-api.service
 import { PublicApiRepository } from '@/worker/modules/public-api/public-api.repository';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { ValidationError } from '@/worker/core/types/errors';
-import { createTestVehicle, createTestLead } from '@test/utils';
+import { createTestVehicle, createTestBooking } from '@test/utils';
 
 describe('PublicApiService', () => {
 	let publicApiService: PublicApiService;
@@ -13,12 +13,12 @@ describe('PublicApiService', () => {
 	beforeEach(() => {
 		// Create mock repositories
 		mockRepo = {
-			createLead: vi.fn(),
 			getAvailableVehicles: vi.fn(),
 			getActiveVehicles: vi.fn(),
 			getVehicleById: vi.fn(),
 			getVehicleTypes: vi.fn(),
 			isVehicleAvailableForDates: vi.fn().mockResolvedValue(true),
+			findBookingByNumber: vi.fn(),
 		} as unknown as PublicApiRepository;
 
 		mockConfigRepo = {
@@ -32,167 +32,6 @@ describe('PublicApiService', () => {
 		} as unknown as ConfigRepository;
 
 		publicApiService = new PublicApiService(mockRepo, mockConfigRepo);
-	});
-
-	describe('submitLead', () => {
-		// ============================================
-		// P0: Happy Path - Critical business scenarios
-		// ============================================
-
-		it('[P0] should submit lead with valid data', async () => {
-			const mockLead = createTestLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-				email: 'jane@example.com',
-			});
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			const result = await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-				email: 'jane@example.com',
-			});
-
-			expect(result.id).toBe(mockLead.id);
-			expect(result.status).toBe('New');
-		});
-
-		it('[P0] should create lead with default source when not provided', async () => {
-			const mockLead = createTestLead({ source: 'Website' });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(mockRepo.createLead).toHaveBeenCalledWith(
-				expect.objectContaining({
-					source: 'Website',
-				})
-			);
-		});
-
-		it('[P0] should store message in notes field', async () => {
-			const mockLead = createTestLead();
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-				message: 'Interested in renting a trail bike',
-			});
-
-			expect(mockRepo.createLead).toHaveBeenCalledWith(
-				expect.objectContaining({
-					notes: 'Interested in renting a trail bike',
-				})
-			);
-		});
-
-		it('[P0] should create lead with New status', async () => {
-			const mockLead = createTestLead({ status: 'New' });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			const result = await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(result.status).toBe('New');
-		});
-
-		// ============================================
-		// P1: Edge Cases
-		// ============================================
-
-		it('[P1] should accept lead without email', async () => {
-			const mockLead = createTestLead({ email: null });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			const result = await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(result.id).toBeDefined();
-		});
-
-		it('[P1] should accept lead without message', async () => {
-			const mockLead = createTestLead({ notes: null });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(mockRepo.createLead).toHaveBeenCalledWith(
-				expect.objectContaining({
-					notes: null,
-				})
-			);
-		});
-
-		it('[P1] should accept all valid sources', async () => {
-			const sources = ['WhatsApp', 'Instagram', 'Facebook', 'TikTok', 'Website', 'WalkIn'];
-
-			for (const source of sources) {
-				const mockLead = createTestLead({ source });
-
-				vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-				await publicApiService.submitLead({
-					name: 'Jane Smith',
-					phone: '+6281234567890',
-					source: source as 'WhatsApp' | 'Instagram' | 'Facebook' | 'TikTok' | 'Website' | 'WalkIn',
-				});
-
-				expect(mockRepo.createLead).toHaveBeenCalledWith(
-					expect.objectContaining({ source })
-				);
-			}
-		});
-
-		it('[P1] should create lead with Warm priority by default', async () => {
-			const mockLead = createTestLead({ priority: 'Warm' });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(mockRepo.createLead).toHaveBeenCalledWith(
-				expect.objectContaining({
-					priority: 'Warm',
-				})
-			);
-		});
-
-		it('[P1] should not assign lead to any staff by default', async () => {
-			const mockLead = createTestLead({ assignedTo: null });
-
-			vi.mocked(mockRepo.createLead).mockResolvedValue(mockLead);
-
-			await publicApiService.submitLead({
-				name: 'Jane Smith',
-				phone: '+6281234567890',
-			});
-
-			expect(mockRepo.createLead).toHaveBeenCalledWith(
-				expect.objectContaining({
-					assignedTo: null,
-				})
-			);
-		});
 	});
 
 	describe('checkAvailability', () => {
@@ -600,6 +439,123 @@ describe('PublicApiService', () => {
 			const result = await publicApiService.getVehicleDetails('vehicle-123');
 
 			expect(result?.dailyRateIdr).toBe(450000);
+		});
+	});
+
+	describe('getBookingStatus', () => {
+		// ============================================
+		// P0: Critical bug fix — isFullyPaid for full-payment bookings
+		// ============================================
+
+		it('[P0] should return isFullyPaid=false for unpaid full-payment booking (BUG regression)', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'pending',
+				paymentType: 'full',
+				paymentTerms: 'Full_Upfront',
+				remainingAmount: 0,
+				fullyPaidAt: null,
+				paidAt: null,
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+			expect(result!.paymentStatus).toBe('pending');
+			expect(result!.paymentType).toBe('full');
+		});
+
+		it('[P0] should return isFullyPaid=true for paid full-payment booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'Confirmed',
+				paymentStatus: 'settlement',
+				paymentType: 'full',
+				paymentTerms: 'Full_Upfront',
+				remainingAmount: 0,
+				fullyPaidAt: '2026-03-01T10:00:00Z',
+				paidAt: '2026-03-01T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(true);
+		});
+
+		it('[P0] should return isFullyPaid=false for unpaid DP booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'pending',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 245000,
+				fullyPaidAt: null,
+				paidAt: null,
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+			expect(result!.paymentType).toBe('dp');
+		});
+
+		it('[P0] should return isFullyPaid=false for DP booking with only DP paid', async () => {
+			const mockBooking = createTestBooking({
+				status: 'pending_payment',
+				paymentStatus: 'dp_paid',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 245000,
+				fullyPaidAt: null,
+				paidAt: '2026-03-01T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(false);
+		});
+
+		it('[P0] should return isFullyPaid=true for fully paid DP booking', async () => {
+			const mockBooking = createTestBooking({
+				status: 'Confirmed',
+				paymentStatus: 'settlement',
+				paymentType: 'dp',
+				paymentTerms: 'DP_Pickup',
+				remainingAmount: 0,
+				fullyPaidAt: '2026-03-02T10:00:00Z',
+				paidAt: '2026-03-02T10:00:00Z',
+			});
+
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(mockBooking as any);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const result = await publicApiService.getBookingStatus('SM-20260101-TEST1');
+
+			expect(result).not.toBeNull();
+			expect(result!.isFullyPaid).toBe(true);
+		});
+
+		it('[P0] should return null for non-existent booking', async () => {
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(null);
+
+			const result = await publicApiService.getBookingStatus('NONEXISTENT');
+
+			expect(result).toBeNull();
 		});
 	});
 

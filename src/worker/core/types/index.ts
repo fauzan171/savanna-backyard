@@ -47,8 +47,8 @@ export interface UserContext {
 // Public end-user context set by publicUserAuthMiddleware (distinct from admin UserContext)
 export interface PublicUserContext {
 	publicUserId: string;
-	email: string;
-	name: string;
-	phone: string | null;
+	phone: string;
+	name: string | null;
+	email: string | null;
 	phoneVerified: boolean;
 }

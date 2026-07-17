@@ -47,12 +47,12 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 			{ vendor: 'manual', config: {} },
 		);
 
-		// base = 200000 * 2 days = 400000; equipment = (50000*1*2) + (25000*2*2) = 100000 + 100000 = 200000
-		expect(result.totalAmount).toBe(600_000);
+		// base = 200000 * 4 blocks = 800000 (12-hour blocks: 2 days = 4 blocks); equipment = (50000*1*4) + (25000*2*4) = 200000 + 200000 = 400000
+		expect(result.totalAmount).toBe(1_200_000);
 		expect(result.paymentType).toBe('full');
 		expect(repo.createBookingEquipment).toHaveBeenCalledWith(expect.arrayContaining([
-			expect.objectContaining({ equipmentId: 'e1', unitPrice: 50_000, totalPrice: 100_000 }),
-			expect.objectContaining({ equipmentId: 'e2', unitPrice: 25_000, totalPrice: 100_000 }),
+			expect.objectContaining({ equipmentId: 'e1', unitPrice: 50_000, totalPrice: 200_000 }),
+			expect.objectContaining({ equipmentId: 'e2', unitPrice: 25_000, totalPrice: 200_000 }),
 		]));
 	});
 
@@ -62,12 +62,12 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 			{ vendor: 'manual', config: {} },
 		);
 
-		// total = 400000; DP 30% = 120000; remaining = 280000
+		// total = 800000 (4 blocks x 200k); DP 30% = 240000; remaining = 560000
 		expect(result.paymentType).toBe('dp');
-		expect(result.dpAmount).toBe(120_000);
-		expect(result.remainingAmount).toBe(280_000);
+		expect(result.dpAmount).toBe(240_000);
+		expect(result.remainingAmount).toBe(560_000);
 		expect(configRepo.getNumber).toHaveBeenCalledWith('dp_percentage', 30);
-		expect(repo.createBooking).toHaveBeenCalledWith(expect.objectContaining({ paymentType: 'dp', paymentTerms: 'DP_Pickup', dpAmount: 120_000, remainingAmount: 280_000 }));
+		expect(repo.createBooking).toHaveBeenCalledWith(expect.objectContaining({ paymentType: 'dp', paymentTerms: 'DP_Pickup', dpAmount: 240_000, remainingAmount: 560_000 }));
 	});
 
 	it('[P0] should link the booking to the public user when provided', async () => {

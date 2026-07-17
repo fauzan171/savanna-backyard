@@ -1,4 +1,4 @@
-import { DollarSign, Car, Users, CreditCard, BarChart3 } from 'lucide-react';
+import { DollarSign, Car, CreditCard, BarChart3 } from 'lucide-react';
 import { ReportCard } from '../components/ReportCard';
 
 export default function ReportsPage() {
@@ -14,12 +14,6 @@ export default function ReportsPage() {
 			description: 'Analyze vehicle usage and availability',
 			icon: <Car className="h-5 w-5" />,
 			href: '/reports/fleet',
-		},
-		{
-			title: 'Lead Sources',
-			description: 'Track lead conversion by source',
-			icon: <Users className="h-5 w-5" />,
-			href: '/reports/leads',
 		},
 		{
 			title: 'Payment Report',

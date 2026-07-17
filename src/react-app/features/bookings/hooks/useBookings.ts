@@ -23,6 +23,8 @@ import type {
 	ExtensionCalculationParams,
 	ExtensionCalculationResult,
 	BookingAddon,
+	PenaltyBreakdown,
+	ScanReturnResult,
 } from '../types/booking.types';
 
 const BASE_PATH = '/v1/bookings';
@@ -36,6 +38,7 @@ export const bookingKeys = {
 	list: (filters?: BookingFilters) => ['bookings', 'list', filters],
 	detail: (id: string) => ['bookings', 'detail', id],
 	byNumber: (number: string) => ['bookings', 'number', number],
+	penalties: (id: string) => ['bookings', 'penalties', id],
 };
 
 // ============================================
@@ -155,6 +158,36 @@ export function useCompleteRental() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: bookingKeys.all });
 		},
+	});
+}
+
+/** Get penalty breakdown (late fee + damage fee) for a booking */
+export function usePenalties(id: string) {
+	return useQuery<ApiSuccessResponse<PenaltyBreakdown>, Error, PenaltyBreakdown>({
+		queryKey: bookingKeys.penalties(id),
+		queryFn: () => api.get<ApiSuccessResponse<PenaltyBreakdown>>(`${BASE_PATH}/${id}/penalties`),
+		select: (res) => res.data,
+	});
+}
+
+/** Mark a booking's penalty as paid */
+export function useMarkPenaltyPaid() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (id: string) =>
+			api.post<ApiSuccessResponse<Booking>>(`${BASE_PATH}/${id}/penalties/mark-paid`),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: bookingKeys.all });
+		},
+	});
+}
+
+/** Scan a vehicle QR to resolve the active rental (admin return processing) */
+export function useScanReturn() {
+	return useMutation({
+		mutationFn: (qrCode: string) =>
+			api.post<ApiSuccessResponse<ScanReturnResult>>(`${BASE_PATH}/scan-return`, { qrCode }),
 	});
 }
 

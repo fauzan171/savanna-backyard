@@ -14,3 +14,4 @@ export { PaymentForm } from './components/PaymentForm';
 // Pages
 export { PaymentsPage } from './pages/PaymentsPage';
 export { PaymentDetailPage } from './pages/PaymentDetailPage';
+export { PaymentDashboardPage } from './pages/PaymentDashboardPage';

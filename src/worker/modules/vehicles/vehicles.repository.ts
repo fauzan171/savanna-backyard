@@ -1,4 +1,4 @@
-import { eq, or, like, and, desc } from 'drizzle-orm';
+import { eq, or, like, and, desc, lte, isNotNull } from 'drizzle-orm';
 import { vehicles, vehicleStatusLogs, type Vehicle, type NewVehicle, type NewVehicleStatusLog } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 import type { ListVehiclesQuery } from './vehicles.dto';
@@ -93,6 +93,10 @@ export class VehiclesRepository {
 		return this.update(id, { status });
 	}
 
+	async delete(id: string): Promise<void> {
+		await this.db.delete(vehicles).where(eq(vehicles.id, id));
+	}
+
 	// Status logs
 	async createStatusLog(data: Omit<NewVehicleStatusLog, 'id'>): Promise<void> {
 		const id = crypto.randomUUID();
@@ -148,5 +152,33 @@ export class VehiclesRepository {
 	async checkExists(id: string): Promise<boolean> {
 		const result = await this.findById(id);
 		return result !== null;
+	}
+
+	/** Get vehicles that are in Cleaning status and past their cleaningCompletedAt time */
+	async getCleanableVehicles(): Promise<Vehicle[]> {
+		const now = new Date().toISOString();
+		return this.db
+			.select()
+			.from(vehicles)
+			.where(
+				and(
+					eq(vehicles.status, 'Cleaning'),
+					isNotNull(vehicles.cleaningCompletedAt),
+					lte(vehicles.cleaningCompletedAt, now),
+				)
+			);
+	}
+
+	/** Mark vehicle as cleaned (back to Available) */
+	async markCleaned(id: string): Promise<void> {
+		await this.db
+			.update(vehicles)
+			.set({
+				status: 'Available',
+				conditionStatus: 'Excellent',
+				cleaningCompletedAt: null,
+				updatedAt: new Date().toISOString(),
+			})
+			.where(eq(vehicles.id, id));
 	}
 }

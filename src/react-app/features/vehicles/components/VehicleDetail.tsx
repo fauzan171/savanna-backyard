@@ -14,6 +14,7 @@ interface VehicleDetailProps {
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
 	Available: { variant: 'success', label: 'Available' },
 	Rented: { variant: 'info', label: 'Rented' },
+	Cleaning: { variant: 'default', label: 'Cleaning' },
 	Maintenance: { variant: 'warning', label: 'Maintenance' },
 	Inactive: { variant: 'default', label: 'Inactive' },
 };
@@ -156,6 +157,20 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange }: VehicleDetail
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* Description */}
+			{vehicle.description && (
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-lg">Description</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+							{vehicle.description}
+						</p>
+					</CardContent>
+				</Card>
+			)}
 
 			{/* Photo */}
 			{vehicle.photoUrl && (

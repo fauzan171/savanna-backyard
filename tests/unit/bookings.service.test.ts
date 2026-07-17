@@ -942,9 +942,9 @@ describe('BookingsService', () => {
 
 			expect(result.originalEndDate).toBe('2026-03-08');
 			expect(result.newEndDate).toBe('2026-03-10');
-			expect(result.additionalDays).toBe(2);
-			expect(result.additionalAmount).toBe(900000);
-			expect(result.newTotalAmount).toBe(2250000);
+			expect(result.additionalBlocks).toBe(4);
+			expect(result.additionalAmount).toBe(1800000);
+			expect(result.newTotalAmount).toBe(3150000);
 		});
 
 		// ============================================
@@ -1010,15 +1010,16 @@ describe('BookingsService', () => {
 			vi.mocked(mockBookingRepo.extend).mockResolvedValue({
 				...mockBooking,
 				endDate: '2026-03-09',
-				totalAmount: 1800000,
+				totalAmount: 2250000,
 			});
 
 			const result = await bookingsService.extend(mockBooking.id, {
 				newEndDate: '2026-03-09',
 			});
 
-			expect(result.additionalDays).toBe(1);
-			expect(result.additionalAmount).toBe(450000);
+			expect(result.additionalBlocks).toBe(2);
+			expect(result.additionalAmount).toBe(900000);
+			expect(result.newTotalAmount).toBe(2250000);
 		});
 	});
 

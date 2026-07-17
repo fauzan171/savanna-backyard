@@ -3,7 +3,11 @@ import { z } from 'zod';
 export const createUserSchema = z.object({
 	name: z.string().min(2),
 	email: z.string().email(),
-	password: z.string().min(8),
+	password: z
+		.string()
+		.min(8, 'Password must be at least 8 characters')
+		.regex(/[A-Za-z]/, 'Password must contain a letter')
+		.regex(/[0-9]/, 'Password must contain a number'),
 	role: z.enum(['SUPER_ADMIN', 'STAFF']).optional().default('STAFF'),
 	isActive: z.boolean().optional().default(true),
 });

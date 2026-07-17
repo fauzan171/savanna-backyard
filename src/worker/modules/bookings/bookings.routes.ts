@@ -6,6 +6,8 @@ import { BookingsService } from './bookings.service';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
+import { VehicleConditionsRepository } from './vehicle-conditions.repository';
+import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import {
 	createBookingSchema,
@@ -15,6 +17,8 @@ import {
 	extendRentalSchema,
 	cancelBookingSchema,
 	addAddonSchema,
+	scanReturnSchema,
+	submitChecklistSchema,
 	listBookingsQuerySchema,
 	availabilityQuerySchema,
 	type CreateBookingRequest,
@@ -24,6 +28,8 @@ import {
 	type ExtendRentalRequest,
 	type CancelBookingRequest,
 	type AddAddonRequest,
+	type ScanReturnRequest,
+	type SubmitChecklistRequest,
 	type ListBookingsQuery,
 	type AvailabilityQuery,
 } from './bookings.dto';
@@ -43,11 +49,15 @@ export const bookingsServicesMiddleware = () => async (c: Context<BookingsEnv>, 
 	const vehiclesRepository = new VehiclesRepository(db);
 	const customersRepository = new CustomersRepository(db);
 	const checklistsRepository = new ChecklistsRepository(db);
+	const conditionsRepository = new VehicleConditionsRepository(db);
+	const configRepository = new ConfigRepository(db);
 	const bookingsService = new BookingsService(
 		bookingsRepository,
 		vehiclesRepository,
 		customersRepository,
-		checklistsRepository
+		checklistsRepository,
+		configRepository,
+		conditionsRepository,
 	);
 
 	c.set('bookingsService', bookingsService);
@@ -184,6 +194,43 @@ const getStatsHandler = async (c: Context<BookingsEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const scanReturnHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const body = getValidatedBody<ScanReturnRequest>(c);
+	const result = await service.scanReturn(body.qrCode);
+	return c.json({ success: true, data: result });
+};
+
+const getPenaltiesHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const id = c.req.param('id');
+	const result = await service.getPenalties(id);
+	return c.json({ success: true, data: result });
+};
+
+const markPenaltyPaidHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const id = c.req.param('id');
+	const result = await service.markPenaltyPaid(id);
+	return c.json({ success: true, data: result });
+};
+
+const scanQrHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const body = getValidatedBody<{ qrCode: string; scanTime?: string }>(c);
+	const scanTime = body.scanTime ?? new Date().toISOString();
+	const result = await service.scanQr(body.qrCode, scanTime);
+	return c.json({ success: true, data: result });
+};
+
+const submitChecklistHandler = async (c: Context<BookingsEnv>) => {
+	const service = c.get('bookingsService');
+	const body = getValidatedBody<SubmitChecklistRequest>(c);
+	const user = c.get('user');
+	const result = await service.submitChecklist(body, user.userId);
+	return c.json({ success: true, data: result }, 201);
+};
+
 // Factory function to create bookings router
 export function createBookingsRouter(): Hono<BookingsEnv> {
 	const router = new Hono<BookingsEnv>();
@@ -199,6 +246,15 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 
 	// Get booking statistics
 	router.get('/stats', getStatsHandler);
+
+	// Scan vehicle QR to resolve the active rental (admin return processing)
+	router.post('/scan-return', validateBody(scanReturnSchema), scanReturnHandler);
+
+	// Scan vehicle QR to determine pickup checklist vs motor condition check
+	router.post('/scan-qr', scanQrHandler);
+
+	// Submit QR scan checklist results (pickup or motor condition)
+	router.post('/submit-checklist', validateBody(submitChecklistSchema), submitChecklistHandler);
 
 	// Get booking by number
 	router.get('/number/:bookingNumber', getBookingByNumberHandler);
@@ -223,6 +279,10 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 
 	// Complete rental (return)
 	router.post('/:id/complete', validateBody(completeRentalSchema), completeRentalHandler);
+
+	// Penalty management
+	router.get('/:id/penalties', getPenaltiesHandler);
+	router.post('/:id/penalties/mark-paid', markPenaltyPaidHandler);
 
 	// Extend rental
 	router.post('/:id/extend', validateBody(extendRentalSchema), extendRentalHandler);

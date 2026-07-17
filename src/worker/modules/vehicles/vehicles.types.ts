@@ -3,7 +3,7 @@ export type { Vehicle, NewVehicle, VehicleStatusLog, NewVehicleStatusLog } from 
 
 // Vehicle type enum
 export type VehicleType = 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other';
-export type VehicleStatus = 'Available' | 'Rented' | 'Maintenance' | 'Inactive';
+export type VehicleStatus = 'Available' | 'Rented' | 'Cleaning' | 'Maintenance' | 'Inactive';
 
 // API-specific types
 export interface VehicleResponse {
@@ -16,6 +16,7 @@ export interface VehicleResponse {
 	year: number | null;
 	dailyRateIdr: number;
 	dailyRateUsd: number | null;
+	description: string | null;
 	status: VehicleStatus;
 	totalKm: number | null;
 	photoUrl: string | null;
@@ -88,4 +89,28 @@ export interface CalendarResult {
 		status: 'available' | 'booked' | 'maintenance';
 		bookingId?: string;
 	}[];
+}
+
+export interface CalendarMatrixCell {
+	status: 'available' | 'booked' | 'maintenance' | 'inactive';
+	booking?: {
+		id: string;
+		bookingNumber: string;
+		customerName: string;
+		customerPhone: string;
+	};
+}
+
+export interface CalendarMatrixVehicle {
+	id: string;
+	name: string;
+	type: string;
+	plateNumber: string;
+	status: string;
+	dates: Record<string, CalendarMatrixCell>;
+}
+
+export interface CalendarMatrixResult {
+	month: string;
+	vehicles: CalendarMatrixVehicle[];
 }

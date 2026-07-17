@@ -56,21 +56,6 @@ const revenueHandler = async (c: any) => {
 };
 
 /**
- * GET /api/v1/dashboard/leads
- * Get lead statistics
- */
-const leadsHandler = async (c: any) => {
-	const service = c.get('statisticsService') as StatisticsService;
-	const query = c.req.query();
-
-	const result = await service.getLeadStats({
-		startDate: query.startDate,
-		endDate: query.endDate,
-	});
-	return c.json({ success: true, data: result });
-};
-
-/**
  * GET /api/v1/dashboard/fleet
  * Get fleet utilization statistics
  */
@@ -123,7 +108,6 @@ export function createDashboardRouter(): Hono<DashboardEnv> {
 	// Dashboard endpoints
 	router.get('/overview', overviewHandler);
 	router.get('/revenue', revenueHandler);
-	router.get('/leads', leadsHandler);
 	router.get('/fleet', fleetHandler);
 	router.get('/payments', paymentsHandler);
 	router.get('/activities', activitiesHandler);

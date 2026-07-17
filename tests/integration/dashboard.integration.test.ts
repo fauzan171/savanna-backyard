@@ -33,10 +33,6 @@ describe('Dashboard Integration Tests', () => {
 			getActiveBookingsCount: vi.fn(),
 			getTodayPickups: vi.fn(),
 			getTodayReturns: vi.fn(),
-			getLeadCountsByStatus: vi.fn(),
-			getLeadsBySource: vi.fn(),
-			getLeadsByPriority: vi.fn(),
-			getFollowUpReminders: vi.fn(),
 			getVehicleCountsByStatus: vi.fn(),
 			getVehiclesByType: vi.fn(),
 			getTopVehicles: vi.fn(),
@@ -85,15 +81,6 @@ describe('Dashboard Integration Tests', () => {
 			return c.json({ success: true, data: result });
 		});
 
-		app.get('/api/v1/dashboard/leads', async (c) => {
-			const query = c.req.query();
-			const result = await mockStatisticsService.getLeadStats({
-				startDate: query.startDate,
-				endDate: query.endDate,
-			});
-			return c.json({ success: true, data: result });
-		});
-
 		app.get('/api/v1/dashboard/fleet', async (c) => {
 			const query = c.req.query();
 			const result = await mockStatisticsService.getFleetStats({
@@ -127,7 +114,6 @@ describe('Dashboard Integration Tests', () => {
 			vi.spyOn(mockStatisticsService, 'getOverview').mockResolvedValue({
 				period: 'today',
 				revenue: { total: 5000000, currency: 'IDR', bookingsCount: 10, change: { value: null, direction: 'neutral' } },
-				leads: { new: 5, converted: 3, conversionRate: 25, followUpsDue: 2 },
 				fleet: { total: 15, available: 10, rented: 4, maintenance: 1, utilizationRate: 27 },
 				payments: { verified: 4000000, pending: 1000000, overdue: 0 },
 				activeBookings: 4,
@@ -148,7 +134,6 @@ describe('Dashboard Integration Tests', () => {
 			vi.spyOn(mockStatisticsService, 'getOverview').mockResolvedValue({
 				period: 'month',
 				revenue: { total: 150000000, currency: 'IDR', bookingsCount: 100, change: { value: 10, direction: 'up' } },
-				leads: { new: 50, converted: 30, conversionRate: 25, followUpsDue: 5 },
 				fleet: { total: 15, available: 10, rented: 4, maintenance: 1, utilizationRate: 27 },
 				payments: { verified: 120000000, pending: 30000000, overdue: 5000000 },
 				activeBookings: 4,
@@ -168,7 +153,6 @@ describe('Dashboard Integration Tests', () => {
 			vi.spyOn(mockStatisticsService, 'getOverview').mockResolvedValue({
 				period: 'week',
 				revenue: { total: 35000000, currency: 'IDR', bookingsCount: 25, change: { value: null, direction: 'neutral' } },
-				leads: { new: 15, converted: 8, conversionRate: 20, followUpsDue: 3 },
 				fleet: { total: 15, available: 10, rented: 4, maintenance: 1, utilizationRate: 27 },
 				payments: { verified: 28000000, pending: 7000000, overdue: 0 },
 				activeBookings: 4,
@@ -186,7 +170,6 @@ describe('Dashboard Integration Tests', () => {
 			vi.spyOn(mockStatisticsService, 'getOverview').mockResolvedValue({
 				period: 'today',
 				revenue: { total: 0, currency: 'IDR', bookingsCount: 0, change: { value: null, direction: 'neutral' } },
-				leads: { new: 0, converted: 0, conversionRate: 0, followUpsDue: 0 },
 				fleet: { total: 0, available: 0, rented: 0, maintenance: 0, utilizationRate: 0 },
 				payments: { verified: 0, pending: 0, overdue: 0 },
 				activeBookings: 0,
@@ -255,48 +238,6 @@ describe('Dashboard Integration Tests', () => {
 			});
 
 			const res = await app.request('/api/v1/dashboard/revenue');
-
-			expect(res.status).toBe(200);
-		});
-	});
-
-	// ============================================
-	// GET /api/v1/dashboard/leads
-	// ============================================
-
-	describe('GET /api/v1/dashboard/leads', () => {
-		it('[P0] should return lead statistics', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadStats').mockResolvedValue({
-				period: { start: '2026-02-01', end: '2026-02-28' },
-				summary: { total: 100, converted: 30, lost: 10, inProgress: 60, conversionRate: 30 },
-				byStatus: { New: 25, Contacted: 20, Negotiating: 15, Converted: 30, Lost: 10 },
-				bySource: [
-					{ source: 'WhatsApp', count: 40, converted: 15, conversionRate: 37.5 },
-					{ source: 'Instagram', count: 30, converted: 8, conversionRate: 26.67 },
-				],
-				byPriority: { Hot: 20, Warm: 50, Cold: 30 },
-			});
-
-			const res = await app.request('/api/v1/dashboard/leads?startDate=2026-02-01&endDate=2026-02-28');
-
-			expect(res.status).toBe(200);
-			const body = await res.json() as { success: boolean; data: { summary: { total: number; conversionRate: number }; bySource: unknown[] } };
-			expect(body.success).toBe(true);
-			expect(body.data.summary.total).toBe(100);
-			expect(body.data.summary.conversionRate).toBe(30);
-			expect(body.data.bySource).toHaveLength(2);
-		});
-
-		it('[P1] should work without date parameters', async () => {
-			vi.spyOn(mockStatisticsService, 'getLeadStats').mockResolvedValue({
-				period: { start: 'all', end: 'now' },
-				summary: { total: 500, converted: 150, lost: 50, inProgress: 300, conversionRate: 30 },
-				byStatus: {},
-				bySource: [],
-				byPriority: { Hot: 100, Warm: 250, Cold: 150 },
-			});
-
-			const res = await app.request('/api/v1/dashboard/leads');
 
 			expect(res.status).toBe(200);
 		});
@@ -409,9 +350,6 @@ describe('Dashboard Integration Tests', () => {
 				todayReturns: [
 					{ bookingId: 'b2', bookingNumber: 'SM-002', customerName: 'Jane', customerPhone: '+62813', vehicleName: 'Yamaha WR', expectedTime: '17:00', isLate: false },
 				],
-				followUpReminders: [
-					{ leadId: 'l1', customerName: 'Mike', phone: '+62814', priority: 'Hot', daysOverdue: 2 },
-				],
 				pendingPayments: [
 					{ paymentId: 'p1', bookingNumber: 'SM-003', amount: 500000, method: 'BankTransfer', daysPending: 5 },
 				],
@@ -420,11 +358,10 @@ describe('Dashboard Integration Tests', () => {
 			const res = await app.request('/api/v1/dashboard/activities');
 
 			expect(res.status).toBe(200);
-			const body = await res.json() as { success: boolean; data: { todayPickups: unknown[]; todayReturns: unknown[]; followUpReminders: unknown[]; pendingPayments: unknown[] } };
+			const body = await res.json() as { success: boolean; data: { todayPickups: unknown[]; todayReturns: unknown[]; pendingPayments: unknown[] } };
 			expect(body.success).toBe(true);
 			expect(body.data.todayPickups).toHaveLength(1);
 			expect(body.data.todayReturns).toHaveLength(1);
-			expect(body.data.followUpReminders).toHaveLength(1);
 			expect(body.data.pendingPayments).toHaveLength(1);
 		});
 
@@ -432,17 +369,15 @@ describe('Dashboard Integration Tests', () => {
 			vi.spyOn(mockStatisticsService, 'getActivities').mockResolvedValue({
 				todayPickups: [],
 				todayReturns: [],
-				followUpReminders: [],
 				pendingPayments: [],
 			});
 
 			const res = await app.request('/api/v1/dashboard/activities');
 
 			expect(res.status).toBe(200);
-			const body = await res.json() as { success: boolean; data: { todayPickups: unknown[]; todayReturns: unknown[]; followUpReminders: unknown[]; pendingPayments: unknown[] } };
+			const body = await res.json() as { success: boolean; data: { todayPickups: unknown[]; todayReturns: unknown[]; pendingPayments: unknown[] } };
 			expect(body.data.todayPickups).toHaveLength(0);
 			expect(body.data.todayReturns).toHaveLength(0);
-			expect(body.data.followUpReminders).toHaveLength(0);
 			expect(body.data.pendingPayments).toHaveLength(0);
 		});
 
@@ -452,7 +387,6 @@ describe('Dashboard Integration Tests', () => {
 				todayReturns: [
 					{ bookingId: 'b1', bookingNumber: 'SM-001', customerName: 'John', customerPhone: '+62812', vehicleName: 'Honda CRF', expectedTime: '17:00', isLate: true },
 				],
-				followUpReminders: [],
 				pendingPayments: [],
 			});
 

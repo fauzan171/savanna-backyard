@@ -1,16 +1,5 @@
 // Public API module types
 
-// Public lead submission response
-export interface PublicLeadResponse {
-	success: true;
-	message: string;
-	data: {
-		id: string;
-		status: string;
-		createdAt: string;
-	};
-}
-
 // Public availability check response
 export interface PublicAvailabilityResponse {
 	success: true;

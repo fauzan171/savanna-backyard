@@ -2,13 +2,17 @@ import { BookingsRepository } from './bookings.repository';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
+import { VehicleConditionsRepository } from './vehicle-conditions.repository';
+import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import {
 	generateBookingNumber,
 	calculateDays,
 	calculateLateFee,
+	getHourlyRate,
 	LATE_FEE_MULTIPLIER,
 } from './availability.helper';
+import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import { BOOKING_STATUS_TRANSITIONS } from './bookings.types';
 import type {
 	BookingResponse,
@@ -25,6 +29,8 @@ import type {
 	AvailabilityResult,
 	BookingStats,
 	BookingStatus,
+	PenaltyBreakdown,
+	QrScanResult,
 } from './bookings.types';
 import type {
 	CreateBookingRequest,
@@ -35,16 +41,65 @@ import type {
 	ListBookingsQuery,
 	AvailabilityQuery,
 	AddAddonRequest,
+	SubmitChecklistRequest,
 } from './bookings.dto';
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
+	/** Get cleaning duration in hours from config (default 4 hours) */
+	private async getCleaningDurationHours(): Promise<number> {
+		if (!this.configRepo) return 4;
+		return this.configRepo.getNumber('cleaning_duration_hours', 4);
+	}
+
 	constructor(
 		private bookingRepo: BookingsRepository,
 		private vehicleRepo: VehiclesRepository,
 		private customerRepo: CustomersRepository,
-		private checklistRepo?: ChecklistsRepository
+		private checklistRepo?: ChecklistsRepository,
+		private configRepo?: ConfigRepository,
+		private conditionsRepo?: VehicleConditionsRepository,
 	) {}
+
+	/**
+	 * Admin scans a vehicle QR to resolve the active rental for return processing.
+	 * Resolve-only: the admin UI then opens the Complete dialog (POST /:id/complete)
+	 * so completeRental stays the single source of truth for penalties + vehicle status.
+	 */
+	async scanReturn(qrCode: string): Promise<{
+		bookingId: string;
+		bookingNumber: string;
+		vehicleId: string;
+		vehicleName: string;
+		customerName: string;
+		status: string;
+		startDate: string;
+		endDate: string;
+	}> {
+		const vehicleId = decodeVehicleQr(qrCode);
+		if (!vehicleId) throw new ValidationError('QR code tidak valid');
+
+		const booking = await this.bookingRepo.findActiveByVehicle(vehicleId);
+		if (!booking) {
+			throw new NotFoundError('Tidak ada rental aktif untuk kendaraan ini');
+		}
+
+		const [vehicle, customer] = await Promise.all([
+			this.vehicleRepo.findById(vehicleId),
+			this.customerRepo.findById(booking.customerId),
+		]);
+
+		return {
+			bookingId: booking.id,
+			bookingNumber: booking.bookingNumber,
+			vehicleId: booking.vehicleId,
+			vehicleName: vehicle?.name ?? 'Unknown',
+			customerName: customer?.name ?? 'Unknown',
+			status: booking.status,
+			startDate: booking.startDate,
+			endDate: booking.endDate,
+		};
+	}
 
 	// Transform addon to response format
 	private toAddonResponse(addon: { id: string; type: string; description: string | null; amount: number; isMandatory: boolean | null }): AddonResponse {
@@ -95,6 +150,10 @@ export class BookingsService {
 			baseAmount: booking.baseAmount,
 			addonsAmount: booking.addonsAmount ?? 0,
 			lateFee: booking.lateFee ?? 0,
+			damageFee: booking.damageFee ?? 0,
+			totalPenalty: booking.totalPenalty ?? 0,
+			penaltyPaid: booking.penaltyPaid ?? false,
+			returnConfirmed: booking.returnConfirmed ?? false,
 			totalAmount: booking.totalAmount,
 			currency: booking.currency,
 			notes: booking.notes,
@@ -287,18 +346,18 @@ export class BookingsService {
 			};
 		}
 
-		// Calculate amounts with validation for daily rate
-		const days = calculateDays(data.startDate, data.endDate);
-		const dailyRate = data.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
+		// Calculate amounts (12-hour block pricing, not daily)
+		const blocks = calculateDays(data.startDate, data.endDate);
+		const blockRate = data.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
 
-		// Validate daily rate exists
-		if (dailyRate === 0) {
+		// Validate block rate exists
+		if (blockRate === 0) {
 			throw new ValidationError(
-				`Vehicle does not have a ${data.currency} daily rate configured`
+				`Vehicle does not have a ${data.currency} rate configured`
 			);
 		}
 
-		const baseAmount = dailyRate * days;
+		const baseAmount = blockRate * blocks;
 
 		// Calculate addons amount
 		let addonsAmount = 0;
@@ -386,11 +445,13 @@ export class BookingsService {
 		}
 
 		// Validate pickup checklist exists
+		let pickupChecklistId: string | undefined;
 		if (this.checklistRepo) {
 			const pickupChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'pickup');
 			if (!pickupChecklist) {
 				throw new ValidationError('Checklist pickup wajib diisi sebelum memulai rental');
 			}
+			pickupChecklistId = pickupChecklist.id;
 		}
 
 		this.validateStatusTransition(booking.status, 'Active');
@@ -400,8 +461,8 @@ export class BookingsService {
 			throw new ValidationError('Start KM must be a non-negative number');
 		}
 
-		// Update booking with start km
-		const updated = await this.bookingRepo.startRental(id, data.startKm);
+		// Update booking with start km + mark pickup confirmed
+		const updated = await this.bookingRepo.startRental(id, { startKm: data.startKm, pickupChecklistId });
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
@@ -423,11 +484,22 @@ export class BookingsService {
 			throw new ValidationError('Rental is already completed');
 		}
 
-		// Validate return checklist exists
+		// Validate return checklist exists + load pickup checklist for damage comparison
+		let returnChecklistId: string | undefined;
+		let returnCheckedBy: string | null = null;
+		let pickupItems: Record<string, boolean> = {};
+		let returnItems: Record<string, boolean> = {};
 		if (this.checklistRepo) {
 			const returnChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'return');
 			if (!returnChecklist) {
 				throw new ValidationError('Checklist return wajib diisi sebelum menyelesaikan rental');
+			}
+			returnChecklistId = returnChecklist.id;
+			returnCheckedBy = returnChecklist.createdBy;
+			returnItems = BookingsService.parseChecklistItems(returnChecklist.items);
+			const pickupChecklist = await this.checklistRepo.findByBookingAndType(booking.id, 'pickup');
+			if (pickupChecklist) {
+				pickupItems = BookingsService.parseChecklistItems(pickupChecklist.items);
 			}
 		}
 
@@ -449,14 +521,22 @@ export class BookingsService {
 			throw new NotFoundError('Vehicle');
 		}
 
-		// Calculate late fee - add to existing total, not recalculate
-		const { daysLate, lateFee } = calculateLateFee(
+		// Calculate late fee - hourly based now
+		const { daysLate, lateFee, hoursLate } = calculateLateFee(
 			vehicle.dailyRateIdr,
 			booking.endDate,
 			data.actualReturnDate
 		);
 
-		// Calculate new total by adding late fee to current total
+		// Damage detection: items that were OK (true) at pickup but NOT OK (false) at return.
+		// Flat rate per damaged item (configurable); admin may override the total.
+		const flippedItems = BookingsService.countFlippedItems(pickupItems, returnItems);
+		const ratePerItem = await this.getDamagePerItem();
+		const override = data.damageFeeOverride != null;
+		const damageFee = override ? (data.damageFeeOverride as number) : flippedItems * ratePerItem;
+		const totalPenalty = lateFee + damageFee;
+
+		// Calculate new total by adding late fee to current total (damage fee is tracked separately)
 		const newTotalAmount = booking.totalAmount + lateFee;
 
 		// Update booking
@@ -465,33 +545,71 @@ export class BookingsService {
 			endKm: data.endKm,
 			lateFee,
 			totalAmount: newTotalAmount,
+			damageFee,
+			totalPenalty,
+			returnChecklistId,
 		});
 
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
 
-		// Update vehicle status back to Available and update km
+		// Derive condition status (admin override wins) and update vehicle
+		const conditionStatus = (data.conditionStatus
+			?? (flippedItems === 0 && daysLate === 0 ? 'Excellent' : flippedItems > 0 ? 'Fair' : 'Good')) as NonNullable<Vehicle['conditionStatus']>;
+
+		// Vehicle goes to Cleaning, not Available directly
+		const cleaningDurationHours = await this.getCleaningDurationHours();
+		const cleaningCompletedAt = new Date(Date.now() + cleaningDurationHours * 60 * 60 * 1000).toISOString();
+
 		await this.vehicleRepo.update(booking.vehicleId, {
-			status: 'Available',
+			status: 'Cleaning',
 			totalKm: data.endKm,
+			lastKm: data.endKm,
+			conditionStatus,
+			cleaningCompletedAt,
 		});
+
+		// Record condition history
+		if (this.conditionsRepo) {
+			await this.conditionsRepo.create({
+				vehicleId: booking.vehicleId,
+				checklistId: returnChecklistId,
+				conditionStatus,
+				notes: data.returnNotes ?? data.damageNotes ?? null,
+				km: data.endKm,
+				checkedAt: new Date().toISOString(),
+				checkedBy: returnCheckedBy,
+			});
+		}
 
 		const response = await this.toResponse(updated);
 
 		let lateFeeDetails: LateFeeDetails | null = null;
-		if (daysLate > 0) {
+		if (hoursLate > 0) {
 			lateFeeDetails = {
 				daysLate,
 				dailyRate: vehicle.dailyRateIdr,
 				multiplier: LATE_FEE_MULTIPLIER,
-				calculation: `${daysLate} day(s) x ${vehicle.dailyRateIdr} x ${LATE_FEE_MULTIPLIER} = ${lateFee}`,
+				calculation: `${hoursLate} hour(s) late x Rp${Math.round(getHourlyRate(vehicle.dailyRateIdr))}/hour x ${LATE_FEE_MULTIPLIER} = Rp${Math.round(lateFee).toLocaleString('id-ID')}`,
 			};
 		}
+
+		const damageFeeDetails = flippedItems > 0 || override
+			? {
+					flippedItems,
+					ratePerItem,
+					override,
+					calculation: override
+						? `Admin override = ${damageFee}`
+						: `${flippedItems} damaged item(s) x ${ratePerItem} = ${damageFee}`,
+				}
+			: null;
 
 		return {
 			...response,
 			lateFeeDetails,
+			damageFeeDetails,
 			vehicleStatus: 'Available',
 		};
 	}
@@ -526,14 +644,14 @@ export class BookingsService {
 			);
 		}
 
-		// Calculate additional amount
+		// Calculate additional blocks (12-hour based)
 		const vehicle = await this.vehicleRepo.findById(booking.vehicleId);
 		if (!vehicle) {
 			throw new NotFoundError('Vehicle');
 		}
 
-		const additionalDays = calculateDays(booking.endDate, data.newEndDate);
-		const additionalAmount = vehicle.dailyRateIdr * additionalDays;
+		const additionalBlocks = calculateDays(booking.endDate, data.newEndDate);
+		const additionalAmount = vehicle.dailyRateIdr * additionalBlocks;
 		const newTotalAmount = booking.totalAmount + additionalAmount;
 
 		// Update booking
@@ -544,7 +662,7 @@ export class BookingsService {
 			id,
 			originalEndDate,
 			newEndDate: data.newEndDate,
-			additionalDays,
+			additionalBlocks,
 			additionalAmount,
 			newTotalAmount,
 			extendedAt: new Date().toISOString(),
@@ -714,5 +832,272 @@ export class BookingsService {
 				await this.bookingRepo.confirm(bookingId);
 			}
 		}
+	}
+
+	// ---------------- Penalty management ----------------
+
+	async getPenalties(id: string): Promise<PenaltyBreakdown> {
+		const booking = await this.bookingRepo.findById(id);
+		if (!booking) throw new NotFoundError('Booking');
+
+		let lateFeeDetails: LateFeeDetails | null = null;
+		const vehicle = await this.vehicleRepo.findById(booking.vehicleId);
+		if (vehicle && booking.actualReturnDate) {
+			const { daysLate, hoursLate } = calculateLateFee(vehicle.dailyRateIdr, booking.endDate, booking.actualReturnDate);
+			if (hoursLate > 0) {
+				lateFeeDetails = {
+					daysLate,
+					dailyRate: vehicle.dailyRateIdr,
+					multiplier: LATE_FEE_MULTIPLIER,
+					calculation: `${hoursLate} hour(s) late x Rp${Math.round(getHourlyRate(vehicle.dailyRateIdr))}/hour x ${LATE_FEE_MULTIPLIER} = Rp${Math.round(booking.lateFee ?? 0).toLocaleString('id-ID')}`,
+				};
+			}
+		}
+
+		return {
+			lateFee: booking.lateFee ?? 0,
+			damageFee: booking.damageFee ?? 0,
+			totalPenalty: booking.totalPenalty ?? 0,
+			penaltyPaid: booking.penaltyPaid ?? false,
+			penaltyPaidAt: booking.penaltyPaidAt ?? null,
+			lateFeeDetails,
+			damageFeeDetails: null,
+		};
+	}
+
+	async markPenaltyPaid(id: string): Promise<BookingResponse> {
+		const booking = await this.bookingRepo.findById(id);
+		if (!booking) throw new NotFoundError('Booking');
+		const updated = await this.bookingRepo.update(id, {
+			penaltyPaid: true,
+			penaltyPaidAt: new Date().toISOString(),
+		});
+		if (!updated) throw new NotFoundError('Booking');
+		return this.toResponse(updated);
+	}
+
+	// ---------------- Checklist / penalty helpers ----------------
+
+	private static parseChecklistItems(raw: string): Record<string, boolean> {
+		try {
+			const parsed = JSON.parse(raw);
+			if (parsed && typeof parsed === 'object') {
+				return parsed as Record<string, boolean>;
+			}
+		} catch {
+			// ignore malformed JSON
+		}
+		return {};
+	}
+
+	/** Items that were OK at pickup (true) but NOT OK at return (false) = damage. */
+	private static countFlippedItems(pickup: Record<string, boolean>, ret: Record<string, boolean>): number {
+		let count = 0;
+		for (const key of Object.keys(ret)) {
+			if (pickup[key] === true && ret[key] === false) count++;
+		}
+		return count;
+	}
+
+	private async getDamagePerItem(): Promise<number> {
+		if (!this.configRepo) return 0;
+		const raw = await this.configRepo.getValue('damage_per_item');
+		const n = raw ? Number(raw) : NaN;
+		return Number.isFinite(n) ? n : 0;
+	}
+
+	// ── QR Scan flow ────────────────────────────────────────────────────────────
+
+	/**
+	 * Scan a vehicle QR code to determine the current context:
+	 * 1. If there is a Confirmed/Active booking for this vehicle and the
+	 *    current time is within 1 hour before to 1 hour after the booking
+	 *    startDate -> PICKUP_CHECKLIST (serah-terima motor).
+	 * 2. Otherwise -> MOTOR_CONDITION_CHECK (control / pengecekan kondisi).
+	 */
+	async scanQr(qrData: string, scanTimeIso: string): Promise<QrScanResult> {
+		const vehicleId = decodeVehicleQr(qrData);
+		if (!vehicleId) {
+			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
+		}
+
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) {
+			throw new NotFoundError('Vehicle');
+		}
+
+		const scanTime = new Date(scanTimeIso);
+		const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicleId);
+
+		const PICKUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+		let scanMode: QrScanResult['scanMode'] = 'motor_condition_check';
+		let message = 'Scan untuk pengecekan kondisi motor (control).';
+		let bookingSummary: QrScanResult['booking'] = null;
+
+		if (booking) {
+			const startDate = new Date(booking.startDate);
+			const diffMs = scanTime.getTime() - startDate.getTime();
+
+			if (diffMs >= -PICKUP_WINDOW_MS && diffMs <= PICKUP_WINDOW_MS) {
+				scanMode = 'pickup_checklist';
+				message = 'Scan untuk serah-terima motor (pickup checklist).';
+			}
+
+			// Always include booking info when a relevant booking exists
+			const customer = await this.customerRepo.findById(booking.customerId);
+			bookingSummary = {
+				id: booking.id,
+				bookingNumber: booking.bookingNumber,
+				customerName: customer?.name ?? 'Unknown',
+				customerPhone: customer?.phone ?? '-',
+				startDate: booking.startDate,
+				endDate: booking.endDate,
+				status: booking.status as BookingStatus,
+				paymentType: booking.paymentType ?? 'full',
+			};
+		}
+
+		return {
+			scanMode,
+			vehicle: {
+				id: vehicle.id,
+				name: vehicle.name,
+				plateNumber: vehicle.plateNumber,
+				type: vehicle.type,
+			},
+			booking: bookingSummary,
+			checklistItems: this.getChecklistItemsForMode(scanMode),
+			message,
+		};
+	}
+
+	private getChecklistItemsForMode(mode: QrScanResult['scanMode']): {
+		key: string;
+		label: string;
+		required: boolean;
+	}[] {
+		if (mode === 'pickup_checklist') {
+			return [
+				{ key: 'fuel_level', label: 'Bensin cukup / terisi', required: true },
+				{ key: 'tire_condition', label: 'Ban dalam kondisi baik (tekanan + keausan)', required: true },
+				{ key: 'brake_function', label: 'Rem depan & belakang berfungsi normal', required: true },
+				{ key: 'lights_function', label: 'Lampu depan, belakang, & sein menyala', required: true },
+				{ key: 'horn_mirror', label: 'Klakson & spion lengkap dan berfungsi', required: true },
+				{ key: 'oil_level', label: 'Oli mesin cukup', required: true },
+				{ key: 'body_condition', label: 'Body motor tidak ada kerusakan baru', required: true },
+				{ key: 'helmet_count', label: 'Helm disediakan sesuai jumlah (2)', required: true },
+				{ key: 'raincoat', label: 'Jas hujan tersedia', required: false },
+				{ key: 'phone_holder', label: 'Holder HP tersedia', required: false },
+			];
+		}
+
+		// motor_condition_check
+		return [
+			{ key: 'engine_start', label: 'Mesin hidup normal tanpa suara aneh', required: true },
+			{ key: 'brake_function', label: 'Rem depan & belakang berfungsi normal', required: true },
+			{ key: 'tire_condition', label: 'Ban tidak aus / bocor', required: true },
+			{ key: 'lights_function', label: 'Lampu & sein menyala', required: true },
+			{ key: 'oil_level', label: 'Oli mesin dalam batas normal', required: true },
+			{ key: 'chain_belt', label: 'Rantai / V-belt kencang & tidak aus', required: true },
+			{ key: 'fuel_level', label: 'Bensin cukup untuk operasional', required: true },
+			{ key: 'body_scratches', label: 'Tidak ada goresan / kerusakan baru', required: false },
+			{ key: 'kilometer', label: 'Kilometer tercatat', required: false },
+		];
+	}
+
+	/**
+	 * Submit QR scan checklist results.
+	 * - pickup_checklist: creates a pickup checklist record + optionally starts rental
+	 * - motor_condition_check: creates a vehicle condition record (no booking needed)
+	 */
+	async submitChecklist(
+		data: SubmitChecklistRequest,
+		staffUserId: string,
+	): Promise<{
+		checklistId: string;
+		conditionId: string;
+		rentalStarted?: boolean;
+	}> {
+		const vehicleId = decodeVehicleQr(data.qrCode);
+		if (!vehicleId) {
+			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
+		}
+
+		const vehicle = await this.vehicleRepo.findById(vehicleId);
+		if (!vehicle) {
+			throw new NotFoundError('Vehicle');
+		}
+
+		// Determine overall condition status from items
+		const allRequiredOk = Object.entries(data.items)
+			.filter(([key]) => {
+				const items = this.getChecklistItemsForMode(data.scanMode);
+				return items.find((i) => i.key === key)?.required ?? false;
+			})
+			.every(([, value]) => value === true);
+
+		const conditionStatus = data.conditionStatus ?? (allRequiredOk ? 'Good' : 'Fair');
+
+		let checklistId = '';
+		let rentalStarted = false;
+
+		if (data.scanMode === 'pickup_checklist') {
+			const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicleId);
+			if (!booking) {
+				throw new NotFoundError('No Confirmed/Active booking found for this vehicle');
+			}
+
+			if (!this.checklistRepo) {
+				throw new ValidationError('Checklist repository not available');
+			}
+
+			const checklist = await this.checklistRepo.create({
+				bookingId: booking.id,
+				vehicleId,
+				type: 'pickup',
+				items: JSON.stringify(data.items),
+				kmReading: data.kmReading,
+				fuelLevel: data.fuelLevel ?? null,
+				photos: data.photos.length > 0 ? JSON.stringify(data.photos) : null,
+				notes: data.notes ?? null,
+				damageNotes: null,
+				createdBy: staffUserId,
+			});
+			checklistId = checklist.id;
+
+			// Optionally start the rental (mark Active)
+			if (data.startRental && booking.status === 'Confirmed') {
+				await this.bookingRepo.update(booking.id, {
+					status: 'Active',
+				});
+				await this.vehicleRepo.update(vehicleId, { status: 'Rented' });
+				rentalStarted = true;
+			}
+		} else {
+			// motor_condition_check: no booking needed, generate a placeholder checklist ID
+			checklistId = crypto.randomUUID();
+		}
+
+		// Always record a condition entry for history
+		if (!this.conditionsRepo) {
+			throw new ValidationError('Conditions repository not available');
+		}
+
+		await this.conditionsRepo.create({
+			vehicleId,
+			checklistId: checklistId || null,
+			conditionStatus,
+			notes: data.notes ?? null,
+			km: data.kmReading,
+			checkedAt: new Date().toISOString(),
+			checkedBy: staffUserId,
+		});
+
+		return {
+			checklistId,
+			conditionId: checklistId, // re-use for simplicity; condition ID is generated inside create
+			rentalStarted,
+		};
 	}
 }

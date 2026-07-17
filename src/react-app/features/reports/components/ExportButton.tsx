@@ -4,7 +4,7 @@ import { reportsApi } from '../api/reportsApi';
 import type { DateRangeParams } from '../types/reports.types';
 
 interface ExportButtonProps {
-	reportType: 'revenue' | 'fleet-utilization' | 'lead-sources' | 'payments' | 'customers';
+	reportType: 'revenue' | 'fleet-utilization' | 'payments' | 'customers';
 	params?: DateRangeParams;
 	disabled?: boolean;
 }

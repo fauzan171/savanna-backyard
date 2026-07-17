@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format, subDays, subMonths, subWeeks, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
@@ -58,6 +59,9 @@ export function DateRangeFilter({
 	preset,
 	onPresetChange,
 }: DateRangeFilterProps) {
+	const [startOpen, setStartOpen] = useState(false);
+	const [endOpen, setEndOpen] = useState(false);
+
 	const handlePresetChange = (value: string) => {
 		const selected = presets.find((p) => p.value === value);
 		if (selected) {
@@ -71,7 +75,7 @@ export function DateRangeFilter({
 	return (
 		<div className="flex items-center gap-2">
 			<Select value={preset} onValueChange={handlePresetChange}>
-				<SelectTrigger className=".w-[140px]">
+				<SelectTrigger className="w-[140px]">
 					<SelectValue placeholder="Select period" />
 				</SelectTrigger>
 				<SelectContent>
@@ -83,12 +87,12 @@ export function DateRangeFilter({
 				</SelectContent>
 			</Select>
 
-			<Popover>
+			<Popover open={startOpen} onOpenChange={setStartOpen}>
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
 						className={cn(
-							'.w-[150px] justify-start text-left font-normal',
+							'w-[150px] justify-start text-left font-normal',
 							!startDate && 'text-muted-foreground'
 						)}
 					>
@@ -100,7 +104,10 @@ export function DateRangeFilter({
 					<Calendar
 						mode="single"
 						selected={startDate}
-						onSelect={onStartDateChange}
+						onSelect={(date) => {
+							onStartDateChange(date ?? undefined);
+							setStartOpen(false);
+						}}
 						initialFocus
 					/>
 				</PopoverContent>
@@ -108,12 +115,12 @@ export function DateRangeFilter({
 
 			<span className="text-muted-foreground">to</span>
 
-			<Popover>
+			<Popover open={endOpen} onOpenChange={setEndOpen}>
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
 						className={cn(
-							'.w-[150px] justify-start text-left font-normal',
+							'w-[150px] justify-start text-left font-normal',
 							!endDate && 'text-muted-foreground'
 						)}
 					>
@@ -125,7 +132,10 @@ export function DateRangeFilter({
 					<Calendar
 						mode="single"
 						selected={endDate}
-						onSelect={onEndDateChange}
+						onSelect={(date) => {
+							onEndDateChange(date ?? undefined);
+							setEndOpen(false);
+						}}
 						initialFocus
 					/>
 				</PopoverContent>

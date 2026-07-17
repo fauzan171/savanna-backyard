@@ -304,4 +304,8 @@ export class PaymentsService {
 			totalAmount: stats.totalAmount,
 		};
 	}
+
+	async getBookingPaymentSummaries() {
+		return this.paymentRepo.getBookingPaymentSummaries();
+	}
 }

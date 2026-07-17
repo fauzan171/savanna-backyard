@@ -177,7 +177,7 @@ export class WebhooksService {
 	 * Docs: https://developers.xendit.co/api-reference/#webhooks
 	 */
 	async handleXenditNotification(data: Record<string, unknown>): Promise<void> {
-		const externalId = (data.external_id as string) ?? '';
+		const rawExternalId = (data.external_id as string) ?? '';
 		const invoiceStatus = (data.status as string) ?? '';
 		const invoiceId = (data.id as string) ?? '';
 		const paymentMethod = (data.payment_method as string) ?? 'Gateway';
@@ -190,6 +190,11 @@ export class WebhooksService {
 			return;
 		}
 
+		// Support remainder invoices: external_id = "{bookingNumber}-remainder"
+		// Strip the suffix to get the base booking number.
+		const isRemainder = rawExternalId.endsWith('-remainder');
+		const externalId = isRemainder ? rawExternalId.slice(0, -'-remainder'.length) : rawExternalId;
+
 		// Find booking by booking number (external_id is the booking number)
 		const bookingResult = await this.db
 			.select()
@@ -198,7 +203,7 @@ export class WebhooksService {
 			.limit(1);
 
 		if (bookingResult.length === 0) {
-			console.error(`Booking not found for Xendit external_id: ${externalId}`);
+			console.error(`Booking not found for Xendit external_id: ${externalId} (raw: ${rawExternalId})`);
 			return;
 		}
 

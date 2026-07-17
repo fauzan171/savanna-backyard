@@ -1,24 +1,12 @@
 import { z } from 'zod';
 
-// Submit Lead Schema
-export const submitLeadSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters'),
-	phone: z.string().min(10, 'Phone number must be at least 10 characters'),
-	email: z.string().email('Invalid email address').optional().nullable(),
-	message: z.string().max(1000, 'Message must be at most 1000 characters').optional().nullable(),
-	source: z.enum(['WhatsApp', 'Instagram', 'Facebook', 'TikTok', 'Website', 'WalkIn']).optional(),
-	preferredDates: z.object({
-		start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-		end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-		vehicleInterest: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
-		vehicleTypeId: z.string().optional(),
-	}).optional().nullable(),
-});
-
 // Check availability query schema
+// startDate/endDate accept either YYYY-MM-DD or ISO 8601 datetime
+const isoOrDateRegex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?(.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
+
 export const checkAvailabilityQuerySchema = z.object({
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	startDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
+	endDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
 });
 
@@ -26,17 +14,18 @@ export const checkAvailabilityQuerySchema = z.object({
 export const getVehicleTypesQuerySchema = z.object({});
 
 // Create booking schema
+// startDate/endDate accept either YYYY-MM-DD or ISO 8601 datetime (supports12-hour blocks)
 export const createPublicBookingSchema = z.object({
 	vehicleId: z.string().min(1, 'Vehicle ID is required'),
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+	startDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
+	endDate: z.string().regex(isoOrDateRegex, 'Invalid date format (YYYY-MM-DD or ISO 8601 datetime)'),
 	customerName: z.string().min(2, 'Name must be at least 2 characters'),
 	customerPhone: z.string().min(8, 'Phone number must be at least 8 characters'),
 	customerEmail: z.string().email('Invalid email').optional().nullable().or(z.literal('')),
 	notes: z.string().max(1000).optional().nullable().or(z.literal('')),
 	/** Payment method: 'QRIS' | 'BankTransfer' | 'Gateway' (all methods). Default: 'Gateway' */
 	paymentMethod: z.enum(['QRIS', 'BankTransfer', 'Gateway']).optional(),
-	/** Equipment line items to rent alongside the vehicle (per-day, same duration). */
+	/** Equipment line items to rent alongside the vehicle (per-block, same duration). */
 	equipment: z.array(z.object({
 		equipmentId: z.string().min(1),
 		quantity: z.number().int().min(1),
@@ -46,7 +35,6 @@ export const createPublicBookingSchema = z.object({
 });
 
 // Types
-export type SubmitLeadRequest = z.infer<typeof submitLeadSchema>;
 export type CheckAvailabilityQuery = z.infer<typeof checkAvailabilityQuerySchema>;
 export type GetVehicleTypesQuery = z.infer<typeof getVehicleTypesQuerySchema>;
 export type CreatePublicBookingRequest = z.infer<typeof createPublicBookingSchema>;

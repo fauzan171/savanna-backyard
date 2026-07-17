@@ -74,6 +74,10 @@ export interface BookingResponse {
 	baseAmount: number;
 	addonsAmount: number;
 	lateFee: number;
+	damageFee: number;
+	totalPenalty: number;
+	penaltyPaid: boolean;
+	returnConfirmed: boolean;
 	totalAmount: number;
 	currency: Currency;
 	notes: string | null;
@@ -105,13 +109,29 @@ export interface LateFeeDetails {
 export interface CompleteRentalResult extends BookingResponse {
 	lateFeeDetails: LateFeeDetails | null;
 	vehicleStatus: Vehicle['status'];
+	damageFeeDetails: {
+		flippedItems: number;
+		ratePerItem: number;
+		override: boolean;
+		calculation: string;
+	} | null;
+}
+
+export interface PenaltyBreakdown {
+	lateFee: number;
+	damageFee: number;
+	totalPenalty: number;
+	penaltyPaid: boolean;
+	penaltyPaidAt: string | null;
+	damageFeeDetails: CompleteRentalResult['damageFeeDetails'];
+	lateFeeDetails: LateFeeDetails | null;
 }
 
 export interface ExtendRentalResult {
 	id: string;
 	originalEndDate: string;
 	newEndDate: string;
-	additionalDays: number;
+	additionalBlocks: number;
 	additionalAmount: number;
 	newTotalAmount: number;
 	extendedAt: string;
@@ -151,4 +171,36 @@ export interface BookingStats {
 	total: number;
 	byStatus: Record<BookingStatus, number>;
 	totalRevenue: number;
+}
+
+// ── QR Scan flow ────────────────────────────────────────────────────────────
+
+export type QrScanMode = 'pickup_checklist' | 'motor_condition_check';
+
+export interface QrScanChecklistItem {
+	key: string;
+	label: string;
+	required: boolean;
+}
+
+export interface QrScanResult {
+	scanMode: QrScanMode;
+	vehicle: {
+		id: string;
+		name: string;
+		plateNumber: string | null;
+		type: Vehicle['type'];
+	};
+	booking: {
+		id: string;
+		bookingNumber: string;
+		customerName: string;
+		customerPhone: string;
+		startDate: string;
+		endDate: string;
+		status: BookingStatus;
+		paymentType: string;
+	} | null;
+	checklistItems: QrScanChecklistItem[];
+	message: string;
 }

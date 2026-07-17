@@ -22,6 +22,8 @@ import type {
 	ExtensionCalculationParams,
 	ExtensionCalculationResult,
 	BookingAddon,
+	PenaltyBreakdown,
+	ScanReturnResult,
 } from '../types/booking.types';
 
 const BASE_PATH = '/v1/bookings';
@@ -95,6 +97,21 @@ export const bookingApi = {
 	/** Cancel booking */
 	cancel: async (id: string, data: CancelBookingRequest) => {
 		return api.post<ApiSuccessResponse<Booking>>(`${BASE_PATH}/${id}/cancel`, data);
+	},
+
+	/** Get penalty breakdown (late fee + damage fee) for a booking */
+	getPenalties: async (id: string) => {
+		return api.get<ApiSuccessResponse<PenaltyBreakdown>>(`${BASE_PATH}/${id}/penalties`);
+	},
+
+	/** Mark a booking's penalty as paid */
+	markPenaltyPaid: async (id: string) => {
+		return api.post<ApiSuccessResponse<Booking>>(`${BASE_PATH}/${id}/penalties/mark-paid`);
+	},
+
+	/** Scan a vehicle QR to resolve the active rental (admin return processing) */
+	scanReturn: async (qrCode: string) => {
+		return api.post<ApiSuccessResponse<ScanReturnResult>>(`${BASE_PATH}/scan-return`, { qrCode });
 	},
 
 	/** Extend booking */

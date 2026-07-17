@@ -287,4 +287,85 @@ export class PaymentsRepository {
 			totalAmount,
 		};
 	}
+
+	async getBookingPaymentSummaries(): Promise<{
+		bookingId: string;
+		bookingNumber: string;
+		customerName: string;
+		vehicleName: string;
+		startDate: string;
+		endDate: string;
+		totalAmount: number;
+		totalPaid: number;
+		pendingAmount: number;
+		remaining: number;
+		isFullyPaid: boolean;
+		paymentProgress: number;
+		bookingStatus: string;
+		paymentType: string;
+	}[]> {
+		// Get all non-cancelled bookings
+		const allBookings = await this.db
+			.select()
+			.from(bookings)
+			.where(sql`${bookings.status} NOT IN ('Cancelled', 'expired', 'refunded')`)
+			.orderBy(desc(bookings.createdAt));
+
+		const results: {
+			bookingId: string;
+			bookingNumber: string;
+			customerName: string;
+			vehicleName: string;
+			startDate: string;
+			endDate: string;
+			totalAmount: number;
+			totalPaid: number;
+			pendingAmount: number;
+			remaining: number;
+			isFullyPaid: boolean;
+			paymentProgress: number;
+			bookingStatus: string;
+			paymentType: string;
+		}[] = [];
+
+		for (const booking of allBookings) {
+			// Get customer
+			const customerResult = await this.db
+				.select()
+				.from(customers)
+				.where(eq(customers.id, booking.customerId))
+				.limit(1);
+			const customer = customerResult[0];
+
+			// Get vehicle
+			const vehicleResult = await this.db
+				.select()
+				.from(vehicles)
+				.where(eq(vehicles.id, booking.vehicleId))
+				.limit(1);
+			const vehicle = vehicleResult[0];
+
+			// Get payment summary
+			const summary = await this.getPaymentSummary(booking.id);
+
+			results.push({
+				bookingId: booking.id,
+				bookingNumber: booking.bookingNumber,
+				customerName: customer?.name ?? 'Unknown',
+				vehicleName: vehicle?.name ?? 'Unknown',
+				startDate: booking.startDate,
+				endDate: booking.endDate,
+				totalAmount: booking.totalAmount,
+				totalPaid: summary.totalPaid,
+				pendingAmount: summary.pendingAmount,
+				remaining: summary.remaining,
+				isFullyPaid: summary.isFullyPaid,
+				paymentProgress: summary.paymentProgress,
+				bookingStatus: booking.status,
+				paymentType: booking.paymentType ?? 'full',
+			});
+		}
+
+		return results;
+	}
 }

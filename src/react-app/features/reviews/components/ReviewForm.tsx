@@ -30,7 +30,7 @@ export function ReviewForm({ initialData, onSubmit, onCancel, isLoading }: Revie
 				<div><label className="text-sm font-medium">Location</label><Input {...register('location')} /></div>
 				<div><label className="text-sm font-medium">Rating (1-5)</label><Input type="number" min={1} max={5} {...register('rating', { valueAsNumber: true })} /></div>
 				<div><label className="text-sm font-medium">Avatar Initials</label><Input {...register('avatar')} maxLength={3} /></div>
-				<div className="col-span-2"><label className="text-sm font-medium">Review Text</label><Textarea {...register('text', { required: true })} rows={3} /></div>
+				<div className="col-span-2"><label className="text-sm font-medium">Review Text</label><Textarea {...register('text', { required: true, minLength: 10 })} rows={3} /><p className="text-xs text-muted-foreground">Minimum 10 characters.</p></div>
 			</div>
 			<div className="flex justify-end gap-2 pt-4">
 				<Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
