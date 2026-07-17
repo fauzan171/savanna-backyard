@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { Link } from 'react-router-dom';
-import { MoreHorizontal, Wrench, Eye, QrCode } from 'lucide-react';
+import { MoreHorizontal, Wrench, Eye, QrCode, Trash2 } from 'lucide-react';
 import { DataTable } from '@/react-app/components/ui/table';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
@@ -20,6 +20,7 @@ interface VehicleTableProps {
 	onStatusChange?: (vehicle: Vehicle) => void;
 	onRowClick?: (vehicle: Vehicle) => void;
 	onQrClick?: (vehicle: Vehicle) => void;
+	onDelete?: (vehicle: Vehicle) => void;
 }
 
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
@@ -38,7 +39,7 @@ const typeLabels: Record<string, string> = {
 	Other: 'Other',
 };
 
-export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQrClick }: VehicleTableProps) {
+export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQrClick, onDelete }: VehicleTableProps) {
 	const columns: ColumnDef<Vehicle>[] = useMemo(
 		() => [
 			{
@@ -130,12 +131,24 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 									</DropdownMenuItem>
 								</>
 							)}
+							{onDelete && (
+								<>
+									<DropdownMenuSeparator />
+									<DropdownMenuItem
+										className="text-destructive"
+										onClick={() => onDelete(row.original)}
+									>
+										<Trash2 className="mr-2 size-4" />
+										Delete
+									</DropdownMenuItem>
+								</>
+							)}
 						</DropdownMenuContent>
 					</DropdownMenu>
 				),
 			},
 		],
-		[onStatusChange, onQrClick]
+		[onStatusChange, onQrClick, onDelete]
 	);
 
 	const renderCard = (vehicle: Vehicle) => (

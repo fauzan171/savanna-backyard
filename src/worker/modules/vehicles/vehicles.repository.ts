@@ -93,6 +93,10 @@ export class VehiclesRepository {
 		return this.update(id, { status });
 	}
 
+	async delete(id: string): Promise<void> {
+		await this.db.delete(vehicles).where(eq(vehicles.id, id));
+	}
+
 	// Status logs
 	async createStatusLog(data: Omit<NewVehicleStatusLog, 'id'>): Promise<void> {
 		const id = crypto.randomUUID();

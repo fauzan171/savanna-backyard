@@ -4,10 +4,11 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
-import { useVehicles, useCreateVehicle } from '../hooks/useVehicles';
+import { useVehicles, useCreateVehicle, useDeleteVehicle } from '../hooks/useVehicles';
 import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
 import { VehicleQrCard } from '../components/VehicleQrCard';
+import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import type { Vehicle, VehicleFormData } from '../types/vehicle.types';
 import { toast } from '@/react-app/hooks/useToast';
 
@@ -15,10 +16,12 @@ export default function VehiclesPage() {
 	const navigate = useNavigate();
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 	const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null);
+	const [deleteVehicle, setDeleteVehicle] = useState<Vehicle | null>(null);
 
 	// Queries and mutations
 	const { data, isLoading } = useVehicles({ page: 1, limit: 25 });
 	const createMutation = useCreateVehicle();
+	const deleteMutation = useDeleteVehicle();
 
 	const handleCreate = async (formData: VehicleFormData) => {
 		try {
@@ -45,6 +48,21 @@ export default function VehiclesPage() {
 		setQrVehicle(vehicle);
 	};
 
+	const handleDelete = async () => {
+		if (!deleteVehicle) return;
+		try {
+			await deleteMutation.mutateAsync(deleteVehicle.id);
+			toast({ title: 'Kendaraan dihapus' });
+			setDeleteVehicle(null);
+		} catch (error) {
+			toast({
+				variant: 'destructive',
+				title: 'Gagal menghapus kendaraan',
+				description: (error as Error).message,
+			});
+		}
+	};
+
 	return (
 		<div className="space-y-6">
 			<PageHeader
@@ -63,6 +81,7 @@ export default function VehiclesPage() {
 				isLoading={isLoading}
 				onRowClick={handleRowClick}
 				onQrClick={handleQrClick}
+				onDelete={setDeleteVehicle}
 			/>
 
 			{/* Create Dialog */}
@@ -98,6 +117,18 @@ export default function VehiclesPage() {
 					</div>
 				</div>
 			)}
+
+			{/* Delete confirmation */}
+			<ConfirmationDialog
+				open={!!deleteVehicle}
+				onOpenChange={(open) => !open && setDeleteVehicle(null)}
+				title="Hapus Kendaraan"
+				description={`Yakin hapus "${deleteVehicle?.name}" (${deleteVehicle?.plateNumber})? Tindakan ini tidak dapat dibatalkan. Kendaraan dengan booking aktif tidak dapat dihapus.`}
+				confirmLabel="Hapus"
+				variant="danger"
+				onConfirm={handleDelete}
+				isLoading={deleteMutation.isPending}
+			/>
 		</div>
 	);
 }

@@ -47,6 +47,11 @@ export const vehicleApi = {
 		return api.patch<ApiSuccessResponse<Vehicle>>(`${BASE_PATH}/${id}/status`, data);
 	},
 
+	// Delete vehicle
+	remove: async (id: string) => {
+		return api.delete<ApiSuccessResponse<null>>(`${BASE_PATH}/${id}`);
+	},
+
 	// Check availability
 	checkAvailability: async (params: AvailabilityParams) => {
 		const searchParams: Record<string, string> = {

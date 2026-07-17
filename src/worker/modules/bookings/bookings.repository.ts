@@ -378,6 +378,19 @@ export class BookingsRepository {
 	 * Used by the QR scan endpoint to decide whether the scan is for
 	 * pickup checklist or motor condition check.
 	 */
+	async countActiveByVehicle(vehicleId: string): Promise<number> {
+		const rows = await this.db
+			.select({ id: bookings.id })
+			.from(bookings)
+			.where(
+				and(
+					eq(bookings.vehicleId, vehicleId),
+					inArray(bookings.status, ['Pending', 'Confirmed', 'Active']),
+				),
+			);
+		return rows.length;
+	}
+
 	async findUpcomingConfirmedByVehicle(vehicleId: string): Promise<Booking | null> {
 		const rows = await this.db
 			.select()

@@ -180,6 +180,23 @@ export class VehiclesService {
     };
   }
 
+  async delete(id: string): Promise<void> {
+    const existing = await this.vehicleRepo.findById(id);
+    if (!existing) throw new NotFoundError("Vehicle");
+
+    // Refuse if there are active/upcoming bookings referencing this vehicle
+    if (this.bookingRepo) {
+      const activeCount = await this.bookingRepo.countActiveByVehicle(id);
+      if (activeCount > 0) {
+        throw new ConflictError(
+          "Cannot delete vehicle with active or upcoming bookings"
+        );
+      }
+    }
+
+    await this.vehicleRepo.delete(id);
+  }
+
   async checkAvailability(
     query: AvailabilityQuery,
   ): Promise<AvailabilityResult> {
