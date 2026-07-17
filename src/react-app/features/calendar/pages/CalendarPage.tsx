@@ -37,7 +37,7 @@ export default function CalendarPage() {
 	const isCurrentMonth = month === currentMonth();
 
 	return (
-		<div className="flex flex-col overflow-hidden -mx-6 -mt-6 -mb-6" style={{ height: 'calc(100vh - 4rem)' }}>
+		<div className="flex flex-col overflow-hidden -mx-3 md:-mx-6 -mt-3 md:-mt-6 -mb-3 md:-mb-6 h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)]">
 			{/* Top toolbar — compact, Google Calendar-like */}
 			<div className="flex flex-wrap items-center gap-2 border-b bg-background px-4 py-3 shrink-0">
 				{/* Logo / title */}
