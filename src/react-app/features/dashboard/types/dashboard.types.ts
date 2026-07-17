@@ -49,7 +49,7 @@ export interface DashboardOverview {
 // ============================================
 
 export interface RevenueStats {
-	period: string;
+	period: string | { start: string; end: string };
 	summary: {
 		total: number;
 		collected: number;
