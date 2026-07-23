@@ -101,6 +101,13 @@ const getCalendarHandler = async (c: Context<VehiclesEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const deleteVehicleHandler = async (c: Context<VehiclesEnv>) => {
+	const service = c.get('vehiclesService');
+	const id = c.req.param('id');
+	await service.delete(id);
+	return c.json({ success: true, message: 'Vehicle deleted' });
+};
+
 export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	const router = new Hono<VehiclesEnv>();
 
@@ -114,6 +121,7 @@ export function createVehiclesRouter(): Hono<VehiclesEnv> {
 	router.post('/', validateBody(createVehicleSchema), createVehicleHandler);
 	router.patch('/:id', validateBody(updateVehicleSchema), updateVehicleHandler);
 	router.patch('/:id/status', validateBody(updateStatusSchema), updateStatusHandler);
+	router.delete('/:id', deleteVehicleHandler);
 
 	return router;
 }

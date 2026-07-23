@@ -1,4 +1,4 @@
-import { useApiQuery, useApiList, useApiCreate, useApiUpdate, useApiMutation } from '@/react-app/features/shared/hooks/useApi';
+import { useApiQuery, useApiList, useApiCreate, useApiUpdate, useApiDelete, useApiMutation } from '@/react-app/features/shared/hooks/useApi';
 import { leadApi } from '../api/leadApi';
 import type {
 	Lead,
@@ -63,6 +63,11 @@ export function useUpdateLead() {
 		leadKeys.all,
 		'/v1/leads'
 	);
+}
+
+// Hook for deleting a lead
+export function useDeleteLead() {
+	return useApiDelete(leadKeys.all, '/v1/leads');
 }
 
 // Hook for adding note

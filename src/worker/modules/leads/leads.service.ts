@@ -203,6 +203,25 @@ export class LeadsService {
     return this.toResponse(lead);
   }
 
+  /**
+   * Delete a lead. Blocked if the lead has already been converted into a
+   * booking (Converted status) to preserve the booking's audit trail.
+   */
+  async delete(id: string): Promise<void> {
+    const existing = await this.leadRepo.findById(id);
+    if (!existing) {
+      throw new NotFoundError("Lead");
+    }
+
+    if (existing.status === "Converted") {
+      throw new ConflictError(
+        "Cannot delete a converted lead. The associated booking must be removed first.",
+      );
+    }
+
+    await this.leadRepo.delete(id);
+  }
+
   async convertToBooking(
     leadId: string,
     data: ConvertToBookingRequest,

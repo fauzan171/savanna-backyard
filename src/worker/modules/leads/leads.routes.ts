@@ -120,6 +120,13 @@ const convertToBookingHandler = async (c: Context<LeadsEnv>) => {
 	return c.json({ success: true, data: result }, 201);
 };
 
+const deleteLeadHandler = async (c: Context<LeadsEnv>) => {
+	const service = c.get('leadsService');
+	const id = c.req.param('id');
+	await service.delete(id);
+	return c.json({ success: true, message: 'Lead deleted' });
+};
+
 export function createLeadsRouter(): Hono<LeadsEnv> {
 	const router = new Hono<LeadsEnv>();
 
@@ -135,6 +142,7 @@ export function createLeadsRouter(): Hono<LeadsEnv> {
 	router.post('/:id/notes', validateBody(addNoteSchema), addNoteHandler);
 	router.post('/:id/assign', validateBody(assignLeadSchema), assignLeadHandler);
 	router.post('/:id/convert', validateBody(convertToBookingSchema), convertToBookingHandler);
+	router.delete('/:id', deleteLeadHandler);
 
 	return router;
 }

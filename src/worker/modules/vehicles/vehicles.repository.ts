@@ -1,5 +1,5 @@
-import { eq, or, like, and, desc } from 'drizzle-orm';
-import { vehicles, vehicleStatusLogs, type Vehicle, type NewVehicle, type NewVehicleStatusLog } from '@/worker/core/database/schema';
+import { eq, or, like, and, desc, inArray } from 'drizzle-orm';
+import { vehicles, vehicleStatusLogs, bookings, maintenance, type Vehicle, type NewVehicle, type NewVehicleStatusLog } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 import type { ListVehiclesQuery } from './vehicles.dto';
 
@@ -148,5 +148,41 @@ export class VehiclesRepository {
 	async checkExists(id: string): Promise<boolean> {
 		const result = await this.findById(id);
 		return result !== null;
+	}
+
+	/**
+	 * Count active bookings for a vehicle (statuses that are not terminal).
+	 * Used to block deletion of vehicles that still have live rentals.
+	 */
+	async countActiveBookings(vehicleId: string): Promise<number> {
+		const activeStatuses = ['Pending', 'pending_payment', 'Confirmed', 'Active'];
+		const rows = await this.db
+			.select({ id: bookings.id })
+			.from(bookings)
+			.where(and(eq(bookings.vehicleId, vehicleId), inArray(bookings.status, activeStatuses)));
+		return rows.length;
+	}
+
+	/**
+	 * Count active maintenance records for a vehicle.
+	 */
+	async countActiveMaintenance(vehicleId: string): Promise<number> {
+		const activeStatuses = ['Scheduled', 'InProgress'];
+		const rows = await this.db
+			.select({ id: maintenance.id })
+			.from(maintenance)
+			.where(and(eq(maintenance.vehicleId, vehicleId), inArray(maintenance.status, activeStatuses)));
+		return rows.length;
+	}
+
+	/**
+	 * Delete a vehicle. Status logs are cleaned up first to satisfy the
+	 * foreign-key reference. Callers must verify no active bookings/maintenance
+	 * exist before invoking this.
+	 */
+	async delete(id: string): Promise<void> {
+		// Remove dependent status logs first
+		await this.db.delete(vehicleStatusLogs).where(eq(vehicleStatusLogs.vehicleId, id));
+		await this.db.delete(vehicles).where(eq(vehicles.id, id));
 	}
 }

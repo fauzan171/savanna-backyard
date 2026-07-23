@@ -8,6 +8,8 @@ import { format } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { Spinner } from '@/react-app/components/ui/spinner';
+import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
+import { toast } from '@/react-app/hooks/useToast';
 import { FormField } from '@/react-app/components/ui/form-field';
 import { Calendar } from '@/react-app/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/react-app/components/ui/popover';
@@ -20,7 +22,7 @@ import {
 } from '@/react-app/components/ui/select';
 import { Combobox, type ComboboxOption } from '@/react-app/components/ui/combobox';
 import { cn } from '@/react-app/lib/utils';
-import { useLead, useUpdateLead, useConvertToBooking } from '../hooks/useLeads';
+import { useLead, useUpdateLead, useConvertToBooking, useDeleteLead } from '../hooks/useLeads';
 import { useVehicles } from '@/react-app/features/vehicles/hooks/useVehicles';
 import { LeadDetail } from '../components/LeadDetail';
 import { LeadForm } from '../components/LeadForm';
@@ -51,11 +53,13 @@ export default function LeadDetailPage() {
 	const navigate = useNavigate();
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 	const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
 
 	const { data: lead, isLoading, error } = useLead(id!);
 	const updateMutation = useUpdateLead();
 	const convertMutation = useConvertToBooking(id!);
+	const deleteMutation = useDeleteLead();
 	const { data: vehiclesData } = useVehicles({ limit: 100, status: 'Available' });
 
 	const vehicleOptions: ComboboxOption[] = vehiclesData?.items?.map((v) => ({
@@ -81,6 +85,19 @@ export default function LeadDetailPage() {
 			setIsEditDialogOpen(false);
 		} catch (error) {
 			console.log(error);
+		}
+	};
+
+	const handleDelete = async () => {
+		try {
+			await deleteMutation.mutateAsync(id!);
+			toast({ title: 'Lead deleted', description: 'The lead has been removed.' });
+			navigate('/leads');
+		} catch (error: unknown) {
+			const message =
+				(error as { error?: { message?: string } })?.error?.message ??
+				'Failed to delete lead';
+			toast({ title: 'Cannot delete lead', description: message, variant: 'destructive' });
 		}
 	};
 
@@ -142,10 +159,11 @@ export default function LeadDetailPage() {
 				</Link>
 			</Button>
 
-			<LeadDetail
-				lead={lead}
-				onEdit={() => setIsEditDialogOpen(true)}
-				onConvert={() => setIsConvertDialogOpen(true)}
+		<LeadDetail
+			lead={lead}
+			onEdit={() => setIsEditDialogOpen(true)}
+			onConvert={() => setIsConvertDialogOpen(true)}
+			onDelete={() => setIsDeleteDialogOpen(true)}
 			/>
 
 			{/* Edit Dialog */}
@@ -279,6 +297,18 @@ export default function LeadDetailPage() {
 					</form>
 				</DialogContent>
 			</Dialog>
+
+			{/* Delete Confirmation Dialog */}
+			<ConfirmationDialog
+				open={isDeleteDialogOpen}
+				onOpenChange={setIsDeleteDialogOpen}
+				title={`Delete lead ${lead.name}?`}
+				description="This action cannot be undone. The lead and its notes will be permanently removed. Converted leads cannot be deleted."
+				confirmLabel="Delete"
+				variant="danger"
+				onConfirm={handleDelete}
+				isLoading={deleteMutation.isPending}
+			/>
 		</div>
 	);
 }

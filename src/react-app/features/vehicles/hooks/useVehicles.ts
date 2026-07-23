@@ -1,4 +1,4 @@
-	import { useApiQuery, useApiList, useApiCreate, useApiUpdate, useApiMutation } from '@/react-app/features/shared/hooks/useApi';
+	import { useApiQuery, useApiList, useApiCreate, useApiUpdate, useApiDelete, useApiMutation } from '@/react-app/features/shared/hooks/useApi';
 	import { vehicleApi } from '../api/vehicleApi';
 	import type {
 		Vehicle,
@@ -59,13 +59,18 @@
 		);
 	}
 
-	// Hook for updating vehicle status
-	export function useUpdateVehicleStatus() {
-		return useApiMutation<Vehicle, { id: string } & UpdateStatusRequest>(
-			vehicleKeys.all,
-			async ({ id, ...data }) => vehicleApi.updateStatus(id, data)
-		);
-	}
+// Hook for updating vehicle status
+export function useUpdateVehicleStatus() {
+	return useApiMutation<Vehicle, { id: string } & UpdateStatusRequest>(
+		vehicleKeys.all,
+		async ({ id, ...data }) => vehicleApi.updateStatus(id, data)
+	);
+}
+
+// Hook for deleting a vehicle
+export function useDeleteVehicle() {
+	return useApiDelete(vehicleKeys.all, '/v1/vehicles');
+}
 
 	// Hook for checking availability
 	export function useVehicleAvailability(params: AvailabilityParams | null) {

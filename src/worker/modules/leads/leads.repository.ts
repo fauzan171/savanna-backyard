@@ -120,6 +120,10 @@ export class LeadsRepository {
 		return this.update(id, updateData);
 	}
 
+	async delete(id: string): Promise<void> {
+		await this.db.delete(leads).where(eq(leads.id, id));
+	}
+
 	async appendNote(id: string, note: string, existingNotes: string | null): Promise<Lead | null> {
 		const timestamp = new Date().toISOString();
 		const newNoteEntry = `[${timestamp}] ${note}`;

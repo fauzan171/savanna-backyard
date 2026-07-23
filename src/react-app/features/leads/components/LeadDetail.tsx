@@ -6,6 +6,7 @@ import {
   Calendar,
   Tag,
   User,
+  Trash2,
 } from "lucide-react";
 import {
   Card,
@@ -27,6 +28,7 @@ interface LeadDetailProps {
   lead: LeadWithNotes;
   onEdit?: () => void;
   onConvert?: () => void;
+  onDelete?: () => void;
 }
 
 const statusConfig: Record<
@@ -95,7 +97,7 @@ function normalizeNotes(notes: LeadNote[] | string | null) {
   return parseNotesString(notes);
 }
 
-export function LeadDetail({ lead, onEdit, onConvert }: LeadDetailProps) {
+export function LeadDetail({ lead, onEdit, onConvert, onDelete }: LeadDetailProps) {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("id-ID", {
       day: "numeric",
@@ -145,6 +147,12 @@ export function LeadDetail({ lead, onEdit, onConvert }: LeadDetailProps) {
                 Convert to Booking
               </Button>
             )}
+          {onDelete && lead.status !== "Converted" && (
+            <Button variant="destructive" onClick={onDelete}>
+              <Trash2 className="size-4 mr-2" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
 
