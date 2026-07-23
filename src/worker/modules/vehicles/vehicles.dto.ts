@@ -1,37 +1,85 @@
 import { z } from 'zod';
 import { urlOrPath } from '@/worker/core/schemas/url';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
+
+// Shared field schemas (VEH-03: XSS sanitize free text; FRM-05: trim required)
+const nameField = z
+	.string()
+	.trim()
+	.min(2, 'Name must be at least 2 characters')
+	.max(100)
+	.transform((v) => sanitizeText(v) as string);
+
+// Normalize plate: uppercase + collapse whitespace (VEH-02/13: prevents
+// "b 123 xx" vs "B 123 XX" bypassing the uniqueness check)
+const plateField = z
+	.string()
+	.trim()
+	.min(1, 'Plate number is required')
+	.max(20)
+	.transform((v) => v.replace(/\s+/g, ' ').toUpperCase());
+
+const brandModelField = z
+	.string()
+	.max(50)
+	.optional()
+	.nullable()
+	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
 
 // Create vehicle schema
 export const createVehicleSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-	plateNumber: z.string().min(1, 'Plate number is required').max(20),
+	name: nameField,
+	plateNumber: plateField,
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']),
-	brand: z.string().max(50).optional().nullable(),
-	model: z.string().max(50).optional().nullable(),
+	brand: brandModelField,
+	model: brandModelField,
 	year: z.number().int().min(1990).max(2030).optional().nullable(),
-	dailyRateIdr: z.number().positive('Daily rate must be positive'),
-	dailyRateUsd: z.number().positive().optional().nullable(),
+	// VEH-04: enforce upper bound so absurd values cannot be stored
+	dailyRateIdr: z
+		.number()
+		.positive('Daily rate must be positive')
+		.max(50_000_000, 'Daily rate cannot exceed Rp 50.000.000'),
+	dailyRateUsd: z
+		.number()
+		.positive()
+		.max(10_000, 'Daily rate (USD) cannot exceed $10.000')
+		.optional()
+		.nullable(),
 	photoUrl: urlOrPath.optional().nullable(),
 });
 
-// Update vehicle schema (all fields optional except plateNumber and dailyRateIdr which have defaults)
+// Update vehicle schema (all fields optional)
 export const updateVehicleSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
-	plateNumber: z.string().min(1).max(20).optional(),
+	name: nameField.optional(),
+	plateNumber: plateField.optional(),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']).optional(),
-	brand: z.string().max(50).optional().nullable(),
-	model: z.string().max(50).optional().nullable(),
+	brand: brandModelField,
+	model: brandModelField,
 	year: z.number().int().min(1990).max(2030).optional().nullable(),
-	dailyRateIdr: z.number().positive().optional(),
-	dailyRateUsd: z.number().positive().optional().nullable(),
-	totalKm: z.number().optional().nullable(),
+	dailyRateIdr: z
+		.number()
+		.positive('Daily rate must be positive')
+		.max(50_000_000, 'Daily rate cannot exceed Rp 50.000.000')
+		.optional(),
+	dailyRateUsd: z
+		.number()
+		.positive()
+		.max(10_000, 'Daily rate (USD) cannot exceed $10.000')
+		.optional()
+		.nullable(),
+	totalKm: z.number().min(0).optional().nullable(),
 	photoUrl: urlOrPath.optional().nullable(),
 });
 
 // Update status schema
 export const updateStatusSchema = z.object({
 	status: z.enum(['Available', 'Rented', 'Maintenance', 'Inactive']),
-	notes: z.string().max(500).optional().nullable(),
+	notes: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // List query schema

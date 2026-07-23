@@ -1,5 +1,6 @@
 import { TrailsRepository } from './trails.repository';
-import { NotFoundError } from '@/worker/core/types/errors';
+import { ConflictError, NotFoundError } from '@/worker/core/types/errors';
+import type { CreateTrailRequest, UpdateTrailRequest } from './trails.dto';
 
 export class TrailsService {
 	constructor(private repo: TrailsRepository) {}
@@ -14,7 +15,13 @@ export class TrailsService {
 		return trail;
 	}
 
-	async create(data: any) {
+	async create(data: CreateTrailRequest) {
+		// TRAIL-03: reject duplicate trail names
+		const existing = await this.repo.findByName(data.name);
+		if (existing) {
+			throw new ConflictError('Nama trail sudah terdaftar');
+		}
+
 		const now = new Date().toISOString();
 		return this.repo.create({
 			...data,
@@ -39,8 +46,17 @@ export class TrailsService {
 		});
 	}
 
-	async update(id: string, data: any) {
-		await this.getById(id);
+	async update(id: string, data: UpdateTrailRequest) {
+		const existing = await this.getById(id);
+
+		// TRAIL-03: reject duplicate names when renaming
+		if (data.name && data.name !== existing.name) {
+			const conflict = await this.repo.findByName(data.name);
+			if (conflict) {
+				throw new ConflictError('Nama trail sudah terdaftar');
+			}
+		}
+
 		return this.repo.update(id, data);
 	}
 

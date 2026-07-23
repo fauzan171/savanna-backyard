@@ -14,6 +14,11 @@ export class TrailsRepository {
 		return result[0] ?? null;
 	}
 
+	async findByName(name: string): Promise<Trail | null> {
+		const result = await this.db.select().from(trails).where(eq(trails.name, name)).limit(1);
+		return result[0] ?? null;
+	}
+
 	async create(data: NewTrail): Promise<Trail> {
 		await this.db.insert(trails).values(data);
 		const result = await this.db.select().from(trails).where(eq(trails.id, data.id)).limit(1);

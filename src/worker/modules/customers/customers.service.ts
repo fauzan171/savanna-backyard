@@ -68,6 +68,12 @@ export class CustomersService {
 	}
 
 	async create(data: CreateCustomerRequest): Promise<CustomerResponse> {
+		// CUST-06: reject duplicate phone numbers
+		const existingByPhone = await this.customerRepo.findByPhone(data.phone);
+		if (existingByPhone) {
+			throw new ConflictError('Nomor telepon sudah terdaftar');
+		}
+
 		// Check if email already exists (if provided)
 		if (data.email) {
 			const existingByEmail = await this.customerRepo.findByEmail(data.email);
@@ -96,6 +102,14 @@ export class CustomersService {
 		const existing = await this.customerRepo.findById(id);
 		if (!existing) {
 			throw new NotFoundError('Customer');
+		}
+
+		// CUST-06: check phone uniqueness if changing phone
+		if (data.phone && data.phone !== existing.phone) {
+			const existingByPhone = await this.customerRepo.findByPhone(data.phone);
+			if (existingByPhone) {
+				throw new ConflictError('Nomor telepon sudah terdaftar');
+			}
 		}
 
 		// Check email uniqueness if changing email

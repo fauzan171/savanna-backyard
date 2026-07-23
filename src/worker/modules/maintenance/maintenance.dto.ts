@@ -1,41 +1,116 @@
 import { z } from 'zod';
 import { urlOrPath } from '@/worker/core/schemas/url';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
+
+const safeOptText = z
+	.string()
+	.optional()
+	.nullable()
+	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
 
 // Photo schema
 const maintenancePhotoSchema = z.object({
 	url: urlOrPath,
-	caption: z.string().max(200).optional(),
+	caption: z
+		.string()
+		.max(200)
+		.optional()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	uploadedAt: z.string().optional(),
 });
 
+// MAINT-03: cost non-negative with an upper bound
+const costField = z
+	.number()
+	.nonnegative('Cost must be non-negative')
+	.max(500_000_000, 'Cost is too large')
+	.optional()
+	.nullable();
+
 // Create maintenance schema
-export const createMaintenanceSchema = z.object({
-	vehicleId: z.string().min(1, 'Vehicle ID is required'),
-	type: z.enum(['Scheduled', 'Repair', 'Damage']),
-	description: z.string().min(5, 'Description must be at least 5 characters').max(1000),
-	cost: z.number().nonnegative('Cost must be non-negative').optional().nullable(),
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
-	bookingId: z.string().optional().nullable(),
-	photos: z.array(maintenancePhotoSchema).max(10, 'Maximum 10 photos allowed').optional().nullable(),
-	notes: z.string().max(500).optional().nullable(),
-});
+export const createMaintenanceSchema = z
+	.object({
+		vehicleId: z.string().min(1, 'Vehicle ID is required'),
+		type: z.enum(['Scheduled', 'Repair', 'Damage']),
+		description: z
+			.string()
+			.trim()
+			.min(5, 'Description must be at least 5 characters')
+			.max(1000)
+			.transform((v) => sanitizeText(v) as string),
+		cost: costField,
+		startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
+		endDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional()
+			.nullable(),
+		bookingId: z.string().optional().nullable(),
+		photos: z.array(maintenancePhotoSchema).max(10, 'Maximum 10 photos allowed').optional().nullable(),
+		notes: z
+			.string()
+			.max(500)
+			.optional()
+			.nullable()
+			.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+	})
+	// MAINT-02: endDate must not precede startDate
+	.refine((data) => !(data.endDate && data.endDate < data.startDate), {
+		message: 'End date cannot be before start date',
+		path: ['endDate'],
+	});
 
 // Update maintenance schema
-export const updateMaintenanceSchema = z.object({
-	type: z.enum(['Scheduled', 'Repair', 'Damage']).optional(),
-	description: z.string().min(5).max(1000).optional(),
-	cost: z.number().nonnegative().optional().nullable(),
-	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
-	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().nullable(),
-	photos: z.array(maintenancePhotoSchema).max(10, 'Maximum 10 photos allowed').optional().nullable(),
-	notes: z.string().max(500).optional().nullable(),
-});
+export const updateMaintenanceSchema = z
+	.object({
+		type: z.enum(['Scheduled', 'Repair', 'Damage']).optional(),
+		description: z
+			.string()
+			.trim()
+			.min(5)
+			.max(1000)
+			.optional()
+			.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+		cost: costField,
+		startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional(),
+		endDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional()
+			.nullable(),
+		photos: z.array(maintenancePhotoSchema).max(10, 'Maximum 10 photos allowed').optional().nullable(),
+		notes: z
+			.string()
+			.max(500)
+			.optional()
+			.nullable()
+			.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+	})
+	.refine(
+		(data) => {
+			// Only enforce when both dates are present
+			if (data.endDate && data.startDate) {
+				return data.endDate >= data.startDate;
+			}
+			return true;
+		},
+		{ message: 'End date cannot be before start date', path: ['endDate'] },
+	);
 
 // Complete maintenance schema
 export const completeMaintenanceSchema = z.object({
-	actualCost: z.number().nonnegative().optional().nullable(),
-	notes: z.string().max(500).optional().nullable(),
+	actualCost: z
+		.number()
+		.nonnegative()
+		.max(500_000_000, 'Cost is too large')
+		.optional()
+		.nullable(),
+	notes: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // List query schema

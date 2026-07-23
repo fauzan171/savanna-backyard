@@ -1,11 +1,29 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
+
+// LEAD-06 / FRM-05: trim + XSS sanitize free text
+const nameField = z
+	.string()
+	.trim()
+	.min(2, 'Name must be at least 2 characters')
+	.max(100)
+	.transform((v) => sanitizeText(v) as string);
+
+const phoneField = z.string().trim().min(5, 'Phone must be at least 5 characters').max(30);
+
+const notesField = z
+	.string()
+	.max(2000)
+	.optional()
+	.nullable()
+	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
 
 // Create lead schema
 export const createLeadSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-	phone: z.string().min(5, 'Phone must be at least 5 characters'),
-	email: z.string().email('Invalid email address').optional().nullable(),
-	notes: z.string().max(2000).optional().nullable(),
+	name: nameField,
+	phone: phoneField,
+	email: z.string().trim().email('Invalid email address').optional().nullable(),
+	notes: notesField,
 	source: z.enum(['WhatsApp', 'Instagram', 'Facebook', 'TikTok', 'Website', 'WalkIn']).default('Website'),
 	priority: z.enum(['Hot', 'Warm', 'Cold']).default('Warm'),
 	assignedTo: z.string().optional().nullable(),
@@ -14,10 +32,10 @@ export const createLeadSchema = z.object({
 
 // Update lead schema
 export const updateLeadSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
-	phone: z.string().min(5).optional(),
-	email: z.string().email().optional().nullable(),
-	notes: z.string().max(2000).optional().nullable(),
+	name: nameField.optional(),
+	phone: phoneField.optional(),
+	email: z.string().trim().email('Invalid email address').optional().nullable(),
+	notes: notesField,
 	priority: z.enum(['Hot', 'Warm', 'Cold']).optional(),
 	assignedTo: z.string().optional().nullable(),
 	followUpDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),

@@ -1,28 +1,60 @@
 import { z } from 'zod';
 import { urlOrPath } from '@/worker/core/schemas/url';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
+
+// CUST-07 / FRM-05: trim + XSS sanitize free text; reject whitespace-only
+const nameField = z
+	.string()
+	.trim()
+	.min(2, 'Name must be at least 2 characters')
+	.max(100)
+	.transform((v) => sanitizeText(v) as string);
+
+// Normalize phone: trim (no case folding — phone is not case-sensitive)
+const phoneField = z.string().trim().min(5, 'Phone must be at least 5 characters').max(30);
 
 // Create customer schema
 export const createCustomerSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-	phone: z.string().min(5, 'Phone must be at least 5 characters'),
-	email: z.string().email('Invalid email address').optional().nullable(),
-	address: z.string().max(500).optional().nullable(),
+	name: nameField,
+	phone: phoneField,
+	email: z.string().trim().email('Invalid email address').optional().nullable(),
+	address: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
 	identityNumber: z.string().max(50).optional().nullable(),
 	identityPhotoUrl: urlOrPath.optional().nullable(),
-	notes: z.string().max(2000).optional().nullable(),
+	notes: z
+		.string()
+		.max(2000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // Update customer schema (all fields optional)
 export const updateCustomerSchema = z.object({
-	name: z.string().min(2).max(100).optional(),
-	phone: z.string().min(5).optional(),
-	email: z.string().email().optional().nullable(),
-	address: z.string().max(500).optional().nullable(),
+	name: nameField.optional(),
+	phone: phoneField.optional(),
+	email: z.string().trim().email('Invalid email address').optional().nullable(),
+	address: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().nullable(),
 	identityNumber: z.string().max(50).optional().nullable(),
 	identityPhotoUrl: urlOrPath.optional().nullable(),
-	notes: z.string().max(2000).optional().nullable(),
+	notes: z
+		.string()
+		.max(2000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // Set blacklist schema

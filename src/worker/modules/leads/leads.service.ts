@@ -2,7 +2,7 @@ import { LeadsRepository } from "./leads.repository";
 import { BookingsRepository } from "../bookings/bookings.repository";
 import { VehiclesRepository } from "../vehicles/vehicles.repository";
 import { CustomersRepository } from "../customers/customers.repository";
-import { NotFoundError, ValidationError } from "@/worker/core/types/errors";
+import { NotFoundError, ValidationError, ConflictError } from "@/worker/core/types/errors";
 import {
   generateBookingNumber,
   calculateDays,
@@ -91,6 +91,12 @@ export class LeadsService {
   }
 
   async create(data: CreateLeadRequest): Promise<LeadResponse> {
+    // LEAD-05: reject duplicate phone numbers
+    const existingByPhone = await this.leadRepo.findByPhone(data.phone);
+    if (existingByPhone) {
+      throw new ConflictError("Nomor telepon sudah terdaftar");
+    }
+
     const lead = await this.leadRepo.create({
       name: data.name,
       phone: data.phone,
@@ -114,6 +120,14 @@ export class LeadsService {
 
     if (existing.status === "Converted") {
       throw new ValidationError("Cannot update converted leads");
+    }
+
+    // LEAD-05: check phone uniqueness if changing phone
+    if (data.phone && data.phone !== existing.phone) {
+      const existingByPhone = await this.leadRepo.findByPhone(data.phone);
+      if (existingByPhone) {
+        throw new ConflictError("Nomor telepon sudah terdaftar");
+      }
     }
 
     const lead = await this.leadRepo.update(id, {

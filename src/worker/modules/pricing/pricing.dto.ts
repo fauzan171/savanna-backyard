@@ -1,10 +1,30 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
+
+const safeOptText = z
+	.string()
+	.optional()
+	.nullable()
+	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
+
+// PRIC-02: prices must be positive (reject 0) with an upper bound
+const priceField = (label: string) =>
+	z
+		.number()
+		.int()
+		.min(1, `${label} must be greater than 0`)
+		.max(1_000_000_000, `${label} is too large`);
 
 export const createPricingSchema = z.object({
-	name: z.string().min(2),
-	description: z.string().optional().nullable(),
-	dailyPrice: z.number().int().min(0),
-	multiDayPrice: z.number().int().min(0),
+	name: z
+		.string()
+		.trim()
+		.min(2)
+		.max(200)
+		.transform((v) => sanitizeText(v) as string),
+	description: safeOptText,
+	dailyPrice: priceField('Daily price'),
+	multiDayPrice: priceField('Multi-day price'),
 	features: z.array(z.string()),
 	notIncluded: z.array(z.string()),
 	highlighted: z.boolean().optional().default(false),
