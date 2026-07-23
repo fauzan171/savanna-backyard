@@ -71,7 +71,7 @@ export function DateRangeFilter({
 	return (
 		<div className="flex items-center gap-2">
 			<Select value={preset} onValueChange={handlePresetChange}>
-				<SelectTrigger className=".w-[140px]">
+				<SelectTrigger className="w-[140px]">
 					<SelectValue placeholder="Select period" />
 				</SelectTrigger>
 				<SelectContent>
@@ -87,10 +87,10 @@ export function DateRangeFilter({
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
-						className={cn(
-							'.w-[150px] justify-start text-left font-normal',
-							!startDate && 'text-muted-foreground'
-						)}
+							className={cn(
+								'w-[150px] justify-start text-left font-normal',
+								!startDate && 'text-muted-foreground'
+							)}
 					>
 						<CalendarIcon className="mr-2 h-4 w-4" />
 						{startDate ? format(startDate, 'MMM d, yyyy') : 'Start date'}
@@ -112,10 +112,10 @@ export function DateRangeFilter({
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
-						className={cn(
-							'.w-[150px] justify-start text-left font-normal',
-							!endDate && 'text-muted-foreground'
-						)}
+							className={cn(
+								'w-[150px] justify-start text-left font-normal',
+								!endDate && 'text-muted-foreground'
+							)}
 					>
 						<CalendarIcon className="mr-2 h-4 w-4" />
 						{endDate ? format(endDate, 'MMM d, yyyy') : 'End date'}

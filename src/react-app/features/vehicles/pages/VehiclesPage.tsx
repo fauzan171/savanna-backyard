@@ -4,6 +4,8 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useVehicles, useCreateVehicle } from '../hooks/useVehicles';
 import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
@@ -25,7 +27,11 @@ export default function VehiclesPage() {
 				navigate(`/vehicles/${result.data.id}`);
 			}
 		} catch (error) {
-			console.log(error)
+			toast({
+				title: 'Failed to create vehicle',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 

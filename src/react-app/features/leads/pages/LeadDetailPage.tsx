@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/co
 import { Spinner } from '@/react-app/components/ui/spinner';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { FormField } from '@/react-app/components/ui/form-field';
 import { Calendar } from '@/react-app/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/react-app/components/ui/popover';
@@ -84,7 +85,11 @@ export default function LeadDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
-			console.log(error);
+			toast({
+				title: 'Failed to update lead',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 
@@ -119,7 +124,11 @@ export default function LeadDetailPage() {
 				navigate(`/bookings/${result.data.booking.id}`);
 			}
 		} catch (error) {
-			console.log(error);
+			toast({
+				title: 'Failed to convert lead',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 

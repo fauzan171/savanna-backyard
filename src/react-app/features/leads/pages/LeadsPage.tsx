@@ -9,6 +9,8 @@ import {
   DialogTitle,
 } from "@/react-app/components/ui/dialog";
 import { PageHeader } from "@/react-app/components/layout/page-header";
+import { toast } from "@/react-app/hooks/useToast";
+import { extractApiError } from "@/react-app/lib/extract-error";
 import { useLeads, useCreateLead } from "../hooks/useLeads";
 import { LeadTable } from "../components/LeadTable";
 import { LeadForm } from "../components/LeadForm";
@@ -31,7 +33,11 @@ export default function LeadsPage() {
         navigate(`/leads/${result.data.id}`);
       }
     } catch (error) {
-      console.log(error);
+      toast({
+        title: "Failed to create lead",
+        description: extractApiError(error),
+        variant: "destructive",
+      });
     }
   };
 

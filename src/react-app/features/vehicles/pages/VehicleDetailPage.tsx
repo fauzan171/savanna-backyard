@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/co
 import { Spinner } from '@/react-app/components/ui/spinner';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus, useDeleteVehicle } from '../hooks/useVehicles';
 import { useBookings } from '@/react-app/features/bookings/hooks/useBookings';
 import { VehicleDetail } from '../components/VehicleDetail';
@@ -69,7 +70,11 @@ export default function VehicleDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
-			console.log(error)
+			toast({
+				title: 'Failed to update vehicle',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 
@@ -292,7 +297,11 @@ export default function VehicleDetailPage() {
 												await statusMutation.mutateAsync({ id: vehicle.id, status });
 												setIsStatusDialogOpen(false);
 											} catch (error) {
-												console.log(error)
+												toast({
+													title: 'Failed to change status',
+													description: extractApiError(error),
+													variant: 'destructive',
+												});
 											}
 										}}
 										disabled={statusMutation.isPending}

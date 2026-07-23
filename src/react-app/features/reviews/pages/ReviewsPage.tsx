@@ -4,6 +4,8 @@ import { Plus, Star, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useReviews, useToggleReview, useCreateReview } from '../hooks/useReviews';
 import { ReviewForm } from '../components/ReviewForm';
 import type { CreateReviewRequest } from '../api/reviews';
@@ -16,8 +18,17 @@ export default function ReviewsPage() {
 	const createMutation = useCreateReview();
 
 	const handleCreate = async (data: CreateReviewRequest) => {
-		await createMutation.mutateAsync(data);
-		setIsCreateOpen(false);
+		try {
+			await createMutation.mutateAsync(data);
+			setIsCreateOpen(false);
+			toast({ title: 'Review created' });
+		} catch (error) {
+			toast({
+				title: 'Failed to create review',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
 	};
 
 	return (
