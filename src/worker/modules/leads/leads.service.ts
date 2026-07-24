@@ -324,14 +324,22 @@ export class LeadsService {
       createdBy: userId,
     });
 
-    // Mark lead as converted
-    const updatedLead = await this.leadRepo.updateStatus(leadId, "Converted");
-    await this.leadRepo.update(leadId, {
-      convertedAt: new Date().toISOString(),
-    });
+    // C5: best-effort status update after the booking is created. If marking
+    // the lead as Converted fails (no transactions on D1), log it so the
+    // orphan booking is discoverable instead of leaving a duplicate-prone lead.
+    let updatedLead = lead;
+    try {
+      updatedLead = (await this.leadRepo.updateStatus(leadId, "Converted")) ?? lead;
+      await this.leadRepo.update(leadId, { convertedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error(
+        `Booking ${booking.id} created but failed to mark lead ${leadId} as Converted:`,
+        err,
+      );
+    }
 
     return {
-      lead: this.toResponse(updatedLead ?? lead),
+      lead: this.toResponse(updatedLead),
       booking: {
         id: booking.id,
         bookingNumber: booking.bookingNumber,

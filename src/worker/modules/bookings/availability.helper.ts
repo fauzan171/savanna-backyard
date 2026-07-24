@@ -163,6 +163,7 @@ export function calculateLateFee(
 		return { daysLate: 0, lateFee: 0 };
 	}
 
-	const lateFee = diffDays * dailyRate * LATE_FEE_MULTIPLIER;
+	// C1: round to avoid float drift (rate * 1.5 can yield fractional values)
+	const lateFee = Math.round(diffDays * dailyRate * LATE_FEE_MULTIPLIER);
 	return { daysLate: diffDays, lateFee };
 }

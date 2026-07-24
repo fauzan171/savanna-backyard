@@ -300,15 +300,17 @@ export class BookingsService {
 			);
 		}
 
-		const baseAmount = dailyRate * days;
+		// C1: round to whole rupiah to avoid float drift
+		const baseAmount = Math.round(dailyRate * days);
 
 		// Calculate addons amount
 		let addonsAmount = 0;
 		for (const addon of data.addons ?? []) {
 			addonsAmount += addon.amount;
 		}
+		addonsAmount = Math.round(addonsAmount);
 
-		const totalAmount = baseAmount + addonsAmount;
+		const totalAmount = Math.round(baseAmount + addonsAmount);
 
 		// Generate booking number
 		const bookingNumber = generateBookingNumber();
@@ -465,15 +467,17 @@ export class BookingsService {
 			throw new NotFoundError('Vehicle');
 		}
 
+		// C2: use the rate matching the booking's currency (was always IDR)
+		const lateRate = booking.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
 		// Calculate late fee - add to existing total, not recalculate
 		const { daysLate, lateFee } = calculateLateFee(
-			vehicle.dailyRateIdr,
+			lateRate,
 			booking.endDate,
 			data.actualReturnDate
 		);
 
-		// Calculate new total by adding late fee to current total
-		const newTotalAmount = booking.totalAmount + lateFee;
+		// Calculate new total by adding late fee to current total (C1: round)
+		const newTotalAmount = Math.round(booking.totalAmount + lateFee);
 
 		// Update booking
 		const updated = await this.bookingRepo.completeRental(id, {
@@ -553,8 +557,10 @@ export class BookingsService {
 		}
 
 		const additionalDays = calculateDays(booking.endDate, data.newEndDate);
-		const additionalAmount = vehicle.dailyRateIdr * additionalDays;
-		const newTotalAmount = booking.totalAmount + additionalAmount;
+		// C2: use the rate matching the booking's currency (was always IDR)
+		const extRate = booking.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
+		const additionalAmount = Math.round(extRate * additionalDays);
+		const newTotalAmount = Math.round(booking.totalAmount + additionalAmount);
 
 		// Update booking
 		const originalEndDate = booking.endDate;

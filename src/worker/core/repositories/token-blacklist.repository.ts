@@ -1,4 +1,4 @@
-import { eq, and, gt } from 'drizzle-orm';
+import { eq, and, gt, lte } from 'drizzle-orm';
 import { tokenBlacklist, type TokenBlacklistEntry, type NewTokenBlacklistEntry } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
@@ -80,9 +80,11 @@ export class TokenBlacklistRepository {
 	 */
 	async cleanupExpired(): Promise<number> {
 		const now = new Date().toISOString();
+		// C6: was `gt` (deleted still-valid entries, kept expired ones) — inverted.
+		// Now correctly deletes entries whose expiry has passed.
 		const result = await this.db
 			.delete(tokenBlacklist)
-			.where(gt(tokenBlacklist.expiresAt, now));
+			.where(lte(tokenBlacklist.expiresAt, now));
 		return (result as unknown as { changes?: number }).changes ?? 0;
 	}
 }

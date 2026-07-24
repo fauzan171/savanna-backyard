@@ -299,7 +299,7 @@ export class PublicApiService {
       (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
         (1000 * 60 * 60 * 24),
     );
-    const baseAmount = days * vehicle.dailyRateIdr;
+    const baseAmount = Math.round(days * vehicle.dailyRateIdr);
 
     // ---- Equipment line items (per-day, same duration as the vehicle) ----
     let equipmentTotalAmount = 0;
@@ -320,13 +320,15 @@ export class PublicApiService {
           );
         }
         const unitPrice = item.dailyRateIdr;
-        const totalPrice = unitPrice * req.quantity * days;
+        // C1: round each line to avoid float drift accumulation
+        const totalPrice = Math.round(unitPrice * req.quantity * days);
         equipmentTotalAmount += totalPrice;
         equipmentRows.push({ equipmentId: item.id, quantity: req.quantity, unitPrice, totalPrice });
       }
     }
+    equipmentTotalAmount = Math.round(equipmentTotalAmount);
 
-    const totalAmount = baseAmount + equipmentTotalAmount;
+    const totalAmount = Math.round(baseAmount + equipmentTotalAmount);
 
     // ---- Payment type: full vs DP (down-payment via Xendit allow_partial) ----
     const paymentType: 'full' | 'dp' = data.paymentType === 'dp' ? 'dp' : 'full';
@@ -335,7 +337,7 @@ export class PublicApiService {
     if (paymentType === 'dp') {
       const dpPct = await this.configRepo.getNumber('dp_percentage', 30);
       dpAmount = Math.round((totalAmount * dpPct) / 100);
-      remainingAmount = totalAmount - dpAmount;
+      remainingAmount = Math.round(totalAmount - dpAmount);
     }
 
     // Create booking

@@ -216,7 +216,9 @@ export class PublicUsersService {
 		user: PublicAccountInfo;
 		token: string;
 	}> {
-		const code = await this.repo.findLatestVerificationByPhone(data.phone);
+		// C4: scope the lookup to the requesting user so an OTP sent to a phone
+		// can't be consumed by a different account (IDOR).
+		const code = await this.repo.findLatestVerificationByPhone(data.phone, publicUserId);
 		if (!code) {
 			throw new ValidationError('No active verification for this number. Please request a new OTP.');
 		}
