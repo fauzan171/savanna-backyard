@@ -65,11 +65,25 @@ export class UsersService {
 	}
 
 	async update(id: string, data: { name?: string; email?: string; role?: string; isActive?: boolean }) {
-		await this.getById(id);
+		const target = await this.getById(id);
 
 		if (data.email) {
 			const existing = await this.repo.getByEmail(data.email);
 			if (existing && existing.id !== id) throw new ConflictError('Email already exists');
+		}
+
+		// BUG#2 guard: block demoting/deactivating the last SUPER_ADMIN.
+		if (target.role === 'SUPER_ADMIN') {
+			const wouldDemote = data.role !== undefined && data.role !== 'SUPER_ADMIN';
+			const wouldDeactivate = data.isActive === false;
+			if (wouldDemote || wouldDeactivate) {
+				const count = await this.repo.countActiveSuperAdmins();
+				if (count <= 1) {
+					throw new ConflictError(
+						'Cannot demote or deactivate the last active SUPER_ADMIN. Promote another admin first.',
+					);
+				}
+			}
 		}
 
 		const user = await this.repo.update(id, {
@@ -84,6 +98,17 @@ export class UsersService {
 	async toggle(id: string) {
 		const user = await this.repo.getById(id);
 		if (!user) throw new NotFoundError('User');
+
+		// BUG#2 guard: block deactivating the last SUPER_ADMIN.
+		if (user.role === 'SUPER_ADMIN' && user.isActive) {
+			const count = await this.repo.countActiveSuperAdmins();
+			if (count <= 1) {
+				throw new ConflictError(
+					'Cannot deactivate the last active SUPER_ADMIN. Promote another admin first.',
+				);
+			}
+		}
+
 		const updated = await this.repo.update(id, { isActive: !user.isActive });
 		const { passwordHash, ...rest } = updated;
 		return rest;

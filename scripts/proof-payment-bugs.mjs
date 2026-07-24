@@ -65,10 +65,11 @@ async function proveIfortepayWebhookBug() {
 	// Step 1: Create a vehicle + booking in Pending state
 	console.log('\n📝 Step 1: Create a test vehicle + booking (status: Pending)...');
 
-	// Create vehicle
+	// Create vehicle (unique plate per run via timestamp)
+	const stamp = Date.now().toString().slice(-6);
 	const vehRes = await api('POST', '/vehicles', {
 		name: 'Payment Test Bike',
-		plateNumber: 'PAY 001 TS',
+		plateNumber: `PAY ${stamp} TS`,
 		type: 'TrailBike',
 		dailyRateIdr: 200000,
 	});
@@ -79,10 +80,10 @@ async function proveIfortepayWebhookBug() {
 	}
 	console.log(`   ✅ Vehicle created: ${vehicleId}`);
 
-	// Create customer
+	// Create customer (unique phone per run)
 	const custRes = await api('POST', '/customers', {
 		name: 'Payment Test Customer',
-		phone: '+6289900000001',
+		phone: `+62899${stamp}001`,
 	});
 	const customerId = custRes.json.data?.id;
 	if (!customerId) {
@@ -170,11 +171,12 @@ async function proveDoubleBookingRace() {
 	console.log('  BUG #4: Double-booking race condition (no transaction)');
 	console.log('═'.repeat(60));
 
-	// Create a fresh vehicle
+	// Create a fresh vehicle (unique plate per run)
 	console.log('\n📝 Step 1: Create a test vehicle...');
+	const stamp2 = Date.now().toString().slice(-6);
 	const vehRes = await api('POST', '/vehicles', {
 		name: 'Race Test Bike',
-		plateNumber: 'RCE 001 TS',
+		plateNumber: `RCE ${stamp2} TS`,
 		type: 'TrailBike',
 		dailyRateIdr: 150000,
 	});
@@ -183,12 +185,12 @@ async function proveDoubleBookingRace() {
 
 	const custRes = await api('POST', '/customers', {
 		name: 'Race Customer A',
-		phone: '+6289900000101',
+		phone: `+62899${stamp2}101`,
 	});
 	const custA = custRes.json.data?.id;
 	const custRes2 = await api('POST', '/customers', {
 		name: 'Race Customer B',
-		phone: '+6289900000102',
+		phone: `+62899${stamp2}102`,
 	});
 	const custB = custRes2.json.data?.id;
 	console.log(`   ✅ Customer A: ${custA}`);

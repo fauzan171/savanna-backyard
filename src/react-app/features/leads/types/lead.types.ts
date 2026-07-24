@@ -68,7 +68,6 @@ export interface AddNoteRequest {
 export type PaymentTerms = 'DP_Pickup' | 'Full_Upfront' | 'DP_After' | 'Flexible';
 
 export interface ConvertToBookingRequest {
-	customerId: string;
 	vehicleId: string;
 	startDate: string;
 	endDate: string;

@@ -108,8 +108,9 @@ export default function LeadDetailPage() {
 
 	const handleConvert = async (data: ConvertFormData) => {
 		try {
+			// BUG#3: customerId is resolved server-side from lead.phone, so we
+			// must NOT send lead.id here (it would point at a non-existent customer).
 			const payload: ConvertToBookingRequest = {
-				customerId: lead!.id,
 				vehicleId: data.vehicleId,
 				startDate: format(data.startDate, 'yyyy-MM-dd'),
 				endDate: format(data.endDate, 'yyyy-MM-dd'),
