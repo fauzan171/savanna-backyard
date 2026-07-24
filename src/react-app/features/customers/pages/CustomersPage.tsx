@@ -5,6 +5,8 @@ import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useCustomers, useCreateCustomer, useSetBlacklist } from '../hooks/useCustomers';
 import { CustomerTable } from '../components/CustomerTable';
 import { CustomerForm } from '../components/CustomerForm';
@@ -30,7 +32,11 @@ export default function CustomersPage() {
 				navigate(`/customers/${result.data.id}`);
 			}
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				title: 'Failed to create customer',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 
@@ -47,7 +53,11 @@ export default function CustomersPage() {
 			setBlacklistCustomer(null);
 			setBlacklistReason('');
 		} catch (error) {
-			// Error is handled by the mutation
+			toast({
+				title: 'Failed to update blacklist',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 

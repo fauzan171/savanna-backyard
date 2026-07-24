@@ -4,6 +4,8 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useSettings, useBulkUpdateSettings } from '../hooks/useSettings';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import type { Setting } from '../api/settings';
 
 const SETTING_GROUPS = [
@@ -40,7 +42,16 @@ export default function SettingsPage() {
 
 	const handleSave = async () => {
 		const updates = Object.entries(formValues).map(([key, value]) => ({ key, value }));
-		await bulkUpdate.mutateAsync(updates);
+		try {
+			await bulkUpdate.mutateAsync(updates);
+			toast({ title: 'Settings saved' });
+		} catch (error) {
+			toast({
+				title: 'Failed to save settings',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
 	};
 
 	if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
