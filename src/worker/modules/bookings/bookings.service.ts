@@ -2,6 +2,7 @@ import { BookingsRepository } from './bookings.repository';
 import { VehiclesRepository } from '../vehicles/vehicles.repository';
 import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
+import { MaintenanceRepository } from '../maintenance/maintenance.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import {
 	generateBookingNumber,
@@ -43,7 +44,8 @@ export class BookingsService {
 		private bookingRepo: BookingsRepository,
 		private vehicleRepo: VehiclesRepository,
 		private customerRepo: CustomersRepository,
-		private checklistRepo?: ChecklistsRepository
+		private checklistRepo?: ChecklistsRepository,
+		private maintenanceRepo?: MaintenanceRepository,
 	) {}
 
 	// Transform addon to response format
@@ -311,6 +313,20 @@ export class BookingsService {
 		// Generate booking number
 		const bookingNumber = generateBookingNumber();
 
+		// B1: re-verify availability immediately before insert to narrow the
+		// TOCTOU window (D1 has no transactions). A concurrent booking that
+		// slipped in between the first check and here will be caught.
+		const recheck = await this.bookingRepo.findConflictingBookings(
+			data.vehicleId,
+			data.startDate,
+			data.endDate,
+		);
+		if (recheck.length > 0) {
+			throw new ConflictError(
+				`Vehicle was just booked for these dates. Conflicting booking: ${recheck[0]?.bookingNumber}`,
+			);
+		}
+
 		// Create booking
 		const booking = await this.bookingRepo.create({
 			bookingNumber,
@@ -471,9 +487,13 @@ export class BookingsService {
 			throw new NotFoundError('Booking');
 		}
 
-		// Update vehicle status back to Available and update km
+		// B4: only set vehicle back to Available if there is no active maintenance.
+		// Otherwise the maintenance state must be preserved (completeRental would
+		// otherwise clobber it).
+		const hasActiveMaintenance =
+			this.maintenanceRepo && (await this.maintenanceRepo.findActiveByVehicleId(booking.vehicleId)) !== null;
 		await this.vehicleRepo.update(booking.vehicleId, {
-			status: 'Available',
+			status: hasActiveMaintenance ? 'Maintenance' : 'Available',
 			totalKm: data.endKm,
 		});
 
@@ -563,6 +583,10 @@ export class BookingsService {
 		if (booking.status === 'Active') {
 			await this.vehicleRepo.updateStatus(booking.vehicleId, 'Available');
 		}
+
+		// B5: cancel associated payments so they don't linger as Verified
+		// revenue on a cancelled booking.
+		await this.bookingRepo.cancelPendingPaymentsByBookingId(id);
 
 		// Update booking with cancellation reason in notes
 		const updated = await this.bookingRepo.update(id, {

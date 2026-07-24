@@ -33,24 +33,38 @@ export class PublicApiRepository {
 
 	// Check if vehicle is available for date range (no conflicting bookings)
 	async isVehicleAvailableForDates(vehicleId: string, startDate: string, endDate: string): Promise<boolean> {
+		// B1: exclusive overlap (lt/gt) so back-to-back bookings (one returns on
+		// day N, another starts on day N) don't conflict — matching the admin
+		// bookings.repository.findConflictingBookings convention.
 		const conflicts = await this.db
 			.select()
 			.from(bookings)
 			.where(
 				and(
 					eq(bookings.vehicleId, vehicleId),
-					or(
-						eq(bookings.status, 'Pending'),
-						eq(bookings.status, 'pending_payment'),
-						eq(bookings.status, 'Confirmed'),
-						eq(bookings.status, 'Active'),
-					),
-					lte(bookings.startDate, endDate),
-					gte(bookings.endDate, startDate),
+					inArray(bookings.status, ['Pending', 'pending_payment', 'Confirmed', 'Active']),
+					lt(bookings.startDate, endDate),
+					gt(bookings.endDate, startDate),
 				)
 			)
 			.limit(1);
 		return conflicts.length === 0;
+	}
+
+	// B3: equipment stock operations (atomic conditional update)
+	async decrementEquipmentStock(equipmentId: string, qty: number): Promise<boolean> {
+		const result = await this.db
+			.update(equipment)
+			.set({ stock: sql`${equipment.stock} - ${qty}` })
+			.where(and(eq(equipment.id, equipmentId), gte(equipment.stock, qty)));
+		return (result as unknown as { rowsAffected?: number }).rowsAffected !== 0;
+	}
+
+	async restoreEquipmentStock(equipmentId: string, qty: number): Promise<void> {
+		await this.db
+			.update(equipment)
+			.set({ stock: sql`${equipment.stock} + ${qty}` })
+			.where(eq(equipment.id, equipmentId));
 	}
 
 	// Customer operations

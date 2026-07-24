@@ -1,6 +1,6 @@
 import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
-import { ValidationError } from "@/worker/core/types/errors";
+import { ValidationError, ForbiddenError } from "@/worker/core/types/errors";
 import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
 import type {
@@ -286,6 +286,14 @@ export class PublicApiService {
       });
     }
 
+    // B2: enforce blacklist on the public surface. A blacklisted customer
+    // must not be able to self-book.
+    if (customer.isBlacklisted) {
+      throw new ForbiddenError(
+        `Akun ini di-blacklist${customer.blacklistReason ? `: ${customer.blacklistReason}` : ''}`,
+      );
+    }
+
     // Calculate base amount (vehicle)
     const days = Math.ceil(
       (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) /
@@ -305,6 +313,12 @@ export class PublicApiService {
         const item = byId.get(req.equipmentId);
         if (!item)
           throw new ValidationError(`Equipment not found or inactive: ${req.equipmentId}`);
+        // B3: validate requested quantity against available stock
+        if (req.quantity > item.stock) {
+          throw new ValidationError(
+            `Stok tidak cukup untuk ${item.name}: tersedia ${item.stock}, diminta ${req.quantity}`,
+          );
+        }
         const unitPrice = item.dailyRateIdr;
         const totalPrice = unitPrice * req.quantity * days;
         equipmentTotalAmount += totalPrice;
@@ -359,6 +373,11 @@ export class PublicApiService {
           totalPrice: r.totalPrice,
         })),
       );
+      // B3: decrement stock atomically. Best-effort without a transaction —
+      // stock was validated above; this guards against a concurrent race.
+      for (const r of equipmentRows) {
+        await this.repo.decrementEquipmentStock(r.equipmentId, r.quantity);
+      }
     }
 
     // Request payment page via the configured gateway

@@ -267,6 +267,13 @@ export class LeadsService {
       });
     }
 
+    // B2: enforce blacklist when converting a lead to a booking.
+    if (customer.isBlacklisted) {
+      throw new ConflictError(
+        `Cannot convert lead: customer is blacklisted${customer.blacklistReason ? ` (${customer.blacklistReason})` : ''}`,
+      );
+    }
+
     // Validate vehicle
     const vehicle = await this.vehicleRepo.findById(data.vehicleId);
     if (!vehicle) {
