@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, User, CheckCircle, AlertCircle } from 'lucide-react';
 import { format, isWithinInterval, parseISO, differenceInDays } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { Spinner } from '@/react-app/components/ui/spinner';
-import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus } from '../hooks/useVehicles';
+import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
+import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus, useDeleteVehicle } from '../hooks/useVehicles';
 import { useBookings } from '@/react-app/features/bookings/hooks/useBookings';
 import { VehicleDetail } from '../components/VehicleDetail';
 import { VehicleForm } from '../components/VehicleForm';
@@ -24,12 +27,15 @@ const formatDate = (date: string) => format(parseISO(date), 'd MMM yyyy');
 
 export default function VehicleDetailPage() {
 	const { id } = useParams<{ id: string }>();
+	const navigate = useNavigate();
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 	const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
 	const { data: vehicle, isLoading, error } = useVehicle(id!);
 	const updateMutation = useUpdateVehicle();
 	const statusMutation = useUpdateVehicleStatus();
+	const deleteMutation = useDeleteVehicle();
 
 	// Fetch bookings for this vehicle
 	const { data: bookingsData, isLoading: bookingsLoading } = useBookings({
@@ -65,7 +71,24 @@ export default function VehicleDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
-			console.log(error)
+			toast({
+				title: 'Failed to update vehicle',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
+	};
+
+	const handleDelete = async () => {
+		try {
+			await deleteMutation.mutateAsync(id!);
+			toast({ title: 'Vehicle deleted', description: 'The vehicle has been removed.' });
+			navigate('/vehicles');
+		} catch (error: unknown) {
+			const message =
+				(error as { error?: { message?: string } })?.error?.message ??
+				'Failed to delete vehicle';
+			toast({ title: 'Cannot delete vehicle', description: message, variant: 'destructive' });
 		}
 	};
 
@@ -107,8 +130,9 @@ export default function VehicleDetailPage() {
 
 			<VehicleDetail
 				vehicle={vehicle}
-				onEdit={() => setIsEditDialogOpen(true)}
-				onStatusChange={() => setIsStatusDialogOpen(true)}
+					onEdit={() => setIsEditDialogOpen(true)}
+					onStatusChange={() => setIsStatusDialogOpen(true)}
+					onDelete={() => setIsDeleteDialogOpen(true)}
 			/>
 
 			{/* QR code generation */}
@@ -275,28 +299,44 @@ export default function VehicleDetailPage() {
 						<p className="text-muted-foreground">
 							Select the new status for this vehicle.
 						</p>
-						<div className="grid grid-cols-2 gap-2">
-							{(['Available', 'Rented', 'Maintenance', 'Inactive'] as VehicleStatus[]).map((status) => (
-								<Button
-									key={status}
-									variant={vehicle.status === status ? 'default' : 'outline'}
-									onClick={async () => {
-										try {
-											await statusMutation.mutateAsync({ id: vehicle.id, status });
-											setIsStatusDialogOpen(false);
-										} catch (error) {
-											console.log(error)
-										}
-									}}
-									disabled={statusMutation.isPending}
-								>
-									{status}
-								</Button>
-							))}
+							<div className="grid grid-cols-2 gap-2">
+								{(['Available', 'Rented', 'Maintenance', 'Inactive'] as VehicleStatus[]).map((status) => (
+									<Button
+										key={status}
+										variant={vehicle.status === status ? 'default' : 'outline'}
+										onClick={async () => {
+											try {
+												await statusMutation.mutateAsync({ id: vehicle.id, status });
+												setIsStatusDialogOpen(false);
+											} catch (error) {
+												toast({
+													title: 'Failed to change status',
+													description: extractApiError(error),
+													variant: 'destructive',
+												});
+											}
+										}}
+										disabled={statusMutation.isPending}
+									>
+										{status}
+									</Button>
+								))}
+							</div>
 						</div>
-					</div>
-				</DialogContent>
-			</Dialog>
-		</div>
-	);
-}
+					</DialogContent>
+				</Dialog>
+
+				{/* Delete Confirmation Dialog */}
+				<ConfirmationDialog
+					open={isDeleteDialogOpen}
+					onOpenChange={setIsDeleteDialogOpen}
+					title={`Delete ${vehicle.name}?`}
+					description="This action cannot be undone. The vehicle will be permanently removed. Vehicles with active bookings or maintenance cannot be deleted."
+					confirmLabel="Delete"
+					variant="danger"
+					onConfirm={handleDelete}
+					isLoading={deleteMutation.isPending}
+				/>
+			</div>
+		);
+	}

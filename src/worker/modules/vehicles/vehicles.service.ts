@@ -104,22 +104,22 @@ export class VehiclesService {
     return this.toResponse(vehicle);
   }
 
-  async update(
-    id: string,
-    data: UpdateVehicleRequest,
-  ): Promise<VehicleResponse> {
-    const existing = await this.vehicleRepo.findById(id);
-    if (!existing) throw new NotFoundError("Vehicle");
+	async update(
+	id: string,
+	data: UpdateVehicleRequest,
+	): Promise<VehicleResponse> {
+		const existing = await this.vehicleRepo.findById(id);
+		if (!existing) throw new NotFoundError("Vehicle");
 
-    if (data.plateNumber && data.plateNumber !== existing.plateNumber) {
-      const existingByPlate = await this.vehicleRepo.findByPlateNumber(
-        data.plateNumber,
-      );
-      if (existingByPlate)
-        throw new ConflictError(
-          "Vehicle with this plate number already exists",
-        );
-    }
+		if (data.plateNumber && data.plateNumber !== existing.plateNumber) {
+		const existingByPlate = await this.vehicleRepo.findByPlateNumber(
+			data.plateNumber,
+		);
+		if (existingByPlate)
+			throw new ConflictError(
+			"Vehicle with this plate number already exists",
+			);
+		}
 
     const vehicle = await this.vehicleRepo.update(id, {
       name: data.name,
@@ -135,10 +135,35 @@ export class VehiclesService {
       photoUrl: data.photoUrl,
     });
 
-    if (!vehicle) throw new NotFoundError("Vehicle");
+		if (!vehicle) throw new NotFoundError("Vehicle");
 
-    return this.toResponse(vehicle);
-  }
+		return this.toResponse(vehicle);
+	}
+
+	/**
+	 * Delete a vehicle. Blocked if the vehicle has active bookings or
+	 * maintenance to preserve referential integrity and financial records.
+	 */
+	async delete(id: string): Promise<void> {
+		const existing = await this.vehicleRepo.findById(id);
+		if (!existing) throw new NotFoundError("Vehicle");
+
+		const activeBookings = await this.vehicleRepo.countActiveBookings(id);
+		if (activeBookings > 0) {
+			throw new ConflictError(
+				`Cannot delete vehicle with ${activeBookings} active booking(s). Complete or cancel them first.`,
+			);
+		}
+
+		const activeMaintenance = await this.vehicleRepo.countActiveMaintenance(id);
+		if (activeMaintenance > 0) {
+			throw new ConflictError(
+				`Cannot delete vehicle with ${activeMaintenance} active maintenance record(s). Complete them first.`,
+			);
+		}
+
+		await this.vehicleRepo.delete(id);
+	}
 
   async updateStatus(
     id: string,
@@ -178,23 +203,6 @@ export class VehiclesService {
         createdAt: new Date().toISOString(),
       },
     };
-  }
-
-  async delete(id: string): Promise<void> {
-    const existing = await this.vehicleRepo.findById(id);
-    if (!existing) throw new NotFoundError("Vehicle");
-
-    // Refuse if there are active/upcoming bookings referencing this vehicle
-    if (this.bookingRepo) {
-      const activeCount = await this.bookingRepo.countActiveByVehicle(id);
-      if (activeCount > 0) {
-        throw new ConflictError(
-          "Cannot delete vehicle with active or upcoming bookings"
-        );
-      }
-    }
-
-    await this.vehicleRepo.delete(id);
   }
 
   async checkAvailability(

@@ -1,4 +1,4 @@
-import { Edit, Wrench, Calendar, Gauge, Car } from 'lucide-react';
+import { Edit, Wrench, Calendar, Gauge, Car, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/react-app/components/ui/card';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
@@ -9,6 +9,7 @@ interface VehicleDetailProps {
 	vehicle: VehicleWithDetails;
 	onEdit?: () => void;
 	onStatusChange?: () => void;
+	onDelete?: () => void;
 }
 
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
@@ -27,7 +28,7 @@ const typeLabels: Record<string, string> = {
 	Other: 'Other',
 };
 
-export function VehicleDetail({ vehicle, onEdit, onStatusChange }: VehicleDetailProps) {
+export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: VehicleDetailProps) {
 	const formatDate = (dateStr: string) => {
 		return new Date(dateStr).toLocaleDateString('id-ID', {
 			day: 'numeric',
@@ -96,6 +97,12 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange }: VehicleDetail
 						<Button variant="outline" onClick={onStatusChange}>
 							<Wrench className="size-4 mr-2" />
 							Change Status
+						</Button>
+					)}
+					{onDelete && (
+						<Button variant="destructive" onClick={onDelete}>
+							<Trash2 className="size-4 mr-2" />
+							Delete
 						</Button>
 					)}
 				</div>

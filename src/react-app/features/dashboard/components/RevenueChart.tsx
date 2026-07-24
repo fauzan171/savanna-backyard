@@ -8,7 +8,8 @@ import {
 	ResponsiveContainer,
 } from 'recharts';
 import { ChartContainer } from '@/react-app/components/ui/chart-container';
-import type { RevenueStats } from '../types/dashboard.types';
+import type { RevenueStats, Period } from '../types/dashboard.types';
+import { formatPeriodLabel } from '../lib/format-period';
 
 interface RevenueChartProps {
 	data: RevenueStats | undefined;
@@ -35,14 +36,14 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 		}).format(value);
 	};
 
+	// DASH-01: normalize the period (string | object) into a readable label
+	// instead of coercing it via template string ([object Object]).
+	const periodLabel = data?.period ? formatPeriodLabel(data.period as Period) : undefined;
+
 	return (
 		<ChartContainer
 			title="Revenue Trend"
-			description={
-				data?.period
-					? `Period: ${typeof data.period === 'string' ? data.period : `${data.period.start} → ${data.period.end}`}`
-					: undefined
-			}
+			description={periodLabel ? `Period: ${periodLabel}` : undefined}
 			loading={isLoading}
 			empty={!data?.trend || data.trend.length === 0}
 			emptyMessage="No revenue data for the selected period"

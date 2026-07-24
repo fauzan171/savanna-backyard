@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { users, type User, type NewUser } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
@@ -7,6 +7,15 @@ export class UsersRepository {
 
 	async list(): Promise<User[]> {
 		return this.db.select().from(users);
+	}
+
+	/** Count active SUPER_ADMIN accounts (for last-admin lockout guard). */
+	async countActiveSuperAdmins(): Promise<number> {
+		const rows = await this.db
+			.select({ id: users.id })
+			.from(users)
+			.where(and(eq(users.role, 'SUPER_ADMIN'), eq(users.isActive, true)));
+		return rows.length;
 	}
 
 	async getById(id: string): Promise<User | null> {

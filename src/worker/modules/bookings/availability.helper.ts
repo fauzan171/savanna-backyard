@@ -182,6 +182,7 @@ export function calculateLateFee(
 	}
 
 	const hourlyRate = getHourlyRate(dailyRate);
-	const lateFee = hoursLate * hourlyRate * LATE_FEE_MULTIPLIER;
+	// C1: round to whole rupiah to avoid float drift (rate * 1.5 yields fractions)
+	const lateFee = Math.round(hoursLate * hourlyRate * LATE_FEE_MULTIPLIER);
 	return { daysLate: Math.ceil(hoursLate / 24), lateFee, hoursLate };
 }

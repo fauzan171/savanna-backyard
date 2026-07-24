@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Plus, Wrench } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { EmptyState } from '@/react-app/components/ui/empty-state';
+import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import {
 	Select,
@@ -59,19 +62,27 @@ export default function MaintenancePage() {
                 bookingId: data.bookingId,
                 notes: data.notes,
             });
-            // Show success feedback
             setIsFormOpen(false);
+            toast({ title: 'Maintenance record created' });
         } catch (error) {
-            // Show error feedback
+            toast({
+                title: 'Failed to create maintenance',
+                description: extractApiError(error),
+                variant: 'destructive',
+            });
         }
     };
 
     const handleStart = async (id: string) => {
         try {
             await startMutation.mutateAsync(id);
-            // Show success feedback
+            toast({ title: 'Maintenance started' });
         } catch (error) {
-            // Show error feedback
+            toast({
+                title: 'Failed to start maintenance',
+                description: extractApiError(error),
+                variant: 'destructive',
+            });
         }
     };
 
@@ -84,11 +95,15 @@ export default function MaintenancePage() {
         if (!selectedId) return;
         try {
             await completeMutation.mutateAsync({ id: selectedId });
-            // Show success feedback
             setCompleteDialogOpen(false);
             setSelectedId(null);
+            toast({ title: 'Maintenance completed' });
         } catch (error) {
-            // Show error feedback
+            toast({
+                title: 'Failed to complete maintenance',
+                description: extractApiError(error),
+                variant: 'destructive',
+            });
         }
     };
 
@@ -198,27 +213,19 @@ export default function MaintenancePage() {
             />
 
             {/* Complete Confirmation Dialog */}
-            {completeDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="bg-card rounded-lg p-6 max-w-md w-full mx-4">
-                        <h3 className="text-lg font-semibold">Complete Maintenance</h3>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Are you sure you want to mark this maintenance as completed?
-                        </p>
-                        <div className="mt-4 flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setCompleteDialogOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button onClick={handleConfirmComplete}>
-                                Complete
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmationDialog
+                open={completeDialogOpen}
+                onOpenChange={(open) => {
+                    setCompleteDialogOpen(open);
+                    if (!open) setSelectedId(null);
+                }}
+                title="Complete Maintenance"
+                description="Are you sure you want to mark this maintenance as completed?"
+                confirmLabel="Complete"
+                variant="warning"
+                onConfirm={handleConfirmComplete}
+                isLoading={completeMutation.isPending}
+            />
         </div>
     );
 }

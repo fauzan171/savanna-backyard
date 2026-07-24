@@ -71,12 +71,23 @@ export class PublicUsersRepository {
 		return v ?? null;
 	}
 
-	async findLatestVerificationByPhone(phone: string): Promise<VerificationCode | null> {
+	async findLatestVerificationByPhone(phone: string, publicUserId?: string): Promise<VerificationCode | null> {
 		const now = new Date().toISOString();
+		// C4: scope by publicUserId when provided so a code issued to user A's
+		// phone can't be consumed by user B (IDOR). publicUserId is nullable on
+		// the column, so we only filter when explicitly given.
+		const conds = [
+			eq(verificationCodes.phone, phone),
+			eq(verificationCodes.consumed, false),
+			gte(verificationCodes.expiresAt, now),
+		];
+		if (publicUserId) {
+			conds.push(eq(verificationCodes.publicUserId, publicUserId));
+		}
 		const [v] = await this.db
 			.select()
 			.from(verificationCodes)
-			.where(and(eq(verificationCodes.phone, phone), eq(verificationCodes.consumed, false), gte(verificationCodes.expiresAt, now)))
+			.where(and(...conds))
 			.orderBy(desc(verificationCodes.createdAt))
 			.limit(1);
 		return v ?? null;
@@ -87,6 +98,20 @@ export class PublicUsersRepository {
 			.select({ count: sql<number>`count(*)` })
 			.from(verificationCodes)
 			.where(and(eq(verificationCodes.phone, phone), gte(verificationCodes.createdAt, sinceIso)));
+		return Number(rows[0]?.count ?? 0);
+	}
+
+	/**
+	 * Count recent verifications issued BY a specific user (regardless of phone).
+	 * BUG#6: prevents one attacker account from fanning OTP spam out to many
+	 * different victim phone numbers (the per-phone limit alone doesn't stop
+	 * that).
+	 */
+	async countRecentVerificationByUser(publicUserId: string, sinceIso: string): Promise<number> {
+		const rows = await this.db
+			.select({ count: sql<number>`count(*)` })
+			.from(verificationCodes)
+			.where(and(eq(verificationCodes.publicUserId, publicUserId), gte(verificationCodes.createdAt, sinceIso)));
 		return Number(rows[0]?.count ?? 0);
 	}
 

@@ -48,7 +48,9 @@ export class PricingService {
 	}
 
 	async toggle(id: string) {
-		const tier = await this.getById(id);
-		return this.repo.update(id, { isActive: !tier.isActive });
+		// BUG#7: atomic toggle to avoid read-then-write race.
+		const tier = await this.repo.toggleActive(id);
+		if (!tier) throw new NotFoundError('Pricing tier');
+		return tier;
 	}
 }

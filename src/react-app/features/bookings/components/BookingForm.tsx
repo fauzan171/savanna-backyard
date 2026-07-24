@@ -241,6 +241,8 @@ export function BookingForm({
                 mode="single"
                 selected={startDate}
                 onSelect={(date) => date && setValue("startDate", date)}
+                // BUG#12: block past dates for the rental start
+                disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
                 initialFocus
               />
             </PopoverContent>
@@ -268,6 +270,8 @@ export function BookingForm({
                 mode="single"
                 selected={endDate}
                 onSelect={(date) => date && setValue("endDate", date)}
+                // BUG#12: end date can't be before the chosen start date (or today)
+                disabled={{ before: startDate ?? new Date(new Date().setHours(0, 0, 0, 0)) }}
                 initialFocus
               />
             </PopoverContent>

@@ -1,0 +1,69 @@
+# For more details on how to configure Wrangler, refer to:
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "savanna-backyard"
+main = "./src/worker/index.ts"
+compatibility_date = "2025-10-08"
+compatibility_flags = ["nodejs_compat"]
+upload_source_maps = true
+
+[observability]
+enabled = true
+
+# Assets configuration for SPA (React frontend)
+[assets]
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/images/*"]
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 1: Create D1 database in NEW account, then paste ID here
+# Command: npx wrangler d1 create savanna-backyard-db
+# ═══════════════════════════════════════════════════════════════
+[[d1_databases]]
+binding = "DB"
+database_name = "savanna-backyard-db"
+database_id = "0aada7ce-ebb9-4769-932e-2c7e1f2b8779"
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 2: Create R2 bucket in NEW account
+# Command: npx wrangler r2 bucket create savanna-uploads
+# ═══════════════════════════════════════════════════════════════
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "savanna-uploads"
+
+# Environment Variables (non-secret, visible in dashboard)
+[vars]
+ENVIRONMENT = "development"
+ALLOWED_PUBLIC_API_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
+CORS_ALLOWED_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
+PAYMENT_GATEWAY_VENDOR = "xendit"
+# iFortePay (kosong dulu, aktifkan kalau mau ganti vendor)
+IFORTEPAY_MERCHANT_ID = ""
+IFORTEPAY_SECRET_UNBOUND_ID = ""
+IFORTEPAY_HASH_KEY = ""
+IFORTEPAY_CALLBACK_URL = ""
+IFORTEPAY_SUCCESS_REDIRECT_URL = ""
+IFORTEPAY_FAILED_REDIRECT_URL = ""
+# Email
+EMAIL_FROM = "Savanna Bromo <noreply@savannabromo.com>"
+
+# ═══════════════════════════════════════════════════════════════
+# STEP 3: Set SECRETS via wrangler secret put (tidak boleh di wrangler.toml)
+# ═══════════════════════════════════════════════════════════════
+# Jalankan command di bawah SETELAH deploy pertama:
+#   npx wrangler secret put JWT_SECRET
+#   npx wrangler secret put XENDIT_API_KEY
+#   npx wrangler secret put XENDIT_WEBHOOK_TOKEN
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put MIDTRANS_SERVER_KEY
+#   npx wrangler secret put WHATSAPP_WEBHOOK_TOKEN
+
+# Scheduled email notifications (Cloudflare Cron Triggers)
+# Timezone: UTC (WIB = UTC+7)
+[triggers]
+crons = [
+  "0 22 * * *",   # 05:00 WIB daily → H-1 booking reminders
+  "0 * * * *"     # Every hour → H-1 jam reminders + follow-ups
+]

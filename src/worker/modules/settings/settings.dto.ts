@@ -1,60 +1,103 @@
 import { z } from 'zod';
-import { ValidationError } from '@/worker/core/types/errors';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
 
 /**
- * Per-key validation for system_configuration values.
- * Values are stored as text, so numeric/URL rules are enforced here.
+ * Per-key validation for system settings (SET-02, SET-03).
  *
- * ponytail: explicit key map, not a generic "any string allowed" — covers the
- * known seed keys. Unknown keys fall through to a non-empty sanitized string.
- * Add new keys here when introduced.
+ * Settings are a generic key/value store, but certain keys have semantic
+ * meaning (numeric deposit, URLs, contact identifiers) and must be validated
+ * before being persisted. Unknown keys are accepted as-is (sanitized as text)
+ * to remain forward-compatible with new settings added via the UI.
  */
 
-// numeric: parse to int >= 0
-const numericKey = z
-	.string()
-	.trim()
-	.refine((s) => /^\d+$/.test(s), { message: 'Must be a non-negative integer' });
-
-// URL must be http(s) — blocks javascript:/data:/vbscript:
-const urlKey = z
-	.string()
-	.trim()
-	.url('Invalid URL')
-	.refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
-		message: 'URL must start with http:// or https://',
-	});
-
-const emailKey = z.string().trim().email('Invalid email address');
-
-// phone: digits, +, spaces, dashes
-const phoneKey = z
-	.string()
-	.trim()
-	.regex(/^[0-9+\-\s]+$/, 'Phone must contain only digits, +, spaces or dashes');
-
-const booleanKey = z.enum(['true', 'false']);
-
-const SCHEMAS: Record<string, z.ZodType> = {
-	contact_email: emailKey,
-	contact_phone: phoneKey,
-	whatsapp_number: phoneKey,
-	instagram_url: urlKey,
-	deposit_amount: numericKey,
-	public_api_enabled: booleanKey,
+// SET-03: reject dangerous URI schemes (javascript:, data:text/html, vbscript:)
+const safeUrlScheme = (val: string): boolean => {
+	const trimmed = val.trim().toLowerCase();
+	const dangerous = ['javascript:', 'vbscript:', 'data:text/html'];
+	return !dangerous.some((scheme) => trimmed.startsWith(scheme));
 };
 
-const fallbackString = z.string().trim().min(1, 'Value is required').max(2000);
+// SET-02: numeric keys must parse to a non-negative finite number
+const numericKeys = new Set([
+	'deposit_amount',
+	'deposit_amount_idr',
+	'late_return_fee',
+	'cancellation_fee',
+]);
 
-/** Validate a single setting value for the given key. Returns the normalized string. */
-export function validateSettingValue(key: string, value: unknown): string {
-	if (typeof value !== 'string') {
-		throw new ValidationError('value must be a string');
-	}
-	const schema = SCHEMAS[key] ?? fallbackString;
-	const result = schema.safeParse(value);
-	if (!result.success) {
-		throw new ValidationError(`${key}: ${result.error.errors.map((e) => e.message).join(', ')}`);
-	}
-	return result.data as string;
+// SET-03: keys expected to hold a URL
+const urlKeys = new Set([
+	'site_url',
+	'website_url',
+	'instagram_url',
+	'facebook_url',
+	'tiktok_url',
+	'youtube_url',
+	'logo_url',
+]);
+
+// Validate a single {key, value} pair based on its key semantics.
+export const settingItemSchema = z
+	.object({
+		key: z.string().trim().min(1).max(100),
+		value: z.string().max(5000),
+	})
+	.superRefine((item, ctx) => {
+		const { key, value } = item;
+
+		if (numericKeys.has(key)) {
+			// SET-02: must be a non-negative number
+			const n = Number(value);
+			if (Number.isNaN(n) || !Number.isFinite(n) || n < 0) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: `${key} must be a non-negative number`,
+					path: ['value'],
+				});
+				return;
+			}
+		}
+
+		if (urlKeys.has(key)) {
+			// SET-03: must be a safe URL (http/https) or a relative path
+			if (!safeUrlScheme(value)) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: `${key} must not use a dangerous URL scheme`,
+					path: ['value'],
+				});
+				return;
+			}
+			const ok =
+				value.startsWith('/') ||
+				(/^https?:\/\//i.test(value) && (() => { try { new URL(value); return true; } catch { return false; } })());
+			if (!ok) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: `${key} must be a valid http(s) URL`,
+					path: ['value'],
+				});
+			}
+		}
+	});
+
+// Bulk update: array of validated setting items
+export const bulkUpdateSettingsSchema = z.object({
+	settings: z.array(settingItemSchema).min(1, 'settings array is required'),
+});
+
+// Update by key: { value }
+export const updateByKeySchema = z.object({
+	value: z.string().max(5000),
+});
+
+export type BulkUpdateSettingsRequest = z.infer<typeof bulkUpdateSettingsSchema>;
+export type UpdateByKeyRequest = z.infer<typeof updateByKeySchema>;
+
+/**
+ * Sanitize a setting value before persistence. Free-text settings are
+ * sanitized for XSS; numeric/URL settings are stored as validated above.
+ */
+export function sanitizeSettingValue(value: string): string {
+	return sanitizeText(value) as string;
 }

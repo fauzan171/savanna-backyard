@@ -301,7 +301,9 @@ export class BookingsRepository {
 	): Promise<Booking[]> {
 		const conditions = [
 			eq(bookings.vehicleId, vehicleId),
-			inArray(bookings.status, ['Pending', 'Confirmed', 'Active']),
+			// B1: treat all non-terminal statuses as potential conflicts so admin and
+			// public booking paths agree (was ['Confirmed','Active'] only).
+			inArray(bookings.status, ['Pending', 'pending_payment', 'Confirmed', 'Active']),
 			// End date exclusive overlap: existing.start < new.end AND existing.end > new.start
 			lt(bookings.startDate, endDate),
 			gt(bookings.endDate, startDate),
@@ -324,6 +326,20 @@ export class BookingsRepository {
 			.from(payments)
 			.where(eq(payments.bookingId, bookingId))
 			.orderBy(desc(payments.createdAt));
+	}
+
+	// B5: mark a booking's non-terminal payments as Cancelled so they don't
+	// linger as Verified revenue on a cancelled booking.
+	async cancelPendingPaymentsByBookingId(bookingId: string): Promise<void> {
+		await this.db
+			.update(payments)
+			.set({ status: 'Cancelled', updatedAt: new Date().toISOString() })
+			.where(
+				and(
+					eq(payments.bookingId, bookingId),
+					inArray(payments.status, ['Pending', 'Verified']),
+				),
+			);
 	}
 
 	// Get booking stats

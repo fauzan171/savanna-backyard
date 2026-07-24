@@ -140,6 +140,22 @@ export class MaintenanceService {
 			throw new ConflictError('Vehicle already has active maintenance');
 		}
 
+		// B4: check for conflicting bookings over the maintenance date range.
+		// A vehicle out on an Active rental must not be scheduled for maintenance
+		// over the same period (would break the rental and clobber status).
+		if (data.endDate && this.bookingsRepo) {
+			const conflicts = await this.bookingsRepo.findConflictingBookings(
+				data.vehicleId,
+				data.startDate,
+				data.endDate,
+			);
+			if (conflicts.length > 0) {
+				throw new ConflictError(
+					`Vehicle has a booking (${conflicts[0]?.bookingNumber}) overlapping the maintenance dates`,
+				);
+			}
+		}
+
 		// Serialize photos to JSON
 		const photosJson = data.photos ? JSON.stringify(data.photos) : null;
 

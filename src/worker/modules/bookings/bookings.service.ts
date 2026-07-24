@@ -4,6 +4,7 @@ import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
 import { VehicleConditionsRepository } from './vehicle-conditions.repository';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
+import { MaintenanceRepository } from '../maintenance/maintenance.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import {
 	generateBookingNumber,
@@ -59,6 +60,7 @@ export class BookingsService {
 		private checklistRepo?: ChecklistsRepository,
 		private configRepo?: ConfigRepository,
 		private conditionsRepo?: VehicleConditionsRepository,
+		private maintenanceRepo?: MaintenanceRepository,
 	) {}
 
 	/**
@@ -357,18 +359,34 @@ export class BookingsService {
 			);
 		}
 
-		const baseAmount = blockRate * blocks;
+		// C1: round to whole rupiah to avoid float drift
+		const baseAmount = Math.round(blockRate * blocks);
 
 		// Calculate addons amount
 		let addonsAmount = 0;
 		for (const addon of data.addons ?? []) {
 			addonsAmount += addon.amount;
 		}
+		addonsAmount = Math.round(addonsAmount);
 
-		const totalAmount = baseAmount + addonsAmount;
+		const totalAmount = Math.round(baseAmount + addonsAmount);
 
 		// Generate booking number
 		const bookingNumber = generateBookingNumber();
+
+		// B1: re-verify availability immediately before insert to narrow the
+		// TOCTOU window (D1 has no transactions). A concurrent booking that
+		// slipped in between the first check and here will be caught.
+		const recheck = await this.bookingRepo.findConflictingBookings(
+			data.vehicleId,
+			data.startDate,
+			data.endDate,
+		);
+		if (recheck.length > 0) {
+			throw new ConflictError(
+				`Vehicle was just booked for these dates. Conflicting booking: ${recheck[0]?.bookingNumber}`,
+			);
+		}
 
 		// Create booking
 		const booking = await this.bookingRepo.create({
@@ -521,9 +539,11 @@ export class BookingsService {
 			throw new NotFoundError('Vehicle');
 		}
 
+		// C2: use the rate matching the booking's currency (was always IDR)
+		const lateRate = booking.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
 		// Calculate late fee - hourly based now
 		const { daysLate, lateFee, hoursLate } = calculateLateFee(
-			vehicle.dailyRateIdr,
+			lateRate,
 			booking.endDate,
 			data.actualReturnDate
 		);
@@ -536,8 +556,8 @@ export class BookingsService {
 		const damageFee = override ? (data.damageFeeOverride as number) : flippedItems * ratePerItem;
 		const totalPenalty = lateFee + damageFee;
 
-		// Calculate new total by adding late fee to current total (damage fee is tracked separately)
-		const newTotalAmount = booking.totalAmount + lateFee;
+		// Calculate new total by adding late fee to current total (C1: round; damage fee tracked separately)
+		const newTotalAmount = Math.round(booking.totalAmount + lateFee);
 
 		// Update booking
 		const updated = await this.bookingRepo.completeRental(id, {
@@ -558,12 +578,19 @@ export class BookingsService {
 		const conditionStatus = (data.conditionStatus
 			?? (flippedItems === 0 && daysLate === 0 ? 'Excellent' : flippedItems > 0 ? 'Fair' : 'Good')) as NonNullable<Vehicle['conditionStatus']>;
 
-		// Vehicle goes to Cleaning, not Available directly
-		const cleaningDurationHours = await this.getCleaningDurationHours();
-		const cleaningCompletedAt = new Date(Date.now() + cleaningDurationHours * 60 * 60 * 1000).toISOString();
+		// B4: if the vehicle has active maintenance, preserve that state instead
+		// of Sending it to Cleaning (completeRental would otherwise clobber it).
+		const hasActiveMaintenance =
+			this.maintenanceRepo && (await this.maintenanceRepo.findActiveByVehicleId(booking.vehicleId)) !== null;
+
+		// Otherwise vehicle goes to Cleaning, not Available directly
+		const cleaningDurationHours = hasActiveMaintenance ? 0 : await this.getCleaningDurationHours();
+		const cleaningCompletedAt = hasActiveMaintenance
+			? null
+			: new Date(Date.now() + cleaningDurationHours * 60 * 60 * 1000).toISOString();
 
 		await this.vehicleRepo.update(booking.vehicleId, {
-			status: 'Cleaning',
+			status: hasActiveMaintenance ? 'Maintenance' : 'Cleaning',
 			totalKm: data.endKm,
 			lastKm: data.endKm,
 			conditionStatus,
@@ -651,8 +678,10 @@ export class BookingsService {
 		}
 
 		const additionalBlocks = calculateDays(booking.endDate, data.newEndDate);
-		const additionalAmount = vehicle.dailyRateIdr * additionalBlocks;
-		const newTotalAmount = booking.totalAmount + additionalAmount;
+		// C2: use the rate matching the booking's currency (was always IDR); C1: round
+		const extRate = booking.currency === 'USD' ? (vehicle.dailyRateUsd ?? 0) : vehicle.dailyRateIdr;
+		const additionalAmount = Math.round(extRate * additionalBlocks);
+		const newTotalAmount = Math.round(booking.totalAmount + additionalAmount);
 
 		// Update booking
 		const originalEndDate = booking.endDate;
@@ -681,6 +710,10 @@ export class BookingsService {
 		if (booking.status === 'Active') {
 			await this.vehicleRepo.updateStatus(booking.vehicleId, 'Available');
 		}
+
+		// B5: cancel associated payments so they don't linger as Verified
+		// revenue on a cancelled booking.
+		await this.bookingRepo.cancelPendingPaymentsByBookingId(id);
 
 		// Update booking with cancellation reason in notes
 		const updated = await this.bookingRepo.update(id, {
@@ -712,9 +745,11 @@ export class BookingsService {
 			isMandatory: data.isMandatory,
 		});
 
-		// Update totals
-		const newAddonsAmount = (booking.addonsAmount ?? 0) + data.amount;
-		const newTotalAmount = booking.baseAmount + newAddonsAmount + (booking.lateFee ?? 0);
+		// D1: re-fetch the booking after the addon insert so concurrent addon
+		// adds are reflected in the recomputed totals (avoids lost update).
+		const refreshed = await this.bookingRepo.findById(id);
+		const newAddonsAmount = (refreshed?.addonsAmount ?? booking.addonsAmount ?? 0) + data.amount;
+		const newTotalAmount = Math.round((refreshed?.baseAmount ?? booking.baseAmount) + newAddonsAmount + (refreshed?.lateFee ?? booking.lateFee ?? 0));
 		await this.bookingRepo.updateAddonsAmount(id, newAddonsAmount, newTotalAmount);
 
 		return {
@@ -741,9 +776,10 @@ export class BookingsService {
 		// Remove addon
 		await this.bookingRepo.deleteAddon(id, addonId);
 
-		// Update totals
-		const newAddonsAmount = (booking.addonsAmount ?? 0) - addon.amount;
-		const newTotalAmount = booking.baseAmount + newAddonsAmount + (booking.lateFee ?? 0);
+		// D1: re-fetch after delete to avoid lost update on concurrent ops
+		const refreshed = await this.bookingRepo.findById(id);
+		const newAddonsAmount = (refreshed?.addonsAmount ?? booking.addonsAmount ?? 0) - addon.amount;
+		const newTotalAmount = Math.round((refreshed?.baseAmount ?? booking.baseAmount) + newAddonsAmount + (refreshed?.lateFee ?? booking.lateFee ?? 0));
 		await this.bookingRepo.updateAddonsAmount(id, newAddonsAmount, newTotalAmount);
 
 		return { removedAddonId: addonId, newTotalAmount };

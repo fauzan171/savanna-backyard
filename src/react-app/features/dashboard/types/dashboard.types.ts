@@ -6,12 +6,20 @@
 
 export type PeriodFilter = 'today' | 'week' | 'month' | 'year';
 
+/**
+ * The backend returns `period` in two inconsistent shapes depending on the
+ * endpoint: some return a plain string (e.g. 'today'), others return an
+ * object { start, end }. This union accepts both and the rendering layer
+ * normalizes via formatPeriodLabel(). DASH-01 fix.
+ */
+export type Period = string | { start: string; end: string } | { label?: string; value?: string };
+
 // ============================================
 // DASHBOARD OVERVIEW
 // ============================================
 
 export interface DashboardOverview {
-	period: string;
+	period: Period;
 	revenue: {
 		total: number;
 		currency: string;
@@ -43,7 +51,7 @@ export interface DashboardOverview {
 // ============================================
 
 export interface RevenueStats {
-	period: string | { start: string; end: string };
+	period: Period;
 	summary: {
 		total: number;
 		collected: number;
@@ -69,7 +77,7 @@ export interface RevenueStats {
 // ============================================
 
 export interface FleetStats {
-	period: string;
+	period: Period;
 	summary: {
 		total: number;
 		available: number;
@@ -104,7 +112,7 @@ export interface FleetStats {
 // ============================================
 
 export interface PaymentStats {
-	period: string;
+	period: Period;
 	summary: {
 		totalPayments: number;
 		totalAmount: number;

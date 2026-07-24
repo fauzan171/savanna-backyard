@@ -73,6 +73,18 @@ async function getGateway(
     config.webhookToken = (await configRepo.getValue("xendit_webhook_token")) ?? "";
     config.isProduction =
       (await configRepo.getValue("xendit_is_production")) ?? "false";
+    // A2: webhookToken was never populated, causing the generic
+    // /payments/webhooks/:vendor route to reject every Xendit webhook.
+    // Read from config DB so gateway.validateWebhookSignature works.
+    // (The dedicated /webhooks/xendit/notification route uses c.env directly.)
+    config.webhookToken =
+      (await configRepo.getValue("xendit_webhook_token")) ?? "";
+  } else if (vendor === "ifortepay") {
+    // A1: wire iFortePay config so the gateway can verify webhooks
+    config.merchantId = (await configRepo.getValue("ifortepay_merchant_id")) ?? "";
+    config.secretUnboundId =
+      (await configRepo.getValue("ifortepay_secret_unbound_id")) ?? "";
+    config.hashKey = (await configRepo.getValue("ifortepay_hash_key")) ?? "";
   }
 
   return PaymentGatewayFactory.create(vendor, config);
@@ -275,7 +287,11 @@ export function createPaymentsRouter(): Hono<PaymentsEnv> {
   // Gateway status endpoint (requires auth)
   router.get("/gateway/status", authMiddleware(), getGatewayStatusHandler);
 
-  // Webhook endpoint (no auth - validated by signature)
+  // Webhook endpoint (no auth - validated by signature).
+  // D2: DEPRECATED redundant surface — prefer the dedicated
+  // /webhooks/{xendit,midtrans,ifortepay}/notification routes (which verify
+  // signatures directly). This generic path relies on each gateway's
+  // validateWebhookSignature and is kept only for backward compatibility.
   router.post("/webhooks/:vendor", handleWebhookHandler);
 
   // Payment management endpoints (all require auth)

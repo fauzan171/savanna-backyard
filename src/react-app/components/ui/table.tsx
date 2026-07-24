@@ -215,6 +215,9 @@ function DataTable<TData, TValue>({
 		onRowSelectionChange: setRowSelection,
 		onColumnVisibilityChange: setColumnVisibility,
 		onGlobalFilterChange: setGlobalFilter,
+		// BUG#10: reset to page 0 when data/filters shrink so users don't stare
+		// at an empty page beyond the new last page.
+		autoResetPageIndex: true,
 		state: {
 			sorting,
 			columnFilters,

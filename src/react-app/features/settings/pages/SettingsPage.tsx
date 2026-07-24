@@ -4,8 +4,9 @@ import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useSettings, useBulkUpdateSettings } from '../hooks/useSettings';
-import type { Setting } from '../api/settings';
 import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
+import type { Setting } from '../api/settings';
 
 const SETTING_GROUPS = [
 	{
@@ -45,7 +46,11 @@ export default function SettingsPage() {
 			await bulkUpdate.mutateAsync(updates);
 			toast({ title: 'Pengaturan tersimpan' });
 		} catch (error) {
-			toast({ variant: 'destructive', title: 'Gagal menyimpan', description: (error as Error).message });
+			toast({
+				title: 'Gagal menyimpan',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 

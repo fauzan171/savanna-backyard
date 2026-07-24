@@ -9,7 +9,7 @@ export const payments = sqliteTable('payments', {
 	amount: real('amount').notNull(),
 	currency: text('currency', { enum: ['IDR', 'USD'] }).notNull().default('IDR'),
 	method: text('method', { enum: ['QRIS', 'Gateway', 'BankTransfer', 'Cash'] }).notNull(),
-	status: text('status', { enum: ['Pending', 'Verified', 'Failed'] }).notNull().default('Pending'),
+	status: text('status', { enum: ['Pending', 'Verified', 'Failed', 'Cancelled'] }).notNull().default('Pending'),
 	transactionReference: text('transaction_reference'),
 	verifiedBy: text('verified_by').references(() => users.id),
 	verifiedAt: text('verified_at'),

@@ -4,6 +4,8 @@ import { Plus, ToggleLeft, ToggleRight, Crown } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { usePricingTiers, useTogglePricing, useCreatePricing } from '../hooks/usePricing';
 import { PricingForm } from '../components/PricingForm';
 import type { CreatePricingRequest } from '../api/pricing';
@@ -16,9 +18,17 @@ export default function PricingPage() {
 	const createMutation = useCreatePricing();
 
 	const handleCreate = async (data: CreatePricingRequest) => {
-		const result = await createMutation.mutateAsync(data);
-		setIsCreateOpen(false);
-		if (result.data?.id) navigate(`/pricing/${result.data.id}`);
+		try {
+			const result = await createMutation.mutateAsync(data);
+			setIsCreateOpen(false);
+			if (result.data?.id) navigate(`/pricing/${result.data.id}`);
+		} catch (error) {
+			toast({
+				title: 'Failed to create pricing tier',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
 	};
 
 	return (

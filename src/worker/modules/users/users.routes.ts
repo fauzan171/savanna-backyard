@@ -76,7 +76,12 @@ const changePasswordHandler = async (c: Context<UsersEnv>) => {
 	}
 
 	const body = getValidatedBody<ChangePasswordRequest>(c);
-	const result = await service.changePassword(id, body.currentPassword, body.newPassword);
+	// BUG#11: SUPER_ADMIN resetting ANOTHER user's password doesn't need the
+	// current password (they don't know it). Self-changes always require it.
+	const isAdminReset = user.role === 'SUPER_ADMIN' && user.userId !== id;
+	const result = isAdminReset
+		? await service.adminResetPassword(id, body.newPassword)
+		: await service.changePassword(id, body.currentPassword, body.newPassword);
 	return c.json({ success: true, data: result });
 };
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
@@ -13,7 +14,7 @@ interface TrailFormProps {
 }
 
 export function TrailForm({ initialData, onSubmit, onCancel, isLoading, isNew }: TrailFormProps) {
-	const { register, handleSubmit } = useForm<CreateTrailRequest>({
+	const { register, handleSubmit, reset } = useForm<CreateTrailRequest>({
 		defaultValues: {
 			id: initialData?.id ?? '',
 			name: initialData?.name ?? '',
@@ -35,6 +36,32 @@ export function TrailForm({ initialData, onSubmit, onCancel, isLoading, isNew }:
 			isActive: initialData?.isActive ?? true,
 		},
 	});
+
+	// BUG#8: reset when editing a different record.
+	useEffect(() => {
+		if (initialData) {
+			reset({
+				id: initialData.id ?? '',
+				name: initialData.name ?? '',
+				description: initialData.description ?? '',
+				terrain: initialData.terrain ?? '',
+				elevation: initialData.elevation ?? '',
+				difficulty: initialData.difficulty ?? '',
+				recommended: initialData.recommended ?? '',
+				image: initialData.image ?? '',
+				mapImage: initialData.mapImage ?? '',
+				blogOverview: initialData.blogOverview ?? '',
+				blogTips: initialData.blogTips ?? '',
+				blogGallery: initialData.blogGallery ?? '',
+				gpxUrl: initialData.gpxUrl ?? '',
+				estimatedDuration: initialData.estimatedDuration ?? '',
+				distance: initialData.distance ?? '',
+				bestTime: initialData.bestTime ?? '',
+				sortOrder: initialData.sortOrder ?? 0,
+				isActive: initialData.isActive ?? true,
+			});
+		}
+	}, [initialData, reset]);
 
 	return (
 		<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

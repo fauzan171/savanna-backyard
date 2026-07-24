@@ -1,6 +1,6 @@
 import { PublicApiRepository } from "./public-api.repository";
 import { ConfigRepository } from "@/worker/core/repositories/config.repository";
-import { ValidationError, ConflictError } from "@/worker/core/types/errors";
+import { ValidationError, ConflictError, ForbiddenError } from "@/worker/core/types/errors";
 import { PaymentGatewayFactory } from "@/worker/core/services/payment-gateway/factory";
 import { calculateTwelveHourBlocks } from '@/worker/modules/bookings/availability.helper';
 import type { GatewayVendor } from "@/worker/core/services/payment-gateway/types";
@@ -314,9 +314,17 @@ export class PublicApiService {
       });
     }
 
-    // Calculate base amount using 12-hour blocks (not daily)
+    // B2: enforce blacklist on the public surface. A blacklisted customer
+    // must not be able to self-book.
+    if (customer.isBlacklisted) {
+      throw new ForbiddenError(
+        `Akun ini di-blacklisted${customer.blacklistReason ? `: ${customer.blacklistReason}` : ''}`,
+      );
+    }
+
+    // Calculate base amount using 12-hour blocks (not daily); C1: round
     const blocks = calculateTwelveHourBlocks(data.startDate, data.endDate);
-    const baseAmount = blocks * vehicle.dailyRateIdr;
+    const baseAmount = Math.round(blocks * vehicle.dailyRateIdr);
 
     // ---- Equipment line items (per-block, same duration as the vehicle) ----
     let equipmentTotalAmount = 0;
@@ -330,14 +338,22 @@ export class PublicApiService {
         const item = byId.get(req.equipmentId);
         if (!item)
           throw new ValidationError(`Equipment not found or inactive: ${req.equipmentId}`);
+        // B3: validate requested quantity against available stock
+        if (req.quantity > item.stock) {
+          throw new ValidationError(
+            `Stok tidak cukup untuk ${item.name}: tersedia ${item.stock}, diminta ${req.quantity}`,
+          );
+        }
         const unitPrice = item.dailyRateIdr;
-        const totalPrice = unitPrice * req.quantity * blocks;
+        // C1: round each line to avoid float drift accumulation
+        const totalPrice = Math.round(unitPrice * req.quantity * blocks);
         equipmentTotalAmount += totalPrice;
         equipmentRows.push({ equipmentId: item.id, quantity: req.quantity, unitPrice, totalPrice });
       }
     }
+    equipmentTotalAmount = Math.round(equipmentTotalAmount);
 
-    const totalAmount = baseAmount + equipmentTotalAmount;
+    const totalAmount = Math.round(baseAmount + equipmentTotalAmount);
 
     // ---- Payment type: full vs DP (down-payment via Xendit allow_partial) ----
     const paymentType: 'full' | 'dp' = data.paymentType === 'dp' ? 'dp' : 'full';
@@ -346,7 +362,7 @@ export class PublicApiService {
     if (paymentType === 'dp') {
       const dpPct = await this.configRepo.getNumber('dp_percentage', 30);
       dpAmount = Math.round((totalAmount * dpPct) / 100);
-      remainingAmount = totalAmount - dpAmount;
+      remainingAmount = Math.round(totalAmount - dpAmount);
     }
 
     // Create booking
@@ -384,6 +400,11 @@ export class PublicApiService {
           totalPrice: r.totalPrice,
         })),
       );
+      // B3: decrement stock atomically. Best-effort without a transaction —
+      // stock was validated above; this guards against a concurrent race.
+      for (const r of equipmentRows) {
+        await this.repo.decrementEquipmentStock(r.equipmentId, r.quantity);
+      }
     }
 
     // Request payment page via the configured gateway
@@ -598,6 +619,8 @@ export class PublicApiService {
   } | null> {
     const trail = await this.repo.getTrailById(trailId);
     if (!trail) return null;
+    // BUG#5: never expose inactive/draft trails on the public surface.
+    if (!trail.isActive) return null;
 
     return {
       id: trail.id,
@@ -658,7 +681,13 @@ export class PublicApiService {
   }
 
   // 12. Get booking status by number
-  async getBookingStatus(bookingNumber: string): Promise<{
+  // A4: optionally verify the requester owns the booking by matching the
+  // customer phone. Prevents enumeration of all bookings via sequential
+  // booking numbers (SVN-2026-0001, 0002, ...).
+  async getBookingStatus(
+    bookingNumber: string,
+    customerPhone?: string,
+  ): Promise<{
     bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
     blocks: number;
@@ -670,6 +699,16 @@ export class PublicApiService {
   } | null> {
     const booking = await this.repo.findBookingByNumber(bookingNumber);
     if (!booking) return null;
+
+    // Ownership check: if a phone was provided, it must match the booking's
+    // customer phone. If it doesn't match, treat as not-found (avoid leaking
+    // that the booking exists but belongs to someone else).
+    if (customerPhone !== undefined) {
+      const customer = await this.repo.findCustomerByPhone(customerPhone);
+      if (!customer || customer.id !== booking.customerId) {
+        return null;
+      }
+    }
 
     const vehicle = await this.repo.getVehicleById(booking.vehicleId);
 

@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { format, subDays, subMonths, subWeeks, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
@@ -59,9 +58,6 @@ export function DateRangeFilter({
 	preset,
 	onPresetChange,
 }: DateRangeFilterProps) {
-	const [startOpen, setStartOpen] = useState(false);
-	const [endOpen, setEndOpen] = useState(false);
-
 	const handlePresetChange = (value: string) => {
 		const selected = presets.find((p) => p.value === value);
 		if (selected) {
@@ -87,14 +83,14 @@ export function DateRangeFilter({
 				</SelectContent>
 			</Select>
 
-			<Popover open={startOpen} onOpenChange={setStartOpen}>
+			<Popover>
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
-						className={cn(
-							'w-[150px] justify-start text-left font-normal',
-							!startDate && 'text-muted-foreground'
-						)}
+							className={cn(
+								'w-[150px] justify-start text-left font-normal',
+								!startDate && 'text-muted-foreground'
+							)}
 					>
 						<CalendarIcon className="mr-2 h-4 w-4" />
 						{startDate ? format(startDate, 'MMM d, yyyy') : 'Start date'}
@@ -104,10 +100,7 @@ export function DateRangeFilter({
 					<Calendar
 						mode="single"
 						selected={startDate}
-						onSelect={(date) => {
-							onStartDateChange(date ?? undefined);
-							setStartOpen(false);
-						}}
+						onSelect={onStartDateChange}
 						initialFocus
 					/>
 				</PopoverContent>
@@ -115,14 +108,14 @@ export function DateRangeFilter({
 
 			<span className="text-muted-foreground">to</span>
 
-			<Popover open={endOpen} onOpenChange={setEndOpen}>
+			<Popover>
 				<PopoverTrigger asChild>
 					<Button
 						variant="outline"
-						className={cn(
-							'w-[150px] justify-start text-left font-normal',
-							!endDate && 'text-muted-foreground'
-						)}
+							className={cn(
+								'w-[150px] justify-start text-left font-normal',
+								!endDate && 'text-muted-foreground'
+							)}
 					>
 						<CalendarIcon className="mr-2 h-4 w-4" />
 						{endDate ? format(endDate, 'MMM d, yyyy') : 'End date'}
@@ -132,10 +125,7 @@ export function DateRangeFilter({
 					<Calendar
 						mode="single"
 						selected={endDate}
-						onSelect={(date) => {
-							onEndDateChange(date ?? undefined);
-							setEndOpen(false);
-						}}
+						onSelect={onEndDateChange}
 						initialFocus
 					/>
 				</PopoverContent>

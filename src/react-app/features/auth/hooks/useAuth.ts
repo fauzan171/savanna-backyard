@@ -1,17 +1,21 @@
 import { useAuthStore } from '../stores/authStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCallback } from 'react';
 
 export function useAuth() {
 	const { user, isAuthenticated, isLoading, login, logout, fetchUser } = useAuthStore();
 	const navigate = useNavigate();
+	const location = useLocation();
 
 	const handleLogin = useCallback(
 		async (email: string, password: string) => {
 			await login(email, password);
-			navigate('/');
+			// BUG#18: redirect back to the originally requested page (deep-link)
+			// instead of always landing on '/'. AuthGuard stores `from` in state.
+			const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+			navigate(from && from !== '/login' ? from : '/');
 		},
-		[login, navigate]
+		[login, navigate, location.state]
 	);
 
 	const handleLogout = useCallback(() => {

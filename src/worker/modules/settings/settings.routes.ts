@@ -2,8 +2,14 @@ import { Hono, Context } from 'hono';
 import { authMiddleware } from '@/worker/core/middleware/auth';
 import { createDb } from '@/worker/core/database';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
+import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { SettingsService } from './settings.service';
-import { validateSettingValue } from './settings.dto';
+import {
+	bulkUpdateSettingsSchema,
+	updateByKeySchema,
+	type BulkUpdateSettingsRequest,
+	type UpdateByKeyRequest,
+} from './settings.dto';
 
 type SettingsVariables = {
 	settingsService: SettingsService;
@@ -22,14 +28,17 @@ const settingsServicesMiddleware = () => async (c: Context<SettingsEnv>, next: (
 
 const listHandler = async (c: Context<SettingsEnv>) => {
 	const service = c.get('settingsService');
-	const result = await service.list();
+	const user = c.get('user');
+	// A3: redact secret values for non-SUPER_ADMIN users
+	const result = await service.list(user?.role ?? 'STAFF');
 	return c.json({ success: true, data: result });
 };
 
 const getByKeyHandler = async (c: Context<SettingsEnv>) => {
 	const service = c.get('settingsService');
+	const user = c.get('user');
 	const key = c.req.param('key');
-	const result = await service.getByKey(key);
+	const result = await service.getByKey(key, user?.role ?? 'STAFF');
 	if (!result) {
 		return c.json({ success: false, message: 'Setting not found', error: { code: 'NOT_FOUND', message: 'Setting not found' } }, 404);
 	}
@@ -42,29 +51,8 @@ const bulkUpdateHandler = async (c: Context<SettingsEnv>) => {
 		return c.json({ success: false, message: 'Forbidden', error: { code: 'FORBIDDEN', message: 'SUPER_ADMIN only' } }, 403);
 	}
 	const service = c.get('settingsService');
-	let body: any;
-	try {
-		body = JSON.parse(await c.req.text());
-	} catch {
-		return c.json({ success: false, message: 'Invalid JSON', error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON' } }, 400);
-	}
-	if (!body.settings || !Array.isArray(body.settings)) {
-		return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'settings array required' } }, 400);
-	}
-	// Validate each setting value per-key before persisting
-	const normalized: { key: string; value: string }[] = [];
-	for (const item of body.settings) {
-		if (!item || typeof item.key !== 'string' || item.value == null) {
-			return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'each setting needs { key, value }' } }, 400);
-		}
-		try {
-			normalized.push({ key: item.key, value: validateSettingValue(item.key, item.value) });
-		} catch (err) {
-			const message = (err as Error).message;
-			return c.json({ success: false, message, error: { code: 'VALIDATION_ERROR', message } }, 400);
-		}
-	}
-	const result = await service.bulkUpdate(normalized, user.userId);
+	const body = getValidatedBody<BulkUpdateSettingsRequest>(c);
+	const result = await service.bulkUpdate(body.settings, user.userId);
 	return c.json({ success: true, data: result });
 };
 
@@ -75,23 +63,11 @@ const updateByKeyHandler = async (c: Context<SettingsEnv>) => {
 	}
 	const service = c.get('settingsService');
 	const key = c.req.param('key');
-	let body: any;
-	try {
-		body = JSON.parse(await c.req.text());
-	} catch {
-		return c.json({ success: false, message: 'Invalid JSON', error: { code: 'VALIDATION_ERROR', message: 'Invalid JSON' } }, 400);
-	}
-	if (body.value == null || body.value === '') {
-		return c.json({ success: false, message: 'Invalid input', error: { code: 'VALIDATION_ERROR', message: 'value is required' } }, 400);
-	}
-	let normalized: string;
-	try {
-		normalized = validateSettingValue(key, body.value);
-	} catch (err) {
-		const message = (err as Error).message;
-		return c.json({ success: false, message, error: { code: 'VALIDATION_ERROR', message } }, 400);
-	}
-	const result = await service.update(key, normalized, user.userId);
+	const body = getValidatedBody<UpdateByKeyRequest>(c);
+	// Re-validate the single key against per-key semantics (SET-02, SET-03).
+	// The body schema only checks the value is a string; key-specific rules
+	// are enforced by the service via settingItemSchema.
+	const result = await service.update(key, body.value, user.userId);
 	return c.json({ success: true, data: result });
 };
 
@@ -101,9 +77,9 @@ export function createSettingsRouter(): Hono<SettingsEnv> {
 	router.use('*', authMiddleware());
 
 	router.get('/', listHandler);
-	router.patch('/', bulkUpdateHandler);
+	router.patch('/', validateBody(bulkUpdateSettingsSchema), bulkUpdateHandler);
 	router.get('/:key', getByKeyHandler);
-	router.patch('/:key', updateByKeyHandler);
+	router.patch('/:key', validateBody(updateByKeySchema), updateByKeyHandler);
 
 	return router;
 }

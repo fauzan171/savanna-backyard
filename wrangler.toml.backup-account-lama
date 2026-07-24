@@ -1,0 +1,59 @@
+# For more details on how to configure Wrangler, refer to:
+# https://developers.cloudflare.com/workers/wrangler/configuration/
+
+name = "savanna-backyard"
+main = "./src/worker/index.ts"
+compatibility_date = "2025-10-08"
+compatibility_flags = ["nodejs_compat"]
+upload_source_maps = true
+
+[observability]
+enabled = true
+
+# Assets configuration for SPA
+[assets]
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/images/*"]
+
+# D1 Database
+[[d1_databases]]
+binding = "DB"
+database_name = "savanna-backyard-db"
+database_id = "11de4510-a98c-4d40-9e4c-6f4cfe5fa1f2"
+
+# Environment Variables
+[vars]
+ENVIRONMENT = "production"
+ALLOWED_PUBLIC_API_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
+CORS_ALLOWED_ORIGINS = "https://landingpage-cud.pages.dev,https://savanna-landdigpage.andifauzan986.workers.dev"
+IFORTEPAY_MERCHANT_ID = ""
+IFORTEPAY_SECRET_UNBOUND_ID = ""
+IFORTEPAY_HASH_KEY = ""
+IFORTEPAY_CALLBACK_URL = ""
+IFORTEPAY_SUCCESS_REDIRECT_URL = ""
+IFORTEPAY_FAILED_REDIRECT_URL = ""
+# Active payment gateway vendor: xendit | ifortepay | midtrans | manual
+PAYMENT_GATEWAY_VENDOR = "xendit"
+# XENDIT_API_KEY - set via: npx wrangler secret put XENDIT_API_KEY
+# XENDIT_WEBHOOK_TOKEN - set via: npx wrangler secret put XENDIT_WEBHOOK_TOKEN
+
+# Email configuration (Resend)
+EMAIL_FROM = "Savanna Bromo <noreply@savannabromo.com>"
+# RESEND_API_KEY - set via: npx wrangler secret put RESEND_API_KEY
+
+# R2 Storage for file uploads
+[[r2_buckets]]
+binding = "UPLOADS"
+bucket_name = "savanna-uploads"
+
+# Secrets (set via wrangler secret put)
+# JWT_SECRET
+
+# Scheduled email notifications (Cloudflare Cron Triggers)
+# Timezone: UTC (WIB = UTC+7)
+[triggers]
+crons = [
+  "0 22 * * *",   # 05:00 WIB daily → H-1 booking reminders
+  "0 * * * *"     # Every hour → H-1 jam reminders + follow-ups
+]

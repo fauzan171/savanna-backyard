@@ -5,11 +5,12 @@ import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useCustomers, useCreateCustomer, useSetBlacklist } from '../hooks/useCustomers';
 import { CustomerTable } from '../components/CustomerTable';
 import { CustomerForm } from '../components/CustomerForm';
 import type { Customer, CustomerFormData, SetBlacklistRequest } from '../types/customer.types';
-import { toast } from '@/react-app/hooks/useToast';
 
 export default function CustomersPage() {
 	const navigate = useNavigate();
@@ -32,8 +33,9 @@ export default function CustomersPage() {
 			}
 		} catch (error) {
 			toast({
+				title: 'Failed to create customer',
+				description: extractApiError(error),
 				variant: 'destructive',
-				description: (error as Error).message,
 			});
 		}
 	};
@@ -52,8 +54,9 @@ export default function CustomersPage() {
 			setBlacklistReason('');
 		} catch (error) {
 			toast({
+				title: 'Failed to update blacklist',
+				description: extractApiError(error),
 				variant: 'destructive',
-				description: (error as Error).message,
 			});
 		}
 	};

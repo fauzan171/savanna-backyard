@@ -8,6 +8,7 @@ import { CustomersRepository } from '../customers/customers.repository';
 import { ChecklistsRepository } from '../checklists/checklists.repository';
 import { VehicleConditionsRepository } from './vehicle-conditions.repository';
 import { ConfigRepository } from '@/worker/core/repositories/config.repository';
+import { MaintenanceRepository } from '../maintenance/maintenance.repository';
 import { validateBody, validateQuery, getValidatedBody, getValidatedQuery } from '@/worker/core/middleware/validator';
 import {
 	createBookingSchema,
@@ -51,6 +52,7 @@ export const bookingsServicesMiddleware = () => async (c: Context<BookingsEnv>, 
 	const checklistsRepository = new ChecklistsRepository(db);
 	const conditionsRepository = new VehicleConditionsRepository(db);
 	const configRepository = new ConfigRepository(db);
+	const maintenanceRepository = new MaintenanceRepository(db);
 	const bookingsService = new BookingsService(
 		bookingsRepository,
 		vehiclesRepository,
@@ -58,6 +60,7 @@ export const bookingsServicesMiddleware = () => async (c: Context<BookingsEnv>, 
 		checklistsRepository,
 		configRepository,
 		conditionsRepository,
+		maintenanceRepository,
 	);
 
 	c.set('bookingsService', bookingsService);

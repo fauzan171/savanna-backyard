@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
 
-// blogGallery arrives as a JSON-encoded string (textarea); must parse to an array when present.
-const jsonGallery = z
+// TRAIL-02: blogGallery is stored as text but is expected to be a JSON array of
+// URLs. Reject malformed JSON early so the column never holds garbage. Accepts
+// either a pre-serialized JSON string of a URL array, or null.
+const galleryField = z
 	.string()
 	.optional()
 	.nullable()
@@ -9,27 +12,40 @@ const jsonGallery = z
 		(val) => {
 			if (val == null || val === '') return true;
 			try {
-				return Array.isArray(JSON.parse(val));
+				const parsed = JSON.parse(val);
+				return Array.isArray(parsed) && parsed.every((u) => typeof u === 'string');
 			} catch {
 				return false;
 			}
 		},
-		{ message: 'Gallery URLs must be a valid JSON array of strings' }
+		{ message: 'Gallery URLs must be a valid JSON array of strings' },
 	);
 
+// Helper: optional nullable sanitized text
+const safeOptText = z
+	.string()
+	.optional()
+	.nullable()
+	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
+
 export const createTrailSchema = z.object({
-	id: z.string().min(2),
-	name: z.string().min(2),
-	description: z.string().optional().nullable(),
-	terrain: z.string().optional().nullable(),
-	elevation: z.string().optional().nullable(),
-	difficulty: z.string().optional().nullable(),
-	recommended: z.string().optional().nullable(),
+	id: z.string().trim().min(2).max(100),
+	name: z
+		.string()
+		.trim()
+		.min(2)
+		.max(200)
+		.transform((v) => sanitizeText(v) as string),
+	description: safeOptText,
+	terrain: safeOptText,
+	elevation: safeOptText,
+	difficulty: safeOptText,
+	recommended: safeOptText,
 	image: z.string().optional().nullable(),
 	mapImage: z.string().optional().nullable(),
-	blogOverview: z.string().optional().nullable(),
-	blogTips: z.string().optional().nullable(),
-	blogGallery: jsonGallery,
+	blogOverview: safeOptText,
+	blogTips: safeOptText,
+	blogGallery: galleryField,
 	gpxUrl: z.string().optional().nullable(),
 	estimatedDuration: z.string().optional().nullable(),
 	distance: z.string().optional().nullable(),

@@ -4,13 +4,14 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useVehicles, useCreateVehicle, useDeleteVehicle } from '../hooks/useVehicles';
 import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
 import { VehicleQrCard } from '../components/VehicleQrCard';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import type { Vehicle, VehicleFormData } from '../types/vehicle.types';
-import { toast } from '@/react-app/hooks/useToast';
 
 export default function VehiclesPage() {
 	const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function VehiclesPage() {
 			toast({
 				variant: 'destructive',
 				title: 'Gagal menyimpan kendaraan',
-				description: (error as Error).message,
+				description: extractApiError(error),
 			});
 		}
 	};

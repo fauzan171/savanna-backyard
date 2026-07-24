@@ -148,10 +148,14 @@ export class PublicUsersService {
 		devOtp?: string;
 	}> {
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+		// Per-phone throttle (protects a victim's number from spam)
 		const recent = await this.repo.countRecentVerificationByPhone(data.phone, oneHourAgo);
 		if (recent >= MAX_INIT_PER_HOUR) {
 			throw new ValidationError('Too many OTP requests for this number. Please try again later.');
 		}
+		// ponytail: per-user throttle (BUG#6) needs an authenticated caller; phoneInit
+		// is pre-auth (only phone known), so per-phone throttle is the only applicable
+		// gate here. Apply BUG#6 once a session/publicUserId exists in the caller context.
 
 		const refCode = genRefCode();
 		const expiresAt = new Date(Date.now() + REF_EXPIRY_MIN * 60 * 1000).toISOString();
@@ -220,6 +224,9 @@ export class PublicUsersService {
 		user: PublicAccountInfo;
 		token: string;
 	}> {
+		// ponytail: C4 user-scoping needs a known publicUserId; verify is keyed by
+		// phone+OTP and the code row is bound to the phone at init, so plain lookup
+		// is sufficient. Re-add the user filter when a session user is in context.
 		const code = await this.repo.findLatestVerificationByPhone(data.phone);
 		if (!code) {
 			throw new ValidationError('No active verification for this number. Please request a new OTP.');

@@ -226,9 +226,19 @@ export class NotificationService {
     };
   }
 
+  /**
+   * Return a YYYY-MM-DD date offset by `days` from today, computed in WIB
+   * (UTC+7) — the business timezone — not UTC. Bookings store calendar dates
+   * in WIB, so comparing against UTC dates caused H-1 reminders to fire on
+   * the pickup day. The cron runs at 22:00 UTC (05:00 WIB); using UTC here
+   * would already be "tomorrow" in WIB for part of the window.
+   */
   private getDateOffset(days: number): string {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    return date.toISOString().split('T')[0];
+    const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+    const now = new Date();
+    // Shift to WIB wall-clock, then apply the day offset
+    const wib = new Date(now.getTime() + WIB_OFFSET_MS);
+    wib.setUTCDate(wib.getUTCDate() + days);
+    return wib.toISOString().split('T')[0];
   }
 }
