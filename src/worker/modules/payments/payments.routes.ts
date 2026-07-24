@@ -261,7 +261,11 @@ export function createPaymentsRouter(): Hono<PaymentsEnv> {
   // Gateway status endpoint (requires auth)
   router.get("/gateway/status", authMiddleware(), getGatewayStatusHandler);
 
-  // Webhook endpoint (no auth - validated by signature)
+  // Webhook endpoint (no auth - validated by signature).
+  // D2: DEPRECATED redundant surface — prefer the dedicated
+  // /webhooks/{xendit,midtrans,ifortepay}/notification routes (which verify
+  // signatures directly). This generic path relies on each gateway's
+  // validateWebhookSignature and is kept only for backward compatibility.
   router.post("/webhooks/:vendor", handleWebhookHandler);
 
   // Payment management endpoints (all require auth)

@@ -278,3 +278,24 @@ Supports multiple payment gateways via `PaymentGatewayFactory`:
 - **Xendit** - Alternative gateway
 
 Gateway configuration stored in `system_config` table.
+
+## Security Notes (Audit Fixes)
+
+- **Rate limiting**: `src/worker/core/middleware/rate-limit.ts` uses an
+  in-memory `Map` that is **per-isolate** on Cloudflare Workers. Isolates are
+  evicted frequently, so the login brute-force throttle is effectively
+  best-effort, not reliable. For real protection, configure **Cloudflare Rate
+  Limiting Rules** in the dashboard (WAF) for `/api/v1/auth/login` and the
+  public API. Do NOT rely on the in-memory limiter for production security.
+- **Webhook verification**: all payment webhooks verify signatures. The
+  iFortePay route returns `410 Gone` when `IFORTEPAY_HASH_KEY` is unset
+  (fail-closed). The dedicated `/webhooks/{vendor}/notification` routes are
+  preferred over the deprecated generic `/payments/webhooks/:vendor`.
+- **Double-booking**: D1 has no transactions. `bookings.service.create` does a
+  re-verify immediately before insert to narrow the TOCTOU window, but this is
+  not a hard guarantee. A unique constraint or D1-compatible advisory lock
+  would be needed for strict prevention.
+- **Settings secrets**: `settings.service` redacts secret config keys
+  (`*_key`, `*_secret`, gateway keys) to `***` for non-SUPER_ADMIN callers.
+- **Timing-safe comparison**: use `core/lib/crypto-safe-equal.ts` for any
+  secret/token comparison — never raw `===`.

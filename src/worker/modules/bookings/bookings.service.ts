@@ -624,9 +624,11 @@ export class BookingsService {
 			isMandatory: data.isMandatory,
 		});
 
-		// Update totals
-		const newAddonsAmount = (booking.addonsAmount ?? 0) + data.amount;
-		const newTotalAmount = booking.baseAmount + newAddonsAmount + (booking.lateFee ?? 0);
+		// D1: re-fetch the booking after the addon insert so concurrent addon
+		// adds are reflected in the recomputed totals (avoids lost update).
+		const refreshed = await this.bookingRepo.findById(id);
+		const newAddonsAmount = (refreshed?.addonsAmount ?? booking.addonsAmount ?? 0) + data.amount;
+		const newTotalAmount = Math.round((refreshed?.baseAmount ?? booking.baseAmount) + newAddonsAmount + (refreshed?.lateFee ?? booking.lateFee ?? 0));
 		await this.bookingRepo.updateAddonsAmount(id, newAddonsAmount, newTotalAmount);
 
 		return {
@@ -653,9 +655,10 @@ export class BookingsService {
 		// Remove addon
 		await this.bookingRepo.deleteAddon(id, addonId);
 
-		// Update totals
-		const newAddonsAmount = (booking.addonsAmount ?? 0) - addon.amount;
-		const newTotalAmount = booking.baseAmount + newAddonsAmount + (booking.lateFee ?? 0);
+		// D1: re-fetch after delete to avoid lost update on concurrent ops
+		const refreshed = await this.bookingRepo.findById(id);
+		const newAddonsAmount = (refreshed?.addonsAmount ?? booking.addonsAmount ?? 0) - addon.amount;
+		const newTotalAmount = Math.round((refreshed?.baseAmount ?? booking.baseAmount) + newAddonsAmount + (refreshed?.lateFee ?? booking.lateFee ?? 0));
 		await this.bookingRepo.updateAddonsAmount(id, newAddonsAmount, newTotalAmount);
 
 		return { removedAddonId: addonId, newTotalAmount };

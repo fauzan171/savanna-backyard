@@ -44,7 +44,9 @@ app.use(
 			if (origin && c.env.ENVIRONMENT !== 'production' && origin.includes('localhost')) {
 				return origin;
 			}
-			return allowedOrigins[0] ?? defaultOrigins[0];
+			// D3: deny non-matching origins (was returning allowedOrigins[0],
+			// which could enable credentialed cross-origin confusion).
+			return null;
 		},
 		credentials: true,
 	})
