@@ -1,5 +1,5 @@
 import { eq, or, like, and, desc, inArray } from 'drizzle-orm';
-import { vehicles, vehicleStatusLogs, bookings, maintenance, type Vehicle, type NewVehicle, type NewVehicleStatusLog } from '@/worker/core/database/schema';
+import { vehicles, vehicleStatusLogs, bookings, maintenanceRecords, type Vehicle, type NewVehicle, type NewVehicleStatusLog } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 import type { ListVehiclesQuery } from './vehicles.dto';
 
@@ -169,9 +169,9 @@ export class VehiclesRepository {
 	async countActiveMaintenance(vehicleId: string): Promise<number> {
 		const activeStatuses = ['Scheduled', 'InProgress'];
 		const rows = await this.db
-			.select({ id: maintenance.id })
-			.from(maintenance)
-			.where(and(eq(maintenance.vehicleId, vehicleId), inArray(maintenance.status, activeStatuses)));
+			.select({ id: maintenanceRecords.id })
+			.from(maintenanceRecords)
+			.where(and(eq(maintenanceRecords.vehicleId, vehicleId), inArray(maintenanceRecords.status, activeStatuses)));
 		return rows.length;
 	}
 
