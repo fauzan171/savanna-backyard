@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -43,6 +44,7 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 	const {
 		register,
 		handleSubmit,
+		reset,
 		formState: { errors },
 	} = useForm<PricingFormData>({
 		resolver: zodResolver(pricingFormSchema),
@@ -67,6 +69,32 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 			isActive: initialData?.isActive ?? true,
 		},
 	});
+
+	// BUG#8: reset when editing a different record.
+	useEffect(() => {
+		if (initialData) {
+			reset({
+				name: initialData.name ?? '',
+				description: initialData.description ?? '',
+				dailyPrice: initialData.dailyPrice ?? 0,
+				multiDayPrice: initialData.multiDayPrice ?? 0,
+				featuresText: initialData.features
+					? typeof initialData.features === 'string'
+						? initialData.features
+						: initialData.features.join(', ')
+					: '',
+				notIncludedText: initialData.notIncluded
+					? typeof initialData.notIncluded === 'string'
+						? initialData.notIncluded
+						: initialData.notIncluded.join(', ')
+					: '',
+				highlighted: initialData.highlighted ?? false,
+				icon: initialData.icon ?? '',
+				sortOrder: initialData.sortOrder ?? 0,
+				isActive: initialData.isActive ?? true,
+			});
+		}
+	}, [initialData, reset]);
 
 	const processSubmit = (data: PricingFormData) => {
 		onSubmit({

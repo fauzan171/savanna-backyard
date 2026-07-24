@@ -125,4 +125,20 @@ export class UsersService {
 		await this.repo.update(id, { passwordHash });
 		return { success: true };
 	}
+
+	/**
+	 * BUG#11: admin password reset (no current-password required). Resolves the
+	 * contradiction where the route granted admins the right to change others'
+	 * passwords but the service required the current password (which the admin
+	 * doesn't know). This is a SUPER_ADMIN-only operation, separate from the
+	 * self-service changePassword.
+	 */
+	async adminResetPassword(id: string, newPassword: string) {
+		const user = await this.repo.getById(id);
+		if (!user) throw new NotFoundError('User');
+
+		const passwordHash = await hashPassword(newPassword);
+		await this.repo.update(id, { passwordHash });
+		return { success: true };
+	}
 }

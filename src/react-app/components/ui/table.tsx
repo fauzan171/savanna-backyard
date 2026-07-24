@@ -212,9 +212,12 @@ function DataTable<TData, TValue>({
 		getSortedRowModel: enableSorting ? getSortedRowModel() : undefined,
 		onSortingChange: setSorting,
 		onColumnFiltersChange: setColumnFilters,
-		onRowSelectionChange: setRowSelection,
+		onRowSelection: setRowSelection,
 		onColumnVisibilityChange: setColumnVisibility,
 		onGlobalFilterChange: setGlobalFilter,
+		// BUG#10: reset to page 0 when data/filters shrink so users don't stare
+		// at an empty page beyond the new last page.
+		autoResetPageIndex: true,
 		state: {
 			sorting,
 			columnFilters,

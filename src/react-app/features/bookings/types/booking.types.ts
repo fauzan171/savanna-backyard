@@ -340,12 +340,14 @@ export const confirmBookingSchema = z.object({
 
 export const startRentalSchema = z.object({
   pickupNotes: z.string().optional(),
-  startKm: z.number().int().positive().optional(),
+  // BUG#13: min(0) not positive() — a brand-new vehicle legitimately has 0 km.
+  startKm: z.number().int().min(0).optional(),
 });
 
 export const completeRentalSchema = z.object({
   actualReturnDate: z.string().min(1, "Return date is required"),
-  endKm: z.number().int().positive().optional(),
+  // endKm must be > startKm (validated in service), but 0 is structurally valid.
+  endKm: z.number().int().min(0).optional(),
   returnNotes: z.string().optional(),
   damageNotes: z.string().optional(),
 });

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
@@ -12,7 +13,7 @@ interface PackageFormProps {
 }
 
 export function PackageForm({ initialData, onSubmit, onCancel, isLoading }: PackageFormProps) {
-	const { register, handleSubmit } = useForm<CreatePackageRequest>({
+	const { register, handleSubmit, reset } = useForm<CreatePackageRequest>({
 		defaultValues: {
 			name: initialData?.name ?? '',
 			tagline: initialData?.tagline ?? '',
@@ -27,6 +28,25 @@ export function PackageForm({ initialData, onSubmit, onCancel, isLoading }: Pack
 			isActive: initialData?.isActive ?? true,
 		},
 	});
+
+	// BUG#8: reset when editing a different record.
+	useEffect(() => {
+		if (initialData) {
+			reset({
+				name: initialData.name ?? '',
+				tagline: initialData.tagline ?? '',
+				description: initialData.description ?? '',
+				image: initialData.image ?? '',
+				duration: initialData.duration ?? '',
+				distance: initialData.distance ?? '',
+				groupSize: initialData.groupSize ?? '',
+				price: initialData.price ?? 0,
+				trailId: initialData.trailId ?? '',
+				sortOrder: initialData.sortOrder ?? 0,
+				isActive: initialData.isActive ?? true,
+			});
+		}
+	}, [initialData, reset]);
 
 	return (
 		<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

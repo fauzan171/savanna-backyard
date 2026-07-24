@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -36,6 +37,7 @@ export function ReviewForm({ initialData, onSubmit, onCancel, isLoading }: Revie
 	const {
 		register,
 		handleSubmit,
+		reset,
 		formState: { errors },
 	} = useForm<CreateReviewRequest>({
 		resolver: zodResolver(reviewSchema),
@@ -48,6 +50,20 @@ export function ReviewForm({ initialData, onSubmit, onCancel, isLoading }: Revie
 			isPublished: initialData?.isPublished ?? false,
 		},
 	});
+
+	// BUG#8: reset when editing a different record (defaultValues only applies on first mount).
+	useEffect(() => {
+		if (initialData) {
+			reset({
+				name: initialData.name ?? '',
+				location: initialData.location ?? '',
+				rating: initialData.rating ?? 5,
+				text: initialData.text ?? '',
+				avatar: initialData.avatar ?? '',
+				isPublished: initialData.isPublished ?? false,
+			});
+		}
+	}, [initialData, reset]);
 
 	return (
 		<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
