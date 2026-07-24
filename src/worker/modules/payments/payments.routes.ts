@@ -72,6 +72,18 @@ async function getGateway(
     config.apiKey = (await configRepo.getValue("xendit_api_key")) ?? "";
     config.isProduction =
       (await configRepo.getValue("xendit_is_production")) ?? "false";
+    // A2: webhookToken was never populated, causing the generic
+    // /payments/webhooks/:vendor route to reject every Xendit webhook.
+    // Read from config DB so gateway.validateWebhookSignature works.
+    // (The dedicated /webhooks/xendit/notification route uses c.env directly.)
+    config.webhookToken =
+      (await configRepo.getValue("xendit_webhook_token")) ?? "";
+  } else if (vendor === "ifortepay") {
+    // A1: wire iFortePay config so the gateway can verify webhooks
+    config.merchantId = (await configRepo.getValue("ifortepay_merchant_id")) ?? "";
+    config.secretUnboundId =
+      (await configRepo.getValue("ifortepay_secret_unbound_id")) ?? "";
+    config.hashKey = (await configRepo.getValue("ifortepay_hash_key")) ?? "";
   }
 
   return PaymentGatewayFactory.create(vendor, config);

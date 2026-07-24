@@ -626,13 +626,29 @@ export class PublicApiService {
   }
 
   // 12. Get booking status by number
-  async getBookingStatus(bookingNumber: string): Promise<{
+  // A4: optionally verify the requester owns the booking by matching the
+  // customer phone. Prevents enumeration of all bookings via sequential
+  // booking numbers (SVN-2026-0001, 0002, ...).
+  async getBookingStatus(
+    bookingNumber: string,
+    customerPhone?: string,
+  ): Promise<{
     bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
     totalAmount: number; paidAt: string | null;
   } | null> {
     const booking = await this.repo.findBookingByNumber(bookingNumber);
     if (!booking) return null;
+
+    // Ownership check: if a phone was provided, it must match the booking's
+    // customer phone. If it doesn't match, treat as not-found (avoid leaking
+    // that the booking exists but belongs to someone else).
+    if (customerPhone !== undefined) {
+      const customer = await this.repo.findCustomerByPhone(customerPhone);
+      if (!customer || customer.id !== booking.customerId) {
+        return null;
+      }
+    }
 
     const vehicle = await this.repo.getVehicleById(booking.vehicleId);
 

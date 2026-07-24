@@ -7,6 +7,7 @@ import { JwtService } from '@/worker/core/services/jwt.service';
 import { createGoogleOAuthProvider, createWhatsAppProvider } from '@/worker/core/services/providers';
 import { PublicUsersRepository } from '@/worker/modules/public-users/public-users.repository';
 import { PublicUsersService } from '@/worker/modules/public-users/public-users.service';
+import { timingSafeEqualSync } from '@/worker/core/lib/crypto-safe-equal';
 
 type WebhookEnv = { Bindings: Env };
 
@@ -49,6 +50,33 @@ const ifortepayNotificationHandler = async (c: Context<WebhookEnv>) => {
 		return c.json({ success: false, message: 'Invalid JSON' }, 400);
 	}
 
+	// A1: iFortePay signature verification (fail-closed).
+	// The gateway is not currently active (PAYMENT_GATEWAY_VENDOR=xendit), but
+	// the route must not accept unauthenticated requests. If no hash key is
+	// configured, the route is disabled (410 Gone) rather than accepting all.
+	const hashKey = c.env.IFORTEPAY_HASH_KEY ?? '';
+	if (!hashKey) {
+		return c.json(
+			{ success: false, message: 'iFortePay webhook is not configured' },
+			410,
+		);
+	}
+
+	const providedSignature = c.req.header('mcp-signature') ?? c.req.header('x-req-signature') ?? '';
+	if (!providedSignature) {
+		return c.json({ success: false, message: 'Missing signature header' }, 401);
+	}
+
+	// Verify signature: SHA-256(hashKey + externalId + orderId) hex, matching
+	// the outbound request signing convention used by the gateway.
+	const orderId = (data.order_id as string) ?? '';
+	const externalId = (data.external_id as string) ?? orderId;
+	const expectedSig = await computeIfortepaySignature(hashKey, externalId, orderId);
+	if (!timingSafeEqualSync(providedSignature, expectedSig)) {
+		console.error('Invalid iFortePay webhook signature');
+		return c.json({ success: false, message: 'Invalid signature' }, 401);
+	}
+
 	const service = new WebhooksService(createDb(c.env.DB));
 
 	// Process notification
@@ -56,6 +84,15 @@ const ifortepayNotificationHandler = async (c: Context<WebhookEnv>) => {
 
 	return c.json({ success: true, message: 'OK' });
 };
+
+/** Computes the iFortePay webhook signature: SHA-256(hashKey + externalId + orderId). */
+async function computeIfortepaySignature(hashKey: string, externalId: string, orderId: string): Promise<string> {
+	const raw = `${hashKey}${externalId}${orderId}`;
+	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+	return Array.from(new Uint8Array(buf))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+}
 
 /**
  * Xendit webhook handler.
@@ -80,9 +117,9 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 		return c.json({ success: false, message: 'Webhook token not configured' }, 500);
 	}
 
-	// Verify X-CALLBACK-TOKEN header
+	// Verify X-CALLBACK-TOKEN header (timing-safe to avoid side-channel)
 	const callbackToken = c.req.header('x-callback-token') ?? '';
-	if (callbackToken !== webhookToken) {
+	if (!timingSafeEqualSync(callbackToken, webhookToken)) {
 		console.error('Invalid Xendit webhook signature');
 		return c.json({ success: false, message: 'Invalid signature' }, 401);
 	}
@@ -121,9 +158,16 @@ const whatsappInboundHandler = async (c: Context<WebhookEnv>) => {
 		return c.json({ success: false, message: 'Invalid JSON' }, 400);
 	}
 
-	const secret = c.env.WHATSAPP_WEBHOOK_TOKEN ?? '';
+	// C3: fail-closed. If WHATSAPP_WEBHOOK_TOKEN is not set, reject all
+	// requests rather than silently accepting them (prevents unauthenticated
+	// OTP generation / message-sending abuse).
+	const secret = c.env.WHATSAPP_WEBHOOK_TOKEN;
+	if (!secret) {
+		console.error('WHATSAPP_WEBHOOK_TOKEN not configured');
+		return c.json({ success: false, message: 'Webhook token not configured' }, 500);
+	}
 	const provided = c.req.header('x-whatsapp-token') ?? c.req.query('token') ?? '';
-	if (secret && provided !== secret) {
+	if (!timingSafeEqualSync(provided, secret)) {
 		return c.json({ success: false, message: 'Invalid signature' }, 401);
 	}
 

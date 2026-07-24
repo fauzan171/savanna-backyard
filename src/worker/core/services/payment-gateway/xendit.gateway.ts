@@ -6,6 +6,7 @@ import type {
 	WebhookResult,
 	GatewayVendor,
 } from './types';
+import { timingSafeEqualSync } from '@/worker/core/lib/crypto-safe-equal';
 
 interface XenditConfig {
 	apiKey: string;
@@ -220,7 +221,8 @@ export class XenditGateway implements PaymentGateway {
 	 */
 	validateWebhookSignature(_payload: unknown, signature: string): boolean {
 		if (!this.webhookToken) return false;
-		return signature === this.webhookToken;
+		// A5: timing-safe comparison to prevent side-channel token recovery.
+		return timingSafeEqualSync(signature, this.webhookToken);
 	}
 
 	/**

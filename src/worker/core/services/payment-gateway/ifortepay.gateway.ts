@@ -161,12 +161,18 @@ export class iFortePayGateway implements PaymentGateway {
 		};
 	}
 
-	validateWebhookSignature(_payload: unknown, _signature: string): boolean {
-		// iFortePay sends mcp-signature header in callbacks
-		// The exact verification depends on how iFortePay generates the callback signature
-		// For now, presence of signature is sufficient
-		// TODO: Implement proper signature verification once iFortePay provides the algorithm
-		return true;
+	validateWebhookSignature(payload: unknown, signature: string): boolean {
+		// A1: fail-closed. Previously this returned `true` unconditionally,
+		// allowing anyone to forge a paid-booking webhook. Now it requires a
+		// configured hashKey and a non-empty signature.
+		if (!this.hashKey || !signature) return false;
+		const data = payload as Record<string, string | undefined>;
+		const externalId = data.external_id ?? data.order_id ?? '';
+		const orderId = data.order_id ?? '';
+		// NOTE: this is the sync stub — the route handler does the real async
+		// SHA-256 verification. Here we only gate on presence so the generic
+		// /payments/webhooks/:vendor path also rejects unsigned requests.
+		return Boolean(externalId && orderId);
 	}
 
 	private mapStatus(transactionStatus: string): 'Pending' | 'Verified' | 'Failed' {

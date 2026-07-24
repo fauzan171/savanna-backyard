@@ -118,7 +118,9 @@ export function createAuthRouter(): Hono<AuthEnv> {
 
 	// Protected routes
 	router.get('/me', authMiddleware(), meHandler);
-	router.post('/logout', logoutHandler);
+	// A6: require auth so only the token's owner can revoke their own session,
+	// preventing targeted session-DoS by anyone who observed a token value.
+	router.post('/logout', authMiddleware(), logoutHandler);
 
 	return router;
 }

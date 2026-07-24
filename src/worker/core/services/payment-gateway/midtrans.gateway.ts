@@ -6,6 +6,7 @@ import type {
 	WebhookResult,
 	GatewayVendor,
 } from './types';
+import { timingSafeEqualSync } from '@/worker/core/lib/crypto-safe-equal';
 
 /**
  * Midtrans payment gateway integration.
@@ -124,7 +125,8 @@ export class MidtransGateway implements PaymentGateway {
 		const computed = Array.from(new Uint8Array(hashBuffer))
 			.map(b => b.toString(16).padStart(2, '0'))
 			.join('');
-		return computed === data.signature_key;
+		// A5: timing-safe compare (hashes are equal length, so this is safe)
+		return timingSafeEqualSync(computed, data.signature_key);
 	}
 
 	/**

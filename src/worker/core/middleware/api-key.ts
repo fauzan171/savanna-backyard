@@ -2,6 +2,7 @@ import { Context, Next } from 'hono';
 import { UnauthorizedError } from '../types/errors';
 import { ConfigRepository } from '../repositories/config.repository';
 import { createDb } from '../database';
+import { timingSafeEqualSync } from '../lib/crypto-safe-equal';
 
 // Extend Hono's context variables
 declare module 'hono' {
@@ -33,9 +34,9 @@ export function apiKeyMiddleware() {
             throw new UnauthorizedError('Public API is currently disabled');
         }
 
-        // Validate API key
+        // Validate API key (timing-safe to prevent side-channel key recovery)
         const validApiKey = await configRepo.getValue('public_api_key');
-        if (!validApiKey || apiKey !== validApiKey) {
+        if (!validApiKey || !timingSafeEqualSync(apiKey, validApiKey)) {
             throw new UnauthorizedError('Invalid API key');
         }
 
@@ -60,7 +61,7 @@ export function optionalApiKeyMiddleware() {
             const configRepo = new ConfigRepository(db);
 
             const validApiKey = await configRepo.getValue('public_api_key');
-            if (validApiKey && apiKey === validApiKey) {
+            if (validApiKey && timingSafeEqualSync(apiKey, validApiKey)) {
                 c.set('apiKeyValidated', true);
             }
         }

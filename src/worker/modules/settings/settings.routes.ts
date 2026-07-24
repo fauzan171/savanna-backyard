@@ -28,14 +28,17 @@ const settingsServicesMiddleware = () => async (c: Context<SettingsEnv>, next: (
 
 const listHandler = async (c: Context<SettingsEnv>) => {
 	const service = c.get('settingsService');
-	const result = await service.list();
+	const user = c.get('user');
+	// A3: redact secret values for non-SUPER_ADMIN users
+	const result = await service.list(user?.role ?? 'STAFF');
 	return c.json({ success: true, data: result });
 };
 
 const getByKeyHandler = async (c: Context<SettingsEnv>) => {
 	const service = c.get('settingsService');
+	const user = c.get('user');
 	const key = c.req.param('key');
-	const result = await service.getByKey(key);
+	const result = await service.getByKey(key, user?.role ?? 'STAFF');
 	if (!result) {
 		return c.json({ success: false, message: 'Setting not found', error: { code: 'NOT_FOUND', message: 'Setting not found' } }, 404);
 	}
