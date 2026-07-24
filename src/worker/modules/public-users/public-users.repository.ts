@@ -95,6 +95,20 @@ export class PublicUsersRepository {
 		return Number(rows[0]?.count ?? 0);
 	}
 
+	/**
+	 * Count recent verifications issued BY a specific user (regardless of phone).
+	 * BUG#6: prevents one attacker account from fanning OTP spam out to many
+	 * different victim phone numbers (the per-phone limit alone doesn't stop
+	 * that).
+	 */
+	async countRecentVerificationByUser(publicUserId: string, sinceIso: string): Promise<number> {
+		const rows = await this.db
+			.select({ count: sql<number>`count(*)` })
+			.from(verificationCodes)
+			.where(and(eq(verificationCodes.publicUserId, publicUserId), gte(verificationCodes.createdAt, sinceIso)));
+		return Number(rows[0]?.count ?? 0);
+	}
+
 	async updateVerification(id: string, data: Partial<NewVerificationCode>): Promise<void> {
 		await this.db.update(verificationCodes).set(data).where(eq(verificationCodes.id, id));
 	}

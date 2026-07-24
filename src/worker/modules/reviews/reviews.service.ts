@@ -37,7 +37,9 @@ export class ReviewsService {
 	}
 
 	async toggle(id: string) {
-		const review = await this.getById(id);
-		return this.repo.update(id, { isPublished: !review.isPublished });
+		// BUG#7: atomic toggle to avoid read-then-write race.
+		const review = await this.repo.togglePublished(id);
+		if (!review) throw new NotFoundError('Review');
+		return review;
 	}
 }

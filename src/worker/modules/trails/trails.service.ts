@@ -66,7 +66,9 @@ export class TrailsService {
 	}
 
 	async toggle(id: string) {
-		const trail = await this.getById(id);
-		return this.repo.update(id, { isActive: !trail.isActive });
+		// BUG#7: atomic toggle to avoid read-then-write race.
+		const trail = await this.repo.toggleActive(id);
+		if (!trail) throw new NotFoundError('Trail');
+		return trail;
 	}
 }

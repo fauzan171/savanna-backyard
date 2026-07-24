@@ -587,6 +587,8 @@ export class PublicApiService {
   } | null> {
     const trail = await this.repo.getTrailById(trailId);
     if (!trail) return null;
+    // BUG#5: never expose inactive/draft trails on the public surface.
+    if (!trail.isActive) return null;
 
     return {
       id: trail.id,

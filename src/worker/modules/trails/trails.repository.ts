@@ -1,4 +1,4 @@
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, sql } from 'drizzle-orm';
 import { trails, type Trail, type NewTrail } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
@@ -33,5 +33,15 @@ export class TrailsRepository {
 
 	async delete(id: string): Promise<void> {
 		await this.db.delete(trails).where(eq(trails.id, id));
+	}
+
+	/** BUG#7: atomic flip — NOT(isActive) at the SQL level, no read-then-write race. */
+	async toggleActive(id: string): Promise<Trail | null> {
+		await this.db
+			.update(trails)
+			.set({ isActive: sql`NOT ${trails.isActive}`, updatedAt: new Date().toISOString() })
+			.where(eq(trails.id, id));
+		const result = await this.db.select().from(trails).where(eq(trails.id, id)).limit(1);
+		return result[0] ?? null;
 	}
 }

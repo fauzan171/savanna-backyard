@@ -77,7 +77,8 @@ export function LeadForm({ lead, onSubmit, onCancel, isLoading }: LeadFormProps)
 				email: lead.email ?? '',
 				source: lead.source,
 				priority: lead.priority,
-				notes: '',
+				// BUG#9: was hardcoded '' — wiped existing notes on edit. Preserve them.
+				notes: lead.notes ?? '',
 				followUpDate: lead.followUpDate ?? '',
 			});
 		}

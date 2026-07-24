@@ -1,4 +1,4 @@
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, sql } from 'drizzle-orm';
 import { reviews, type Review, type NewReview } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
@@ -29,5 +29,15 @@ export class ReviewsRepository {
 
 	async delete(id: string): Promise<void> {
 		await this.db.delete(reviews).where(eq(reviews.id, id));
+	}
+
+	/** BUG#7: atomic flip of isPublished — no read-then-write race. */
+	async togglePublished(id: string): Promise<Review | null> {
+		await this.db
+			.update(reviews)
+			.set({ isPublished: sql`NOT ${reviews.isPublished}`, updatedAt: new Date().toISOString() })
+			.where(eq(reviews.id, id));
+		const result = await this.db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
+		return result[0] ?? null;
 	}
 }

@@ -151,9 +151,16 @@ export class PublicUsersService {
 		expiresAt: string;
 	}> {
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+		// Per-phone throttle (protects a victim's number from spam)
 		const recent = await this.repo.countRecentVerificationByPhone(data.phone, oneHourAgo);
 		if (recent >= MAX_INIT_PER_HOUR) {
 			throw new ValidationError('Too many OTP requests for this number. Please try again later.');
+		}
+		// BUG#6: per-user throttle (stops one attacker account fanning OTP spam
+		// out to many different victim numbers).
+		const recentByUser = await this.repo.countRecentVerificationByUser(publicUserId, oneHourAgo);
+		if (recentByUser >= MAX_INIT_PER_HOUR) {
+			throw new ValidationError('Too many OTP requests from your account. Please try again later.');
 		}
 
 		const refCode = genRefCode();

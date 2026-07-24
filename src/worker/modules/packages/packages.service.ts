@@ -43,7 +43,9 @@ export class PackagesService {
 	}
 
 	async toggle(id: string) {
-		const pkg = await this.getById(id);
-		return this.repo.update(id, { isActive: !pkg.isActive });
+		// BUG#7: atomic toggle to avoid read-then-write race.
+		const pkg = await this.repo.toggleActive(id);
+		if (!pkg) throw new NotFoundError('Package');
+		return pkg;
 	}
 }
