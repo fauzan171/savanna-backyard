@@ -403,11 +403,14 @@ export class PublicUsersService {
 
 		// Create a NEW invoice for the remainder amount
 		const gateway = PaymentGatewayFactory.create(gatewayConfig.vendor as 'xendit' | 'ifortepay' | 'midtrans' | 'manual', gatewayConfig.config);
-		let paymentPageUrl = b.paymentPageUrl;
+		let paymentPageUrl: string | null = null;
 		let newInvoiceId: string | null = null;
 
-		if (gateway.name !== 'manual') {
-			try {
+		if (gateway.name === 'manual') {
+			throw new ValidationError('Online payment gateway is not available');
+		}
+
+		try {
 				const result = await gateway.createPayment({
 					amount: remaining,
 					currency: 'IDR',
@@ -418,8 +421,8 @@ export class PublicUsersService {
 					description: `Pelunasan ${b.bookingNumber} — sisa Rp ${remaining.toLocaleString('id-ID')}`,
 				});
 
-				if (result.success) {
-					paymentPageUrl = result.paymentUrl ?? b.paymentPageUrl;
+				if (result.success && result.paymentUrl) {
+					paymentPageUrl = result.paymentUrl;
 					newInvoiceId = result.transactionId ?? null;
 
 					// Save the new payment link + invoice id to the booking
@@ -428,11 +431,11 @@ export class PublicUsersService {
 						...(newInvoiceId ? { xenditInvoiceId: newInvoiceId } : {}),
 					});
 				} else {
-					console.error('[payRemaining] Failed to create remainder invoice:', result.error);
-				}
-			} catch (error) {
-				console.error('[payRemaining] Exception creating remainder invoice:', error);
+					throw new Error(result.error?.message ?? 'Payment gateway did not return a payment URL');
 			}
+		} catch (error) {
+			console.error('[payRemaining] Failed to create remainder invoice:', error);
+			throw new ValidationError('Gagal membuat link pelunasan. Silakan coba lagi.');
 		}
 
 		return {
@@ -440,7 +443,7 @@ export class PublicUsersService {
 			bookingNumber: b.bookingNumber,
 			paymentStatus: b.paymentStatus,
 			paymentPageUrl,
-			xenditInvoiceId: newInvoiceId ?? b.xenditInvoiceId,
+			xenditInvoiceId: newInvoiceId,
 			totalAmount: b.totalAmount,
 			remainingAmount: remaining,
 		};

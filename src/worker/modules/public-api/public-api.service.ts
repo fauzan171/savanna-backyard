@@ -688,12 +688,13 @@ export class PublicApiService {
     bookingNumber: string,
     customerPhone?: string,
   ): Promise<{
-    bookingNumber: string; status: string; paymentStatus: string | null;
+    id: string; bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
     blocks: number;
     totalAmount: number; paidAt: string | null;
     paymentPageUrl: string | null; qrString: string | null;
     paymentType: string; dpAmount: number; remainingAmount: number;
+    pickupConfirmed: boolean;
     isFullyPaid: boolean;
     isPickupTime: boolean;
   } | null> {
@@ -726,6 +727,7 @@ export class PublicApiService {
     const isPickupTime = now >= start;
 
     return {
+      id: booking.id,
       bookingNumber: booking.bookingNumber,
       status: booking.status,
       paymentStatus: booking.paymentStatus,
@@ -740,6 +742,7 @@ export class PublicApiService {
       paymentType,
       dpAmount,
       remainingAmount,
+      pickupConfirmed: booking.pickupConfirmed ?? false,
       isFullyPaid,
       isPickupTime,
     };

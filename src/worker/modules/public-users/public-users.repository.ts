@@ -135,13 +135,14 @@ export class PublicUsersRepository {
 	 * added, or cookie was absent during booking creation).
 	 */
 	async listBookingsByPhone(phone: string, limit = 50): Promise<Booking[]> {
-		return this.db
-			.select()
+		const rows = await this.db
+			.select({ booking: bookings })
 			.from(bookings)
 			.innerJoin(customers, eq(customers.id, bookings.customerId))
 			.where(and(eq(customers.phone, phone), isNull(bookings.publicUserId)))
 			.orderBy(desc(bookings.createdAt))
-			.limit(limit) as unknown as Booking[];
+			.limit(limit);
+		return rows.map((row) => row.booking);
 	}
 
 	/** Link unlinked bookings to a public user by customer phone match. */
