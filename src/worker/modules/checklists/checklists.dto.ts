@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
 import { DEFAULT_CHECKLIST_ITEMS } from './checklists.types';
 
 // Items schema: must have all default keys as boolean
@@ -14,8 +15,18 @@ export const createChecklistSchema = z.object({
 	kmReading: z.number().min(0, 'KM reading harus >= 0'),
 	fuelLevel: z.number().min(0).max(100).optional().nullable(),
 	photos: z.array(z.string()).optional().nullable(),
-	notes: z.string().max(1000).optional().nullable(),
-	damageNotes: z.string().max(1000).optional().nullable(),
+	notes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+	damageNotes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 export const updateChecklistSchema = z.object({
@@ -23,8 +34,18 @@ export const updateChecklistSchema = z.object({
 	kmReading: z.number().min(0).optional(),
 	fuelLevel: z.number().min(0).max(100).optional().nullable(),
 	photos: z.array(z.string()).optional().nullable(),
-	notes: z.string().max(1000).optional().nullable(),
-	damageNotes: z.string().max(1000).optional().nullable(),
+	notes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+	damageNotes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 export type CreateChecklistRequest = z.infer<typeof createChecklistSchema>;

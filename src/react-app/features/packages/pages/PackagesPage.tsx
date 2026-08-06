@@ -7,6 +7,8 @@ import { PageHeader } from '@/react-app/components/layout/page-header';
 import { usePackages, useTogglePackage, useCreatePackage } from '../hooks/usePackages';
 import { PackageForm } from '../components/PackageForm';
 import type { Package, CreatePackageRequest } from '../api/packages';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 
 export default function PackagesPage() {
 	const navigate = useNavigate();
@@ -19,9 +21,14 @@ export default function PackagesPage() {
 		try {
 			const result = await createMutation.mutateAsync(formData);
 			setIsCreateDialogOpen(false);
+			toast({ title: 'Package created' });
 			if (result.data?.id) navigate(`/packages/${result.data.id}`);
 		} catch (error) {
-			console.error(error);
+			toast({
+				title: 'Failed to create package',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
 		}
 	};
 

@@ -8,6 +8,7 @@ import { createDb } from '@/worker/core/database';
 import { StatisticsRepository } from '@/worker/core/repositories/statistics.repository';
 import { StatisticsService } from '@/worker/modules/statistics/statistics.service';
 import { generateCsv, generateCsvFilename, getCsvResponseHeaders } from '@/worker/core/lib/csv-export';
+import { ValidationError } from '@/worker/core/types/errors';
 
 type ReportsVariables = {
 	statisticsService: StatisticsService;
@@ -158,12 +159,23 @@ const customersReportHandler = async (c: any) => {
 
 // ============ Router ============
 
+// FEAT-01: reject reversed date ranges once, centrally. Every report handler
+// reads startDate/endDate from query — this guard runs before them all.
+const validateDateRange = async (c: any, next: () => Promise<void>) => {
+	const { startDate, endDate } = c.req.query();
+	if (startDate && endDate && startDate > endDate) {
+		throw new ValidationError('Start date must be before or equal to end date');
+	}
+	await next();
+};
+
 export function createReportsRouter(): Hono<ReportsEnv> {
 	const router = new Hono<ReportsEnv>();
 
 	// All routes require authentication
 	router.use('*', authMiddleware());
 	router.use('*', reportsServicesMiddleware());
+	router.use('*', validateDateRange);
 
 	// Report endpoints
 	router.get('/revenue', revenueReportHandler);

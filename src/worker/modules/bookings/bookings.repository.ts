@@ -2,6 +2,8 @@ import { eq, and, or, desc, inArray, lt, gt, not, sql } from 'drizzle-orm';
 import {
 	bookings,
 	bookingAddons,
+	bookingEquipment,
+	equipment,
 	customers,
 	vehicles,
 	users,
@@ -212,6 +214,24 @@ export class BookingsRepository {
 			endDate: newEndDate,
 			totalAmount: newTotalAmount,
 		});
+	}
+
+	// BIZ-03: equipment stock tied to a booking via booking_equipment rows
+	// (created on the public booking path). Used to restore stock on cancel so
+	// cancelled reservations don't permanently hold inventory.
+	async listBookingEquipment(bookingId: string): Promise<{ equipmentId: string; quantity: number }[]> {
+		const rows = await this.db
+			.select({ equipmentId: bookingEquipment.equipmentId, quantity: bookingEquipment.quantity })
+			.from(bookingEquipment)
+			.where(eq(bookingEquipment.bookingId, bookingId));
+		return rows;
+	}
+
+	async restoreEquipmentStock(equipmentId: string, qty: number): Promise<void> {
+		await this.db
+			.update(equipment)
+			.set({ stock: sql`${equipment.stock} + ${qty}` })
+			.where(eq(equipment.id, equipmentId));
 	}
 
 	// Addons

@@ -715,6 +715,12 @@ export class BookingsService {
 		// revenue on a cancelled booking.
 		await this.bookingRepo.cancelPendingPaymentsByBookingId(id);
 
+		// BIZ-03: return held equipment stock to inventory (public bookings
+		// decrement stock on create; restore here so cancellations release it).
+		for (const row of await this.bookingRepo.listBookingEquipment(id)) {
+			await this.bookingRepo.restoreEquipmentStock(row.equipmentId, row.quantity);
+		}
+
 		// Update booking with cancellation reason in notes
 		const updated = await this.bookingRepo.update(id, {
 			status: 'Cancelled',

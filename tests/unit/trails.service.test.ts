@@ -10,6 +10,7 @@ describe('TrailsService (TRAIL-02 / TRAIL-03)', () => {
 	beforeEach(() => {
 		repo = {
 			getById: vi.fn(),
+			findByName: vi.fn().mockResolvedValue(null),
 			list: vi.fn(),
 			create: vi.fn(),
 			update: vi.fn(),
@@ -18,14 +19,13 @@ describe('TrailsService (TRAIL-02 / TRAIL-03)', () => {
 		svc = new TrailsService(repo);
 	});
 
-	it('rejects duplicate id with ConflictError (TRAIL-03)', async () => {
-		vi.mocked(repo.getById).mockResolvedValue({ id: 'sea-of-sand' } as any);
-		await expect(svc.create({ id: 'sea-of-sand', name: 'X' })).rejects.toThrow('Trail ID sudah terdaftar');
+	it('rejects duplicate name with ConflictError (TRAIL-03)', async () => {
+		vi.mocked(repo.findByName).mockResolvedValue({ id: 'sea-of-sand' } as any);
+		await expect(svc.create({ id: 'sea-of-sand', name: 'Sea of Sand' })).rejects.toThrow('Nama trail sudah terdaftar');
 		expect(repo.create).not.toHaveBeenCalled();
 	});
 
-	it('creates when id is free', async () => {
-		vi.mocked(repo.getById).mockResolvedValue(null);
+	it('creates when name is free', async () => {
 		vi.mocked(repo.create).mockResolvedValue({ id: 'new' } as any);
 		await expect(svc.create({ id: 'new', name: 'X' })).resolves.toBeDefined();
 	});

@@ -27,6 +27,7 @@ export default function CustomersPage() {
 		try {
 			const result = await createMutation.mutateAsync(formData);
 			setIsCreateDialogOpen(false);
+			toast({ title: 'Customer created' });
 			// Navigate to the new customer's detail page
 			if (result.data?.id) {
 				navigate(`/customers/${result.data.id}`);

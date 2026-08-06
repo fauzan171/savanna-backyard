@@ -77,6 +77,11 @@ describe('BookingsService', () => {
 			findConflictingBookings: vi.fn(),
 			getPaymentsByBookingId: vi.fn(),
 			getStats: vi.fn(),
+			// B5 + BIZ-03: cancel path cancels pending payments and restores
+			// held equipment stock — stub so cancel tests don't TypeError.
+			cancelPendingPaymentsByBookingId: vi.fn().mockResolvedValue(undefined),
+			listBookingEquipment: vi.fn().mockResolvedValue([]),
+			restoreEquipmentStock: vi.fn().mockResolvedValue(undefined),
 		} as unknown as BookingsRepository;
 
 		mockVehicleRepo = {

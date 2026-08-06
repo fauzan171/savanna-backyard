@@ -23,7 +23,8 @@ describe('VehiclesService', () => {
 			getAvailableVehicles: vi.fn(),
 			checkExists: vi.fn(),
 			delete: vi.fn(),
-			countActiveByVehicle: vi.fn(),
+			countActiveBookings: vi.fn().mockResolvedValue(0),
+			countActiveMaintenance: vi.fn().mockResolvedValue(0),
 		} as unknown as VehiclesRepository;
 
 		vehiclesService = new VehiclesService(mockVehicleRepo);

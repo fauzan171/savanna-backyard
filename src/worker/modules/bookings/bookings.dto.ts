@@ -1,9 +1,15 @@
 import { z } from 'zod';
+import { sanitizeText } from '@/worker/core/schemas/sanitize';
 
 // Addon schema for booking creation
 export const addonInputSchema = z.object({
 	type: z.enum(['TourGuide', 'SafetyGear', 'PickupDropoff', 'Package', 'Other']),
-	description: z.string().max(500).optional().nullable(),
+	description: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	amount: z.number().min(0),
 	isMandatory: z.boolean().default(false),
 });
@@ -17,7 +23,12 @@ export const createBookingSchema = z.object({
 	paymentTerms: z.enum(['DP_Pickup', 'Full_Upfront', 'DP_After', 'Flexible']),
 	currency: z.enum(['IDR', 'USD']).default('IDR'),
 	addons: z.array(addonInputSchema).optional().default([]),
-	notes: z.string().max(2000).optional().nullable(),
+	notes: z
+		.string()
+		.max(2000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 }).refine(
 	(data) => data.startDate <= data.endDate,
 	{ message: 'Start date must be before or equal to end date' }
@@ -25,21 +36,41 @@ export const createBookingSchema = z.object({
 
 // Update booking schema (limited fields)
 export const updateBookingSchema = z.object({
-	notes: z.string().max(2000).optional().nullable(),
+	notes: z
+		.string()
+		.max(2000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // Start rental schema
 export const startRentalSchema = z.object({
 	startKm: z.number().min(0),
-	pickupNotes: z.string().max(1000).optional().nullable(),
+	pickupNotes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 });
 
 // Complete rental schema
 export const completeRentalSchema = z.object({
 	actualReturnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
 	endKm: z.number().min(0),
-	returnNotes: z.string().max(1000).optional().nullable(),
-	damageNotes: z.string().max(1000).optional().nullable(),
+	returnNotes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+	damageNotes: z
+		.string()
+		.max(1000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	// Optional admin override for the auto-calculated damage fee (flat damage_per_item x flipped items)
 	damageFeeOverride: z.number().min(0).optional().nullable(),
 	// Optional condition status to record for the vehicle after return
@@ -49,7 +80,12 @@ export const completeRentalSchema = z.object({
 // Extend rental schema
 export const extendRentalSchema = z.object({
 	newEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)'),
-	notes: z.string().max(500).optional().nullable(),
+	notes: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 }).refine(
 	(data) => data.newEndDate,
 	{ message: 'New end date is required' }
@@ -57,7 +93,11 @@ export const extendRentalSchema = z.object({
 
 // Cancel booking schema
 export const cancelBookingSchema = z.object({
-	reason: z.string().min(1, 'Cancellation reason is required').max(500),
+	reason: z
+		.string()
+		.min(1, 'Cancellation reason is required')
+		.max(500)
+		.transform((v) => sanitizeText(v) as string),
 });
 
 // Scan-return schema: admin scans the vehicle QR to resolve the active booking
@@ -68,7 +108,12 @@ export const scanReturnSchema = z.object({
 // Add addon schema
 export const addAddonSchema = z.object({
 	type: z.enum(['TourGuide', 'SafetyGear', 'PickupDropoff', 'Package', 'Other']),
-	description: z.string().max(500).optional().nullable(),
+	description: z
+		.string()
+		.max(500)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	amount: z.number().min(0),
 	isMandatory: z.boolean().default(false),
 });
@@ -107,7 +152,12 @@ export const submitChecklistSchema = z.object({
 	kmReading: z.number().min(0),
 	fuelLevel: z.number().int().min(0).max(100).optional().nullable(),
 	photos: z.array(z.string().url()).max(10).optional().default([]),
-	notes: z.string().max(2000).optional().nullable(),
+	notes: z
+		.string()
+		.max(2000)
+		.optional()
+		.nullable()
+		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
 	conditionStatus: z.enum(['Excellent', 'Good', 'Fair', 'Poor', 'Maintenance']).optional(),
 	// For pickup checklist: auto-start rental after checklist is submitted
 	startRental: z.boolean().default(true),

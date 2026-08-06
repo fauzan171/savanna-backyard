@@ -31,6 +31,7 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 			updateBooking: vi.fn().mockResolvedValue(undefined),
 			getActiveEquipmentByIds: vi.fn().mockResolvedValue([]),
 			createBookingEquipment: vi.fn().mockResolvedValue(undefined),
+			decrementEquipmentStock: vi.fn().mockResolvedValue(undefined),
 		} as unknown as PublicApiRepository;
 		configRepo = { getNumber: vi.fn().mockResolvedValue(30), getBoolean: vi.fn(), getValue: vi.fn() } as unknown as ConfigRepository;
 		service = new PublicApiService(repo, configRepo, 'https://api.test');

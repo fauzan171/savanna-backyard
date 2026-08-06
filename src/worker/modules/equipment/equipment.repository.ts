@@ -1,4 +1,4 @@
-import { eq, asc, and, inArray, sql, gte } from 'drizzle-orm';
+import { eq, asc, and, inArray } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
 import { equipment, type Equipment, type NewEquipment } from '@/worker/core/database/schema';
 
@@ -41,27 +41,9 @@ export class EquipmentRepository {
 		await this.db.delete(equipment).where(eq(equipment.id, id));
 	}
 
-	/**
-	 * Atomically decrement stock for an equipment item. Only succeeds if enough
-	 * stock remains (WHERE stock >= qty), preventing oversell without a
-	 * transaction. Returns true if decremented, false if insufficient stock.
-	 * B3 fix.
-	 */
-	async decrementStock(id: string, qty: number): Promise<boolean> {
-		const result = await this.db
-			.update(equipment)
-			.set({ stock: sql`${equipment.stock} - ${qty}`, updatedAt: new Date().toISOString() })
-			.where(and(eq(equipment.id, id), gte(equipment.stock, qty)));
-		return (result as unknown as { rowsAffected?: number }).rowsAffected !== 0;
-	}
-
-	/**
-	 * Restore stock (e.g. when a booking is cancelled). B3 fix.
-	 */
-	async restoreStock(id: string, qty: number): Promise<void> {
-		await this.db
-			.update(equipment)
-			.set({ stock: sql`${equipment.stock} + ${qty}`, updatedAt: new Date().toISOString() })
-			.where(eq(equipment.id, id));
-	}
+	// ponytail: stock decrement/restore used to live here but were never called
+	// (admin bookings use free-form booking_addons with no equipment link).
+	// The public booking path owns live stock enforcement via
+	// public-api.repository.{decrement,restore}EquipmentStock, and cancel-time
+	// restore is wired in bookings.repository + bookings.service.cancel.
 }

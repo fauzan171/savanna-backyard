@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { PageHeader } from '@/react-app/components/layout/page-header';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { EquipmentTable } from '../components/EquipmentTable';
 import { EquipmentForm } from '../components/EquipmentForm';
 import { useEquipmentList, useCreateEquipment } from '../hooks/useEquipment';
@@ -19,8 +21,17 @@ export function EquipmentPage() {
 	const createEquipment = useCreateEquipment();
 
 	const handleCreateEquipment = async (data: CreateEquipmentRequest) => {
-		await createEquipment.mutateAsync(data);
-		setIsCreateOpen(false);
+		try {
+			await createEquipment.mutateAsync(data);
+			setIsCreateOpen(false);
+			toast({ title: 'Equipment created' });
+		} catch (error) {
+			toast({
+				title: 'Failed to create equipment',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
 	};
 
 	const handleRowClick = (item: Equipment) => {

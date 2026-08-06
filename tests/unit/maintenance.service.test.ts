@@ -38,6 +38,8 @@ describe('MaintenanceService', () => {
 
 		mockBookingsRepo = {
 			findById: vi.fn(),
+			// B4: create() checks booking conflicts when endDate is set.
+			findConflictingBookings: vi.fn().mockResolvedValue([]),
 		} as unknown as BookingsRepository;
 
 		mockUsersRepo = {
