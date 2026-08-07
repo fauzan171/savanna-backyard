@@ -9,6 +9,10 @@ interface ApiOptions {
 class ApiClient {
 	private baseUrl = '/api';
 
+	private clearAuthState() {
+		useAuthStore.getState().clearSession();
+	}
+
 	async request<T>(path: string, options: ApiOptions = {}): Promise<T> {
 		const { method = 'GET', body, params } = options;
 
@@ -28,8 +32,9 @@ class ApiClient {
 		});
 
 		if (response.status === 401) {
-			// Clear auth state — React Router guards will handle redirect to /login
-			useAuthStore.getState().logout();
+			// Clear only local auth state. Calling the logout endpoint from a 401 handler
+			// creates a request loop when the session is already invalid/missing.
+			this.clearAuthState();
 			throw new Error('Unauthorized');
 		}
 
@@ -73,7 +78,7 @@ class ApiClient {
 		});
 
 		if (response.status === 401) {
-			useAuthStore.getState().logout();
+			this.clearAuthState();
 			throw new Error('Unauthorized');
 		}
 

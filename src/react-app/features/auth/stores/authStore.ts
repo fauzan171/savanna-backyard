@@ -15,6 +15,7 @@ interface AuthState {
 	isLoading: boolean;
 	login: (email: string, password: string) => Promise<void>;
 	logout: () => void;
+	clearSession: () => void;
 	fetchUser: () => Promise<void>;
 }
 
@@ -32,6 +33,10 @@ export const useAuthStore = create<AuthState>()(
 
 			logout: () => {
 				api.post('/v1/auth/logout', {}).catch(() => {});
+				set({ user: null, isAuthenticated: false });
+			},
+
+			clearSession: () => {
 				set({ user: null, isAuthenticated: false });
 			},
 
