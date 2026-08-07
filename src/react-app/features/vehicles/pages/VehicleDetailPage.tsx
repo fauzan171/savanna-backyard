@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, User, CheckCircle, AlertCircle } from 'lucide-react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, Clock, User, CheckCircle, AlertCircle, ExternalLink, Bike } from 'lucide-react';
 import { format, isWithinInterval, parseISO, differenceInDays } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
@@ -9,7 +9,7 @@ import { Spinner } from '@/react-app/components/ui/spinner';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { toast } from '@/react-app/hooks/useToast';
 import { extractApiError } from '@/react-app/lib/extract-error';
-import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus, useDeleteVehicle } from '../hooks/useVehicles';
+import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus, useDeleteVehicle, useVehicleCalendar } from '../hooks/useVehicles';
 import { useBookings } from '@/react-app/features/bookings/hooks/useBookings';
 import { VehicleDetail } from '../components/VehicleDetail';
 import { VehicleForm } from '../components/VehicleForm';
@@ -28,6 +28,7 @@ const formatDate = (date: string) => format(parseISO(date), 'd MMM yyyy');
 export default function VehicleDetailPage() {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
+	const [searchParams] = useSearchParams();
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 	const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -36,12 +37,16 @@ export default function VehicleDetailPage() {
 	const updateMutation = useUpdateVehicle();
 	const statusMutation = useUpdateVehicleStatus();
 	const deleteMutation = useDeleteVehicle();
+	const currentMonth = format(new Date(), 'yyyy-MM');
+	const scannedFromQr = searchParams.get('fromScan') === '1';
+	const scannedBookingId = searchParams.get('bookingId');
 
 	// Fetch bookings for this vehicle
 	const { data: bookingsData, isLoading: bookingsLoading } = useBookings({
 		vehicleId: id,
 		limit: 100,
 	});
+	const { data: calendarData, isLoading: calendarLoading } = useVehicleCalendar(id!, currentMonth);
 
 	const today = new Date();
 
@@ -50,10 +55,16 @@ export default function VehicleDetailPage() {
 	);
 
 	const activeBookings = activeAndUpcoming.filter((b) => b.status === 'Active');
+	const linkedBooking = (bookingsData?.items ?? []).find((booking) => booking.id === scannedBookingId);
 	const upcomingBookings = activeAndUpcoming.filter(
 		(b) => (b.status === 'Confirmed' || b.status === 'Pending') &&
 			parseISO(b.startDate) >= today
 	);
+	const bookedDaysThisMonth = (calendarData?.calendar ?? []).filter(
+		(day) => day.status === 'booked'
+	).length;
+	const nextScheduledBooking = [...upcomingBookings]
+		.sort((a, b) => parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime())[0];
 
 	const isAvailableToday = !activeAndUpcoming.some((b) => {
 		try {
@@ -128,6 +139,40 @@ export default function VehicleDetailPage() {
 				</Link>
 			</Button>
 
+			{scannedFromQr && (
+				<div className="rounded-lg border border-[hsl(var(--color-success-border))] bg-[hsl(var(--color-success-bg))] p-4">
+					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+						<div className="flex items-start gap-3">
+							<div className="rounded-full bg-background/70 p-2">
+								<Bike className="size-5 text-[hsl(var(--forest-green))]" />
+							</div>
+							<div>
+								<p className="font-medium">Hasil scan kendaraan</p>
+								<p className="text-sm text-muted-foreground">
+									Halaman ini adalah identity kendaraan untuk update kondisi, status operasional, dan cek booking terhubung.
+								</p>
+							</div>
+						</div>
+						<div className="flex flex-wrap gap-2">
+							{linkedBooking && (
+								<Button asChild size="sm">
+									<Link to={`/bookings/${linkedBooking.id}`}>
+										<ExternalLink className="mr-2 size-4" />
+										Buka Booking Terkait
+									</Link>
+								</Button>
+							)}
+							<Button variant="outline" size="sm" asChild>
+								<Link to="/calendar">
+									<Calendar className="mr-2 size-4" />
+									Buka Fleet Schedule
+								</Link>
+							</Button>
+						</div>
+					</div>
+				</div>
+			)}
+
 			<VehicleDetail
 				vehicle={vehicle}
 					onEdit={() => setIsEditDialogOpen(true)}
@@ -144,6 +189,54 @@ export default function VehicleDetailPage() {
 					</p>
 				</div>
 				<VehicleQrCard vehicleId={vehicle.id} vehicleName={vehicle.name} />
+			</div>
+
+			<div className="rounded-lg border p-5 space-y-4">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div>
+						<h3 className="text-base font-semibold">Operations & Schedule</h3>
+						<p className="text-sm text-muted-foreground">
+							Hub operasional kendaraan ini: status armada, booking terkait, dan jadwal bulan berjalan.
+						</p>
+					</div>
+					<div className="flex flex-wrap gap-2">
+						<Button variant="outline" asChild>
+							<Link to="/calendar">
+								<Calendar className="mr-2 size-4" />
+								Fleet Calendar
+							</Link>
+						</Button>
+						{activeBookings[0] && (
+							<Button asChild>
+								<Link to={`/bookings/${activeBookings[0].id}`}>
+									<ExternalLink className="mr-2 size-4" />
+									Active Booking
+								</Link>
+							</Button>
+						)}
+					</div>
+				</div>
+
+				<div className="grid gap-3 md:grid-cols-3">
+					<div className="rounded-lg border p-4">
+						<p className="text-sm text-muted-foreground">Status kendaraan</p>
+						<p className="mt-1 text-lg font-semibold">{vehicle.status}</p>
+					</div>
+					<div className="rounded-lg border p-4">
+						<p className="text-sm text-muted-foreground">Hari ter-book bulan ini</p>
+						<p className="mt-1 text-lg font-semibold">
+							{calendarLoading ? '...' : `${bookedDaysThisMonth} hari`}
+						</p>
+					</div>
+					<div className="rounded-lg border p-4">
+						<p className="text-sm text-muted-foreground">Booking berikutnya</p>
+						<p className="mt-1 text-sm font-semibold">
+							{nextScheduledBooking
+								? `${formatDate(nextScheduledBooking.startDate)} • ${nextScheduledBooking.bookingNumber}`
+								: 'Belum ada jadwal'}
+						</p>
+					</div>
+				</div>
 			</div>
 
 			{/* Availability & Bookings Section */}

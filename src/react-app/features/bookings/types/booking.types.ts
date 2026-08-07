@@ -202,6 +202,33 @@ export interface ScanReturnResult {
   endDate: string;
 }
 
+/** Result of scanning a vehicle QR / barcode for vehicle operations (POST /bookings/scan-qr) */
+export interface VehicleScanResult {
+  scanMode: "pickup_checklist" | "motor_condition_check";
+  vehicle: {
+    id: string;
+    name: string;
+    plateNumber: string | null;
+    type: string;
+  };
+  booking: {
+    id: string;
+    bookingNumber: string;
+    customerName: string;
+    customerPhone: string;
+    startDate: string;
+    endDate: string;
+    status: BookingStatus;
+    paymentType: string;
+  } | null;
+  checklistItems: Array<{
+    key: string;
+    label: string;
+    required: boolean;
+  }>;
+  message: string;
+}
+
 export interface CancelBookingRequest {
   reason: string;
 }

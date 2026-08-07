@@ -25,6 +25,7 @@ import type {
 	BookingAddon,
 	PenaltyBreakdown,
 	ScanReturnResult,
+	VehicleScanResult,
 } from '../types/booking.types';
 
 const BASE_PATH = '/v1/bookings';
@@ -188,6 +189,14 @@ export function useScanReturn() {
 	return useMutation({
 		mutationFn: (qrCode: string) =>
 			api.post<ApiSuccessResponse<ScanReturnResult>>(`${BASE_PATH}/scan-return`, { qrCode }),
+	});
+}
+
+/** Scan a vehicle QR / barcode for vehicle operations and schedule context */
+export function useScanVehicle() {
+	return useMutation({
+		mutationFn: (qrCode: string) =>
+			api.post<ApiSuccessResponse<VehicleScanResult>>(`${BASE_PATH}/scan-qr`, { qrCode }),
 	});
 }
 

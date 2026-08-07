@@ -47,6 +47,24 @@ import type {
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
+	private normalizePlateNumber(value: string): string {
+		return value.trim().toUpperCase().replace(/\s+/g, ' ');
+	}
+
+	private async resolveVehicleFromScan(raw: string): Promise<Vehicle> {
+		const vehicleId = decodeVehicleQr(raw);
+		if (vehicleId) {
+			const byId = await this.vehicleRepo.findById(vehicleId);
+			if (byId) return byId;
+		}
+
+		const normalizedPlate = this.normalizePlateNumber(raw);
+		const byPlate = await this.vehicleRepo.findByPlateNumber(normalizedPlate);
+		if (byPlate) return byPlate;
+
+		throw new NotFoundError('Vehicle');
+	}
+
 	/** Get cleaning duration in hours from config (default 4 hours) */
 	private async getCleaningDurationHours(): Promise<number> {
 		if (!this.configRepo) return 4;
@@ -78,16 +96,15 @@ export class BookingsService {
 		startDate: string;
 		endDate: string;
 	}> {
-		const vehicleId = decodeVehicleQr(qrCode);
-		if (!vehicleId) throw new ValidationError('QR code tidak valid');
+		const vehicle = await this.resolveVehicleFromScan(qrCode);
 
-		const booking = await this.bookingRepo.findActiveByVehicle(vehicleId);
+		const booking = await this.bookingRepo.findActiveByVehicle(vehicle.id);
 		if (!booking) {
 			throw new NotFoundError('Tidak ada rental aktif untuk kendaraan ini');
 		}
 
-		const [vehicle, customer] = await Promise.all([
-			this.vehicleRepo.findById(vehicleId),
+		const [freshVehicle, customer] = await Promise.all([
+			this.vehicleRepo.findById(vehicle.id),
 			this.customerRepo.findById(booking.customerId),
 		]);
 
@@ -95,7 +112,7 @@ export class BookingsService {
 			bookingId: booking.id,
 			bookingNumber: booking.bookingNumber,
 			vehicleId: booking.vehicleId,
-			vehicleName: vehicle?.name ?? 'Unknown',
+			vehicleName: freshVehicle?.name ?? vehicle.name,
 			customerName: customer?.name ?? 'Unknown',
 			status: booking.status,
 			startDate: booking.startDate,
@@ -958,18 +975,10 @@ export class BookingsService {
 	 * 2. Otherwise -> MOTOR_CONDITION_CHECK (control / pengecekan kondisi).
 	 */
 	async scanQr(qrData: string, scanTimeIso: string): Promise<QrScanResult> {
-		const vehicleId = decodeVehicleQr(qrData);
-		if (!vehicleId) {
-			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
-		}
-
-		const vehicle = await this.vehicleRepo.findById(vehicleId);
-		if (!vehicle) {
-			throw new NotFoundError('Vehicle');
-		}
+		const vehicle = await this.resolveVehicleFromScan(qrData);
 
 		const scanTime = new Date(scanTimeIso);
-		const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicleId);
+		const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicle.id);
 
 		const PICKUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
@@ -1061,15 +1070,8 @@ export class BookingsService {
 		conditionId: string;
 		rentalStarted?: boolean;
 	}> {
-		const vehicleId = decodeVehicleQr(data.qrCode);
-		if (!vehicleId) {
-			throw new ValidationError('Invalid QR code format. Expected SVN:{vehicleId}');
-		}
-
-		const vehicle = await this.vehicleRepo.findById(vehicleId);
-		if (!vehicle) {
-			throw new NotFoundError('Vehicle');
-		}
+		const vehicle = await this.resolveVehicleFromScan(data.qrCode);
+		const vehicleId = vehicle.id;
 
 		// Determine overall condition status from items
 		const allRequiredOk = Object.entries(data.items)
