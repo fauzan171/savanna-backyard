@@ -184,10 +184,13 @@ export class WebhooksService {
 		const amount = (data.paid_amount as number) ?? (data.amount as number) ?? 0;
 		const paidAt = data.paid_at as string | undefined;
 
+		if (!rawExternalId || !invoiceId) {
+			throw new Error('Invalid Xendit webhook: external_id and id are required');
+		}
+
 		const statusMapping = XENDIT_STATUS_MAP[invoiceStatus];
 		if (!statusMapping) {
-			console.error(`Unknown Xendit invoice status: ${invoiceStatus}`);
-			return;
+			throw new Error(`Unknown Xendit invoice status: ${invoiceStatus}`);
 		}
 
 		// Support remainder invoices: external_id = "{bookingNumber}-remainder"
@@ -203,8 +206,7 @@ export class WebhooksService {
 			.limit(1);
 
 		if (bookingResult.length === 0) {
-			console.error(`Booking not found for Xendit external_id: ${externalId} (raw: ${rawExternalId})`);
-			return;
+			throw new Error(`Booking not found for Xendit external_id: ${externalId} (raw: ${rawExternalId})`);
 		}
 
 		const booking = bookingResult[0]!;
@@ -240,7 +242,18 @@ export class WebhooksService {
 						updatedAt: now,
 					});
 				} catch (e) {
-					console.log('Payment record insert failed, skipping:', e);
+					// A concurrent retry may have inserted the same invoice. Only suppress
+					// the error when the idempotency record now exists; otherwise fail the
+					// webhook so Xendit retries instead of leaving the booking pending.
+					const insertedByConcurrentRequest = await this.db
+						.select({ id: payments.id })
+						.from(payments)
+						.where(eq(payments.transactionReference, invoiceId))
+						.limit(1);
+					if (insertedByConcurrentRequest.length === 0) {
+						console.error('Payment record insert failed:', e);
+						throw e;
+					}
 				}
 			}
 

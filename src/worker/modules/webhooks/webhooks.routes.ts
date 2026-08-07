@@ -135,17 +135,11 @@ const xenditNotificationHandler = async (c: Context<WebhookEnv>) => {
 
 	const service = new WebhooksService(createDb(c.env.DB), emailService);
 
-	// Run the notification handler in the background so we return 200 to Xendit immediately.
-	// Xendit has a webhook timeout; slow email sending must not block the HTTP response.
-	// Idempotency guards (existing payment check by invoiceId) make this safe to retry.
-	const handlePromise = service.handleXenditNotification(data);
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	const waitUntil = (c as any).executionCtx?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
-	if (waitUntil) {
-		waitUntil(handlePromise);
-	} else {
-		await handlePromise;
-	}
+	// Persist the payment and booking state before acknowledging the webhook.
+	// Returning 200 while this runs in waitUntil can permanently lose a payment:
+	// Xendit stops retrying even when the background database update fails.
+	// The service is idempotent by invoice id, so a timeout/retry is safe.
+	await service.handleXenditNotification(data);
 
 	return c.json({ success: true, message: 'OK' });
 };

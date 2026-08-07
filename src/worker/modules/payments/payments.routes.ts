@@ -5,6 +5,7 @@ import { ConfigRepository } from "@/worker/core/repositories/config.repository";
 import { PaymentsRepository } from "./payments.repository";
 import { PaymentsService } from "./payments.service";
 import { BookingsRepository } from "../bookings/bookings.repository";
+import { WebhooksService } from "../webhooks/webhooks.service";
 import {
   validateBody,
   validateQuery,
@@ -56,9 +57,11 @@ export const paymentsServicesMiddleware =
 // Helper to get configured gateway
 async function getGateway(
   configRepo: ConfigRepository,
+  env: Env,
 ): Promise<PaymentGateway> {
   const vendor =
-    ((await configRepo.getValue("payment_gateway_vendor")) as GatewayVendor) ??
+    ((await configRepo.getValue("payment_gateway_vendor")) as GatewayVendor | null) ??
+    (env.PAYMENT_GATEWAY_VENDOR as GatewayVendor | undefined) ??
     "manual";
 
   const config: Record<string, string> = {};
@@ -69,16 +72,10 @@ async function getGateway(
     config.isProduction =
       (await configRepo.getValue("midtrans_is_production")) ?? "false";
   } else if (vendor === "xendit") {
-    config.apiKey = (await configRepo.getValue("xendit_api_key")) ?? "";
-    config.webhookToken = (await configRepo.getValue("xendit_webhook_token")) ?? "";
+    config.apiKey = (await configRepo.getValue("xendit_api_key")) ?? env.XENDIT_API_KEY ?? "";
+    config.webhookToken = (await configRepo.getValue("xendit_webhook_token")) ?? env.XENDIT_WEBHOOK_TOKEN ?? "";
     config.isProduction =
-      (await configRepo.getValue("xendit_is_production")) ?? "false";
-    // A2: webhookToken was never populated, causing the generic
-    // /payments/webhooks/:vendor route to reject every Xendit webhook.
-    // Read from config DB so gateway.validateWebhookSignature works.
-    // (The dedicated /webhooks/xendit/notification route uses c.env directly.)
-    config.webhookToken =
-      (await configRepo.getValue("xendit_webhook_token")) ?? "";
+      (await configRepo.getValue("xendit_is_production")) ?? String(env.ENVIRONMENT === "production");
   } else if (vendor === "ifortepay") {
     // A1: wire iFortePay config so the gateway can verify webhooks
     config.merchantId = (await configRepo.getValue("ifortepay_merchant_id")) ?? "";
@@ -95,7 +92,9 @@ const getGatewayStatusHandler = async (c: Context<PaymentsEnv>) => {
   const configRepo = c.get("configRepository");
 
   const vendor =
-    (await configRepo.getValue("payment_gateway_vendor")) ?? "manual";
+    (await configRepo.getValue("payment_gateway_vendor")) ??
+    c.env.PAYMENT_GATEWAY_VENDOR ??
+    "manual";
   const isConfigured = vendor !== "manual";
 
   // Get supported methods based on vendor
@@ -120,7 +119,9 @@ const handleWebhookHandler = async (c: Context<PaymentsEnv>) => {
 
   // Validate vendor matches configured gateway
   const configuredVendor =
-    (await configRepo.getValue("payment_gateway_vendor")) ?? "manual";
+    (await configRepo.getValue("payment_gateway_vendor")) ??
+    c.env.PAYMENT_GATEWAY_VENDOR ??
+    "manual";
   if (vendor !== configuredVendor) {
     return c.json(
       {
@@ -135,18 +136,25 @@ const handleWebhookHandler = async (c: Context<PaymentsEnv>) => {
   }
 
   try {
-    const gateway = await getGateway(configRepo);
+    const gateway = await getGateway(configRepo, c.env);
     const payload = await c.req.json();
     const headers = Object.fromEntries(c.req.raw.headers);
 
     const webhookResult = await gateway.handleWebhook(payload, headers);
+
+    // Keep the legacy Xendit URL functional, but route it through the same
+    // idempotent booking/payment updater as the canonical webhook endpoint.
+    if (vendor === "xendit") {
+      await new WebhooksService(createDb(c.env.DB)).handleXenditNotification(
+        payload as Record<string, unknown>,
+      );
+      return c.json({ success: true, message: "Webhook processed" });
+    }
     const service = c.get("paymentsService");
     const data = payload as Record<string, string>;
 
-    // Resolve booking number: Xendit uses `external_id`, Midtrans uses `order_id`
-    const bookingNumber = vendor === "xendit"
-      ? (data.external_id ?? "")
-      : (data.order_id ?? "");
+    // Xendit returned above; the remaining legacy gateways use order_id.
+    const bookingNumber = data.order_id ?? "";
 
     if (!bookingNumber) {
       console.error(`Webhook missing booking identifier for vendor ${vendor}`);
@@ -158,14 +166,8 @@ const handleWebhookHandler = async (c: Context<PaymentsEnv>) => {
     const booking = await bookingsRepo.findByBookingNumber(bookingNumber);
 
     if (booking) {
-      // Resolve payment method based on vendor
-      let method: "QRIS" | "Gateway" | "BankTransfer" | "Cash" = "BankTransfer";
-      if (vendor === "xendit") {
-        method = data.payment_method === "QRIS" ? "QRIS" : "Gateway";
-      } else {
-        // Midtrans
-        method = data.payment_type === "qris" ? "QRIS" : "BankTransfer";
-      }
+      const method: "QRIS" | "BankTransfer" =
+        data.payment_type === "qris" ? "QRIS" : "BankTransfer";
 
       try {
         const created = await service.create({
