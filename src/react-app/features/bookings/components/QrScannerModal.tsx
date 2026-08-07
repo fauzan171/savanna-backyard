@@ -111,7 +111,15 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 		if (!element || scannerRef.current) return;
 
 		try {
-			const scanner = new Html5Qrcode(SCANNER_ID);
+			const scanner = new Html5Qrcode(SCANNER_ID, {
+				formatsToSupport: [
+					Html5QrcodeSupportedFormats.QR_CODE,
+					Html5QrcodeSupportedFormats.CODE_128,
+					Html5QrcodeSupportedFormats.CODE_39,
+					Html5QrcodeSupportedFormats.EAN_13,
+					Html5QrcodeSupportedFormats.EAN_8,
+				],
+			});
 			scannerRef.current = scanner;
 
 			await scanner.start(
@@ -120,13 +128,6 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 					fps: 10,
 					qrbox: { width: 250, height: 250 },
 					aspectRatio: 1.0,
-					formatsToSupport: [
-						Html5QrcodeSupportedFormats.QR_CODE,
-						Html5QrcodeSupportedFormats.CODE_128,
-						Html5QrcodeSupportedFormats.CODE_39,
-						Html5QrcodeSupportedFormats.EAN_13,
-						Html5QrcodeSupportedFormats.EAN_8,
-					],
 				},
 				(decodedText) => {
 					void handleScan(decodedText);
