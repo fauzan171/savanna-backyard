@@ -7,6 +7,14 @@ import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
 import { createWhatsAppProvider } from '@/worker/core/services/providers';
 import { publicUserAuthMiddleware, optionalPublicUserAuth, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
+import {
+	publicAuthInitRateLimit,
+	publicAuthVerifyRateLimit,
+	publicDevLoginRateLimit,
+	publicVehicleScanRateLimit,
+	publicInspectionUploadRateLimit,
+	publicInspectionSubmitRateLimit,
+} from '@/worker/core/middleware/rate-limit';
 import { validateBody, getValidatedBody } from '@/worker/core/middleware/validator';
 import { PublicUsersRepository } from './public-users.repository';
 import { PublicUsersService } from './public-users.service';
@@ -166,9 +174,9 @@ export function createPublicAuthRouter(): Hono<PublicUsersEnv> {
 	router.use('*', publicUsersServicesMiddleware());
 
 	// Login (no cookie yet)
-	router.post('/phone/init', validateBody(phoneInitSchema), phoneInitHandler);
-	router.post('/phone/verify', validateBody(phoneVerifySchema), phoneVerifyHandler);
-	router.post('/dev/login', validateBody(devLoginSchema), devLoginHandler);
+	router.post('/phone/init', publicAuthInitRateLimit(), validateBody(phoneInitSchema), phoneInitHandler);
+	router.post('/phone/verify', publicAuthVerifyRateLimit(), validateBody(phoneVerifySchema), phoneVerifyHandler);
+	router.post('/dev/login', publicDevLoginRateLimit(), validateBody(devLoginSchema), devLoginHandler);
 
 	// /me: graceful fallback — returns null when no valid public-user token
 	// (guests, or admin cookies that are ignored by optionalPublicUserAuth)
@@ -307,9 +315,9 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 	router.get('/bookings/:id', myBookingDetailHandler);
 	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
-	router.post('/bookings/:id/scan-vehicle', requirePhoneVerified(), validateBody(confirmPickupSchema), scanCustomerVehicleHandler);
-	router.post('/bookings/:id/inspection-photos', requirePhoneVerified(), uploadCustomerInspectionPhotoHandler);
-	router.post('/bookings/:id/inspections', requirePhoneVerified(), validateBody(customerInspectionSchema), submitCustomerInspectionHandler);
+	router.post('/bookings/:id/scan-vehicle', requirePhoneVerified(), publicVehicleScanRateLimit(), validateBody(confirmPickupSchema), scanCustomerVehicleHandler);
+	router.post('/bookings/:id/inspection-photos', requirePhoneVerified(), publicInspectionUploadRateLimit(), uploadCustomerInspectionPhotoHandler);
+	router.post('/bookings/:id/inspections', requirePhoneVerified(), publicInspectionSubmitRateLimit(), validateBody(customerInspectionSchema), submitCustomerInspectionHandler);
 
 	return router;
 }

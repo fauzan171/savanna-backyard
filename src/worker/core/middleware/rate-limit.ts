@@ -68,3 +68,27 @@ export function loginRateLimit() {
 export function publicApiRateLimit() {
   return rateLimit({ maxRequests: 100, windowSeconds: 60, prefix: 'public' });
 }
+
+export function publicAuthInitRateLimit() {
+  return rateLimit({ maxRequests: 3, windowSeconds: 3600, prefix: 'public-auth-init' });
+}
+
+export function publicAuthVerifyRateLimit() {
+  return rateLimit({ maxRequests: 5, windowSeconds: 900, prefix: 'public-auth-verify' });
+}
+
+export function publicDevLoginRateLimit() {
+  return rateLimit({ maxRequests: 5, windowSeconds: 900, prefix: 'public-dev-login' });
+}
+
+export function publicVehicleScanRateLimit() {
+  return rateLimit({ maxRequests: 20, windowSeconds: 300, prefix: 'public-scan-vehicle' });
+}
+
+export function publicInspectionUploadRateLimit() {
+  return rateLimit({ maxRequests: 20, windowSeconds: 300, prefix: 'public-inspection-upload' });
+}
+
+export function publicInspectionSubmitRateLimit() {
+  return rateLimit({ maxRequests: 10, windowSeconds: 300, prefix: 'public-inspection-submit' });
+}

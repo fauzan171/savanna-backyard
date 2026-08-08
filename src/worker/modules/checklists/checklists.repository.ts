@@ -10,16 +10,23 @@ export class ChecklistsRepository {
 		return result[0] ?? null;
 	}
 
-	async findByBookingId(bookingId: string): Promise<{ pickup: VehicleChecklist | null; return: VehicleChecklist | null }> {
+	async findByBookingId(bookingId: string): Promise<{
+		customerPickup: VehicleChecklist | null;
+		adminPickup: VehicleChecklist | null;
+		customerReturn: VehicleChecklist | null;
+		adminReturn: VehicleChecklist | null;
+	}> {
 		const results = await this.db
 			.select()
 			.from(vehicleChecklists)
 			.where(eq(vehicleChecklists.bookingId, bookingId));
 
-		const pickup = results.find((r) => r.type === 'pickup' && r.submissionSource === 'admin') ?? null;
-		const returnChecklist = results.find((r) => r.type === 'return' && r.submissionSource === 'admin') ?? null;
+		const customerPickup = results.find((r) => r.type === 'pickup' && r.submissionSource === 'customer') ?? null;
+		const adminPickup = results.find((r) => r.type === 'pickup' && r.submissionSource === 'admin') ?? null;
+		const customerReturn = results.find((r) => r.type === 'return' && r.submissionSource === 'customer') ?? null;
+		const adminReturn = results.find((r) => r.type === 'return' && r.submissionSource === 'admin') ?? null;
 
-		return { pickup, return: returnChecklist };
+		return { customerPickup, adminPickup, customerReturn, adminReturn };
 	}
 
 	async findByBookingAndType(bookingId: string, type: 'pickup' | 'return'): Promise<VehicleChecklist | null> {

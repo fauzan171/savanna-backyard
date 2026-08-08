@@ -25,6 +25,10 @@ export interface ChecklistResponse {
 export interface ChecklistsByBooking {
   pickup: ChecklistResponse | null;
   return: ChecklistResponse | null;
+  customerPickup: ChecklistResponse | null;
+  adminPickup: ChecklistResponse | null;
+  customerReturn: ChecklistResponse | null;
+  adminReturn: ChecklistResponse | null;
 }
 
 // ============================================

@@ -87,8 +87,13 @@ export class ChecklistsService {
 	async getByBookingId(bookingId: string): Promise<ChecklistsByBooking> {
 		const result = await this.checklistRepo.findByBookingId(bookingId);
 		return {
-			pickup: result.pickup ? this.toResponse(result.pickup) : null,
-			return: result.return ? this.toResponse(result.return) : null,
+			// Legacy aliases kept for the current UI; they point to the admin/final checklist.
+			pickup: result.adminPickup ? this.toResponse(result.adminPickup) : null,
+			return: result.adminReturn ? this.toResponse(result.adminReturn) : null,
+			customerPickup: result.customerPickup ? this.toResponse(result.customerPickup) : null,
+			adminPickup: result.adminPickup ? this.toResponse(result.adminPickup) : null,
+			customerReturn: result.customerReturn ? this.toResponse(result.customerReturn) : null,
+			adminReturn: result.adminReturn ? this.toResponse(result.adminReturn) : null,
 		};
 	}
 

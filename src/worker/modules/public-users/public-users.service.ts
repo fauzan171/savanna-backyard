@@ -529,7 +529,13 @@ export class PublicUsersService {
 		}
 		const scan = await this.scanCustomerVehicle(publicUserId, bookingIdOrNumber, data.qrCode);
 		if (scan.phase !== data.phase) throw new ValidationError('Tahap pemeriksaan tidak sesuai dengan status booking');
-		const required = this.checklistItems(data.phase).filter((item) => item.required);
+		const allowedItems = this.checklistItems(data.phase);
+		const allowedKeys = new Set(allowedItems.map((item) => item.key));
+		const required = allowedItems.filter((item) => item.required);
+		const unknownKeys = Object.keys(data.items).filter((key) => !allowedKeys.has(key));
+		if (unknownKeys.length > 0) {
+			throw new ValidationError(`Checklist item tidak dikenali: ${unknownKeys.join(', ')}`);
+		}
 		if (required.some((item) => data.items[item.key] === undefined)) throw new ValidationError('Semua checklist wajib harus diisi');
 		if (Object.values(data.items).includes('issue') && !data.notes?.trim()) throw new ValidationError('Catatan wajib diisi jika ada kondisi bermasalah');
 
