@@ -16,8 +16,8 @@ export class ChecklistsRepository {
 			.from(vehicleChecklists)
 			.where(eq(vehicleChecklists.bookingId, bookingId));
 
-		const pickup = results.find((r) => r.type === 'pickup') ?? null;
-		const returnChecklist = results.find((r) => r.type === 'return') ?? null;
+		const pickup = results.find((r) => r.type === 'pickup' && r.submissionSource === 'admin') ?? null;
+		const returnChecklist = results.find((r) => r.type === 'return' && r.submissionSource === 'admin') ?? null;
 
 		return { pickup, return: returnChecklist };
 	}
@@ -28,7 +28,8 @@ export class ChecklistsRepository {
 			.from(vehicleChecklists)
 			.where(and(
 				eq(vehicleChecklists.bookingId, bookingId),
-				eq(vehicleChecklists.type, type)
+				eq(vehicleChecklists.type, type),
+				eq(vehicleChecklists.submissionSource, 'admin')
 			))
 			.limit(1);
 		return result[0] ?? null;

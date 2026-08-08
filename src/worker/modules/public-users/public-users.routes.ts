@@ -15,11 +15,13 @@ import {
 	phoneVerifySchema,
 	updateProfileSchema,
 	confirmPickupSchema,
+	customerInspectionSchema,
 	devLoginSchema,
 	type PhoneInitRequest,
 	type PhoneVerifyRequest,
 	type UpdateProfileRequest,
 	type ConfirmPickupRequest,
+	type CustomerInspectionRequest,
 	type DevLoginRequest,
 } from './public-users.dto';
 
@@ -217,12 +219,83 @@ const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
 	return c.json({ success: true, message: 'Remainder payment invoice created', data: result });
 };
 
-const confirmPickupHandler = async (c: Context<PublicUsersEnv>) => {
+const scanCustomerVehicleHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
 	const body = getValidatedBody<ConfirmPickupRequest>(c);
-	const result = await service.confirmPickup(pu.publicUserId, c.req.param('id'), body.qrCode);
-	return c.json({ success: true, message: 'Pickup confirmed', data: result });
+	const result = await service.scanCustomerVehicle(pu.publicUserId, c.req.param('id'), body.qrCode);
+	return c.json({ success: true, data: result });
+};
+
+const submitCustomerInspectionHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const body = getValidatedBody<CustomerInspectionRequest>(c);
+	if (!c.env.UPLOADS) return c.json({ success: false, error: { code: 'NO_BUCKET', message: 'R2 bucket not configured' } }, 500);
+	const booking = await service.myBookingDetail(pu.publicUserId, c.req.param('id'));
+	const prefix = `customer-inspections/${booking.id}/${body.phase}/`;
+	for (const photo of body.photos) {
+		let pathname = photo;
+		try {
+			if (photo.startsWith('http')) pathname = new URL(photo).pathname;
+		} catch {
+			return c.json({ success: false, error: { code: 'INVALID_PHOTO', message: 'Inspection photo path is invalid' } }, 400);
+		}
+		const marker = '/api/v1/uploads/';
+		if (!pathname.startsWith(marker)) return c.json({ success: false, error: { code: 'INVALID_PHOTO', message: 'Inspection photo path is invalid' } }, 400);
+		const key = decodeURIComponent(pathname.slice(marker.length));
+		if (!key.startsWith(prefix) || !(await c.env.UPLOADS.head(key))) {
+			return c.json({ success: false, error: { code: 'INVALID_PHOTO', message: 'Inspection photo does not belong to this booking and phase' } }, 400);
+		}
+	}
+	const result = await service.submitCustomerInspection(pu.publicUserId, c.req.param('id'), body);
+	return c.json({ success: true, message: 'Vehicle inspection submitted', data: result }, 201);
+};
+
+const INSPECTION_MAGIC_BYTES: Record<string, number[]> = {
+	'image/jpeg': [0xff, 0xd8, 0xff],
+	'image/png': [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+	'image/webp': [0x52, 0x49, 0x46, 0x46],
+};
+
+const uploadCustomerInspectionPhotoHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const bookingId = c.req.param('id');
+	if (!c.env.UPLOADS) return c.json({ success: false, error: { code: 'NO_BUCKET', message: 'R2 bucket not configured' } }, 500);
+	if (!(c.req.header('Content-Type') ?? '').startsWith('multipart/form-data')) {
+		return c.json({ success: false, error: { code: 'INVALID_CONTENT_TYPE', message: 'Expected multipart/form-data' } }, 400);
+	}
+	const form = await c.req.formData();
+	const qrCode = form.get('qrCode');
+	const phase = form.get('phase');
+	if (typeof qrCode !== 'string' || (phase !== 'pickup' && phase !== 'return')) {
+		return c.json({ success: false, error: { code: 'INVALID_CONTEXT', message: 'qrCode and phase are required' } }, 400);
+	}
+	const scan = await service.scanCustomerVehicle(pu.publicUserId, bookingId, qrCode);
+	if (scan.phase !== phase) return c.json({ success: false, error: { code: 'INVALID_PHASE', message: 'Inspection phase is no longer valid' } }, 409);
+	const prefix = `customer-inspections/${scan.booking.id}/${phase}/`;
+	const existingUploads = await c.env.UPLOADS.list({ prefix, limit: 8 });
+	if (existingUploads.objects.length >= 8) return c.json({ success: false, error: { code: 'UPLOAD_LIMIT', message: 'Photo upload limit reached for this inspection' } }, 429);
+	const file = form.get('file');
+	if (!file || typeof file === 'string') return c.json({ success: false, error: { code: 'NO_FILE', message: 'No file provided' } }, 400);
+	const upload = file as unknown as File;
+	if (!Object.hasOwn(INSPECTION_MAGIC_BYTES, upload.type)) {
+		return c.json({ success: false, error: { code: 'INVALID_TYPE', message: 'Only JPEG, PNG, and WebP images are allowed' } }, 400);
+	}
+	if (upload.size > 5 * 1024 * 1024) return c.json({ success: false, error: { code: 'FILE_TOO_LARGE', message: 'File must be under 5MB' } }, 400);
+	const buffer = await upload.arrayBuffer();
+	const bytes = new Uint8Array(buffer.slice(0, 12));
+	const primaryMagicValid = INSPECTION_MAGIC_BYTES[upload.type]!.every((byte, index) => bytes[index] === byte);
+	const webpMagicValid = upload.type !== 'image/webp' || String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+	if (!primaryMagicValid || !webpMagicValid) {
+		return c.json({ success: false, error: { code: 'INVALID_FILE', message: 'File content does not match its type' } }, 400);
+	}
+	const extension = upload.type === 'image/png' ? 'png' : upload.type === 'image/webp' ? 'webp' : 'jpg';
+	const key = `${prefix}${crypto.randomUUID()}.${extension}`;
+	await c.env.UPLOADS.put(key, buffer, { httpMetadata: { contentType: upload.type } });
+	const path = `/api/v1/uploads/${key}`;
+	return c.json({ success: true, data: { key, url: path } }, 201);
 };
 
 export function createPublicMeRouter(): Hono<PublicUsersEnv> {
@@ -234,8 +307,9 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 	router.get('/bookings/:id', myBookingDetailHandler);
 	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
-	// Confirm pickup via QR scan (requires a verified account)
-	router.post('/bookings/:id/confirm-pickup', requirePhoneVerified(), validateBody(confirmPickupSchema), confirmPickupHandler);
+	router.post('/bookings/:id/scan-vehicle', requirePhoneVerified(), validateBody(confirmPickupSchema), scanCustomerVehicleHandler);
+	router.post('/bookings/:id/inspection-photos', requirePhoneVerified(), uploadCustomerInspectionPhotoHandler);
+	router.post('/bookings/:id/inspections', requirePhoneVerified(), validateBody(customerInspectionSchema), submitCustomerInspectionHandler);
 
 	return router;
 }

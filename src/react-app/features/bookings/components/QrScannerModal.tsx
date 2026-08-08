@@ -112,6 +112,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 
 		try {
 			const scanner = new Html5Qrcode(SCANNER_ID, {
+				verbose: false,
 				formatsToSupport: [
 					Html5QrcodeSupportedFormats.QR_CODE,
 					Html5QrcodeSupportedFormats.CODE_128,

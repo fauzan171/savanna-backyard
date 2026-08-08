@@ -17,6 +17,7 @@ export class ChecklistsService {
 			bookingId: checklist.bookingId,
 			vehicleId: checklist.vehicleId,
 			type: checklist.type,
+			submissionSource: checklist.submissionSource,
 			items: JSON.parse(checklist.items) as ChecklistItems,
 			kmReading: checklist.kmReading,
 			fuelLevel: checklist.fuelLevel,
@@ -24,6 +25,7 @@ export class ChecklistsService {
 			notes: checklist.notes,
 			damageNotes: checklist.damageNotes,
 			createdBy: checklist.createdBy,
+			createdByPublicUserId: checklist.createdByPublicUserId,
 			createdAt: checklist.createdAt,
 			updatedAt: checklist.updatedAt,
 		};
@@ -66,6 +68,7 @@ export class ChecklistsService {
 			bookingId: data.bookingId,
 			vehicleId: booking.vehicleId,
 			type: data.type,
+			submissionSource: 'admin',
 			items: JSON.stringify(data.items),
 			kmReading: data.kmReading,
 			fuelLevel: data.fuelLevel ?? null,
@@ -73,6 +76,7 @@ export class ChecklistsService {
 			notes: data.notes ?? null,
 			damageNotes: data.damageNotes ?? null,
 			createdBy: userId,
+			createdByPublicUserId: null,
 			createdAt: now,
 			updatedAt: now,
 		});

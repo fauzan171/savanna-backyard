@@ -5,7 +5,7 @@ import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import { PaymentGatewayFactory } from '@/worker/core/services/payment-gateway/factory';
 import type { WhatsAppProvider } from '@/worker/core/services/providers';
 import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
-import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest, DevLoginRequest } from './public-users.dto';
+import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest, DevLoginRequest, CustomerInspectionRequest } from './public-users.dto';
 import type { PublicUser, Booking } from '@/worker/core/database/schema';
 
 const REF_EXPIRY_MIN = 5;
@@ -39,6 +39,13 @@ export interface PublicBookingSummary {
 	dpAmount: number | null;
 	remainingAmount: number | null;
 	pickupConfirmed: boolean | null;
+	pickupConfirmedAt: string | null;
+	returnConfirmed: boolean | null;
+	returnConfirmedAt: string | null;
+	pickupChecklistId: string | null;
+	returnChecklistId: string | null;
+	customerPickupChecklistId: string | null;
+	customerReturnChecklistId: string | null;
 	createdAt: string;
 }
 
@@ -67,6 +74,13 @@ function toBookingSummary(b: Booking): PublicBookingSummary {
 		dpAmount: b.dpAmount,
 		remainingAmount: b.remainingAmount,
 		pickupConfirmed: b.pickupConfirmed,
+		pickupConfirmedAt: b.pickupConfirmedAt,
+		returnConfirmed: b.returnConfirmed,
+		returnConfirmedAt: b.returnConfirmedAt,
+		pickupChecklistId: b.pickupChecklistId,
+		returnChecklistId: b.returnChecklistId,
+		customerPickupChecklistId: b.customerPickupChecklistId,
+		customerReturnChecklistId: b.customerReturnChecklistId,
 		createdAt: b.createdAt,
 	};
 }
@@ -449,37 +463,100 @@ export class PublicUsersService {
 		};
 	}
 
-	/**
-	 * Confirm pickup by scanning the vehicle QR code. Soft-confirm: sets
-	 * pickupConfirmed + status=Active. Does NOT record startKm or flip the vehicle
-	 * to Rented — the admin's physical handover (pickup checklist + startRental)
-	 * still owns that. Kept here to avoid coupling the public-users service into
-	 * BookingsService.
-	 */
-	async confirmPickup(publicUserId: string, bookingIdOrNumber: string, qrCode: string): Promise<PublicBookingSummary> {
-		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
-		if (!b) throw new NotFoundError('Booking');
+	private checklistItems(phase: 'pickup' | 'return') {
+		if (phase === 'pickup') {
+			return [
+				{ key: 'fuel_level', label: 'Bensin sesuai informasi serah-terima', required: true },
+				{ key: 'tire_condition', label: 'Ban dalam kondisi baik', required: true },
+				{ key: 'brake_function', label: 'Rem depan dan belakang berfungsi', required: true },
+				{ key: 'lights_function', label: 'Lampu dan sein berfungsi', required: true },
+				{ key: 'horn_mirror', label: 'Klakson dan spion lengkap', required: true },
+				{ key: 'body_condition', label: 'Kondisi body sudah diperiksa', required: true },
+				{ key: 'helmet_count', label: 'Helm diterima sesuai booking', required: true },
+			];
+		}
+		return [
+			{ key: 'engine_condition', label: 'Mesin dapat dinyalakan dan tidak bersuara aneh', required: true },
+			{ key: 'tire_condition', label: 'Ban tidak bocor atau rusak', required: true },
+			{ key: 'brake_function', label: 'Rem depan dan belakang berfungsi', required: true },
+			{ key: 'lights_function', label: 'Lampu dan sein berfungsi', required: true },
+			{ key: 'body_condition', label: 'Body sudah diperiksa untuk kerusakan baru', required: true },
+			{ key: 'equipment_returned', label: 'Helm dan perlengkapan sudah dikembalikan', required: true },
+		];
+	}
 
-		const scannedVehicleId = decodeVehicleQr(qrCode);
-		if (!scannedVehicleId) throw new ValidationError('QR code tidak valid');
-		if (b.vehicleId !== scannedVehicleId) {
-			throw new ValidationError('QR code tidak sesuai dengan kendaraan pada booking ini');
-		}
-		if (b.status !== 'Confirmed') {
-			throw new ValidationError(`Status booking "${b.status}" tidak memungkinkan konfirmasi pickup`);
-		}
-		if (b.pickupConfirmed) {
-			throw new ValidationError('Pickup sudah dikonfirmasi sebelumnya');
+	async scanCustomerVehicle(publicUserId: string, bookingIdOrNumber: string, qrCode: string) {
+		const booking = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
+		if (!booking) throw new NotFoundError('Booking');
+		const vehicleId = decodeVehicleQr(qrCode);
+		if (!vehicleId || vehicleId !== booking.vehicleId) throw new ValidationError('Barcode tidak sesuai dengan motor pada booking ini');
+
+		let phase: 'pickup' | 'return';
+		if (!booking.pickupConfirmed) {
+			if (booking.status !== 'Confirmed') throw new ValidationError(`Booking berstatus ${booking.status} dan belum dapat diambil`);
+			const paymentReady = ['settlement', 'fully_paid'].includes(booking.paymentStatus ?? '') || booking.fullyPaidAt !== null;
+			if (!paymentReady) throw new ValidationError('Pembayaran harus lunas sebelum pengambilan motor');
+			const opensAt = new Date(booking.startDate).getTime() - 60 * 60 * 1000;
+			if (Date.now() < opensAt) throw new ValidationError('Scan pickup baru dibuka satu jam sebelum jadwal pengambilan');
+			if (Date.now() > new Date(booking.endDate).getTime()) throw new ValidationError('Jadwal booking sudah berakhir. Hubungi admin untuk penjadwalan ulang');
+			phase = 'pickup';
+		} else {
+			if (booking.status !== 'Active') throw new ValidationError('Rental tidak sedang aktif');
+			if (booking.returnConfirmed) throw new ValidationError('Pengembalian sudah diajukan dan sedang menunggu admin');
+			phase = 'return';
 		}
 
-		const paymentReady =
-			b.paymentStatus === 'settlement' ||
-			b.fullyPaidAt !== null;
-		if (!paymentReady) {
-			throw new ValidationError('Pembayaran belum lunas. Selesaikan pembayaran penuh sebelum pickup.');
+		const vehicle = await this.repo.findVehicleById(booking.vehicleId);
+		if (!vehicle) throw new NotFoundError('Vehicle');
+		return {
+			phase,
+			vehicle: { id: vehicle.id, name: vehicle.name, plateNumber: vehicle.plateNumber, type: vehicle.type, image: vehicle.photoUrl },
+			booking: toBookingSummary(booking),
+			checklistItems: this.checklistItems(phase),
+			message: phase === 'pickup' ? 'Catat kondisi awal sebelum motor digunakan.' : 'Catat kondisi akhir untuk diverifikasi admin.',
+		};
+	}
+
+	async submitCustomerInspection(publicUserId: string, bookingIdOrNumber: string, data: CustomerInspectionRequest) {
+		const booking = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
+		if (!booking) throw new NotFoundError('Booking');
+		if (decodeVehicleQr(data.qrCode) !== booking.vehicleId) throw new ValidationError('Barcode tidak sesuai dengan motor pada booking ini');
+		const existing = await this.repo.findChecklist(booking.id, data.phase);
+		if (existing) {
+			if (existing.createdByPublicUserId !== publicUserId) throw new ValidationError(`Checklist ${data.phase} sudah pernah dikirim`);
+			const repaired = await this.repo.recordExistingCustomerInspection(booking.id, data.phase, existing.id);
+			return { booking: toBookingSummary(repaired), verificationStatus: 'pending_admin' as const };
+		}
+		const scan = await this.scanCustomerVehicle(publicUserId, bookingIdOrNumber, data.qrCode);
+		if (scan.phase !== data.phase) throw new ValidationError('Tahap pemeriksaan tidak sesuai dengan status booking');
+		const required = this.checklistItems(data.phase).filter((item) => item.required);
+		if (required.some((item) => data.items[item.key] === undefined)) throw new ValidationError('Semua checklist wajib harus diisi');
+		if (Object.values(data.items).includes('issue') && !data.notes?.trim()) throw new ValidationError('Catatan wajib diisi jika ada kondisi bermasalah');
+
+		if (data.phase === 'return' && booking.startKm !== null && data.kmReading < booking.startKm) {
+			throw new ValidationError('Kilometer pengembalian tidak boleh lebih kecil dari kilometer pickup');
 		}
 
-		const updated = await this.repo.confirmPickup(b.id);
-		return toBookingSummary(updated);
+		try {
+			const result = await this.repo.createAndRecordCustomerInspection({
+				bookingId: booking.id,
+				vehicleId: booking.vehicleId,
+				type: data.phase,
+				items: data.items,
+				kmReading: data.kmReading,
+				fuelLevel: data.fuelLevel,
+				photos: data.photos,
+				notes: data.notes,
+				publicUserId,
+			});
+			return { booking: toBookingSummary(result.booking), verificationStatus: 'pending_admin' as const };
+		} catch (error) {
+			// A concurrent retry can lose the unique-index race. Recover the
+			// already committed customer submission instead of surfacing a 500.
+			const concurrent = await this.repo.findChecklist(booking.id, data.phase);
+			if (!concurrent || concurrent.createdByPublicUserId !== publicUserId) throw error;
+			const repaired = await this.repo.recordExistingCustomerInspection(booking.id, data.phase, concurrent.id);
+			return { booking: toBookingSummary(repaired), verificationStatus: 'pending_admin' as const };
+		}
 	}
 }

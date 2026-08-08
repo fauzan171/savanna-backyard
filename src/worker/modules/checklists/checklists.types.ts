@@ -9,13 +9,15 @@ export interface ChecklistResponse {
 	bookingId: string;
 	vehicleId: string;
 	type: ChecklistType;
+	submissionSource: 'admin' | 'customer';
 	items: ChecklistItems;
 	kmReading: number;
 	fuelLevel: number | null;
 	photos: string[];
 	notes: string | null;
 	damageNotes: string | null;
-	createdBy: string;
+	createdBy: string | null;
+	createdByPublicUserId: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

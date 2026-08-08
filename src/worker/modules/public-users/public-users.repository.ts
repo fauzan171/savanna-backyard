@@ -5,11 +5,15 @@ import {
 	verificationCodes,
 	bookings,
 	customers,
+	vehicles,
+	vehicleChecklists,
 	type PublicUser,
 	type NewPublicUser,
 	type VerificationCode,
 	type NewVerificationCode,
 	type Booking,
+	type Vehicle,
+	type VehicleChecklist,
 } from '@/worker/core/database/schema';
 
 export class PublicUsersRepository {
@@ -177,15 +181,72 @@ export class PublicUsersRepository {
 		return b ?? null;
 	}
 
-	/** Mark a booking as pickup-confirmed and activate it (soft confirm — no startKm). */
-	async confirmPickup(bookingId: string): Promise<Booking> {
+	async findVehicleById(vehicleId: string): Promise<Vehicle | null> {
+		const [vehicle] = await this.db.select().from(vehicles).where(eq(vehicles.id, vehicleId)).limit(1);
+		return vehicle ?? null;
+	}
+
+	async findChecklist(bookingId: string, type: 'pickup' | 'return'): Promise<VehicleChecklist | null> {
+		const [checklist] = await this.db
+			.select()
+			.from(vehicleChecklists)
+			.where(and(
+				eq(vehicleChecklists.bookingId, bookingId),
+				eq(vehicleChecklists.type, type),
+				eq(vehicleChecklists.submissionSource, 'customer'),
+			))
+			.limit(1);
+		return checklist ?? null;
+	}
+
+	async createAndRecordCustomerInspection(data: {
+		bookingId: string;
+		vehicleId: string;
+		type: 'pickup' | 'return';
+		items: Record<string, 'ok' | 'issue'>;
+		kmReading: number;
+		fuelLevel?: number | null;
+		photos: string[];
+		notes?: string | null;
+		publicUserId: string;
+	}): Promise<{ checklist: VehicleChecklist; booking: Booking }> {
+		const id = crypto.randomUUID();
 		const now = new Date().toISOString();
-		await this.db
-			.update(bookings)
-			.set({ pickupConfirmed: true, pickupConfirmedAt: now, status: 'Active', updatedAt: now })
-			.where(eq(bookings.id, bookingId));
-		const [b] = await this.db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
-		return b!;
+		const insertChecklist = this.db.insert(vehicleChecklists).values({
+			id,
+			bookingId: data.bookingId,
+			vehicleId: data.vehicleId,
+			type: data.type,
+			submissionSource: 'customer',
+			items: JSON.stringify(data.items),
+			kmReading: data.kmReading,
+			fuelLevel: data.fuelLevel ?? null,
+			photos: JSON.stringify(data.photos),
+			notes: data.notes ?? null,
+			damageNotes: data.type === 'return' ? data.notes ?? null : null,
+			createdBy: null,
+			createdByPublicUserId: data.publicUserId,
+		});
+		const bookingUpdate = data.type === 'pickup'
+			? { pickupConfirmed: true, pickupConfirmedAt: now, customerPickupChecklistId: id, updatedAt: now }
+			: { returnConfirmed: true, returnConfirmedAt: now, customerReturnChecklistId: id, updatedAt: now };
+		await this.db.batch([
+			insertChecklist,
+			this.db.update(bookings).set(bookingUpdate).where(eq(bookings.id, data.bookingId)),
+		]);
+		const [created] = await this.db.select().from(vehicleChecklists).where(eq(vehicleChecklists.id, id)).limit(1);
+		const [booking] = await this.db.select().from(bookings).where(eq(bookings.id, data.bookingId)).limit(1);
+		return { checklist: created!, booking: booking! };
+	}
+
+	async recordExistingCustomerInspection(bookingId: string, type: 'pickup' | 'return', checklistId: string): Promise<Booking> {
+		const now = new Date().toISOString();
+		const update = type === 'pickup'
+			? { pickupConfirmed: true, pickupConfirmedAt: now, customerPickupChecklistId: checklistId, updatedAt: now }
+			: { returnConfirmed: true, returnConfirmedAt: now, customerReturnChecklistId: checklistId, updatedAt: now };
+		await this.db.update(bookings).set(update).where(eq(bookings.id, bookingId));
+		const [booking] = await this.db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
+		return booking!;
 	}
 
 	/** Update payment link and Xendit invoice id on a booking (e.g. remainder payment). */

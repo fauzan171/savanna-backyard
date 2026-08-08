@@ -60,6 +60,8 @@ export const bookings = sqliteTable('bookings', {
 	// Soft refs to vehicle_checklists (no FK to avoid circular friction in SQLite)
 	pickupChecklistId: text('pickup_checklist_id'),
 	returnChecklistId: text('return_checklist_id'),
+	customerPickupChecklistId: text('customer_pickup_checklist_id'),
+	customerReturnChecklistId: text('customer_return_checklist_id'),
 	createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 	updatedAt: text('updated_at').notNull().$defaultFn(() => new Date().toISOString()),
 }, (table) => ({

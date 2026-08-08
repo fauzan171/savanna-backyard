@@ -31,3 +31,14 @@ export const confirmPickupSchema = z.object({
 	qrCode: z.string().min(1, 'QR code is required'),
 });
 export type ConfirmPickupRequest = z.infer<typeof confirmPickupSchema>;
+
+export const customerInspectionSchema = z.object({
+	qrCode: z.string().min(1, 'QR code is required'),
+	phase: z.enum(['pickup', 'return']),
+	items: z.record(z.enum(['ok', 'issue'])).refine((items) => Object.keys(items).length > 0, 'Checklist is required'),
+	kmReading: z.number().min(0),
+	fuelLevel: z.number().int().min(0).max(100).optional().nullable(),
+	photos: z.array(z.string().min(1)).min(1, 'At least one vehicle photo is required').max(6),
+	notes: z.string().max(2000).optional().nullable(),
+});
+export type CustomerInspectionRequest = z.infer<typeof customerInspectionSchema>;
