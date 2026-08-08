@@ -28,12 +28,31 @@ function safeJsonParseStringArray(value: string | null | undefined): string[] {
   return Array.isArray(parsed) ? parsed.map((v) => String(v)) : [];
 }
 
-/** Parse a 'YYYY-MM-DD' string into a UTC Date (timezone-safe). */
-/** Parse a YYYY-MM-DD or ISO 8601 datetime string into a UTC Date. */
-function parseDateStr(value: string): Date {
-  // Strip time portion if present (ISO 8601: "2026-06-28T02:00:00+07:00" -> "2026-06-28")
-  const datePart = value.includes('T') ? value.split('T')[0]! : value;
+/**
+ * Parse a date string (YYYY-MM-DD or ISO 8601) into a UTC Date.
+ * For calendar display: if time > 00:00, round up to next day so the calendar
+ * conservatively marks partial days as booked (prevents UI/backend mismatch).
+ */
+function parseDateStr(value: string, roundUp = false): Date {
+  if (!value.includes('T')) {
+    // Pure date string
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(Date.UTC(y!, m! - 1, d!));
+  }
+  // ISO 8601 datetime
+  const datePart = value.split('T')[0]!;
   const [y, m, d] = datePart.split('-').map(Number);
+  if (!roundUp) {
+    return new Date(Date.UTC(y!, m! - 1, d!));
+  }
+  // Check if time > 00:00
+  const timePart = value.split('T')[1] || '';
+  const hourMin = timePart.split(':')[0] || '0';
+  const hour = parseInt(hourMin, 10);
+  if (hour > 0) {
+    // Round up to next day
+    return new Date(Date.UTC(y!, m! - 1, d! + 1));
+  }
   return new Date(Date.UTC(y!, m! - 1, d!));
 }
 
@@ -797,10 +816,10 @@ export class PublicApiService {
     const bkgs = await this.repo.getVehicleBookingsInRange(vehicleId, monthStart, monthEnd);
     const bookedSet = new Set<string>();
     for (const b of bkgs) {
-      // A booking occupies [startDate, endDate) — endDate is the return day (free again),
-      // consistent with the back-to-back availability check.
+      // A booking occupies [startDate, endDate]. If endDate has time > 00:00,
+      // that day is also occupied (conservative: prevents UI/backend mismatch).
       const start = parseDateStr(b.startDate);
-      const end = parseDateStr(b.endDate);
+      const end = parseDateStr(b.endDate, true); // round up if time > 00:00
       for (let d = new Date(start); d < end; d.setUTCDate(d.getUTCDate() + 1)) {
         const ds = formatDateStr(d);
         if (ds >= monthStart && ds <= monthEnd) bookedSet.add(ds);
