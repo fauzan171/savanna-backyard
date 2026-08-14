@@ -34,6 +34,43 @@ export interface AvailabilityCalendarProps {
 	className?: string;
 }
 
+function startOfDay(date: Date): Date {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isoDayKey(date: Date): string {
+	return startOfDay(date).toISOString().slice(0, 10);
+}
+
+export function isRangeSelectable(
+	range: DateRange | undefined,
+	blockedDates: Date[],
+	minDate?: Date,
+	maxDate?: Date,
+): boolean {
+	if (!range?.from) return true;
+
+	const from = startOfDay(range.from);
+	const to = startOfDay(range.to ?? range.from);
+	const lowerBound = from <= to ? from : to;
+	const upperBound = from <= to ? to : from;
+	const blockedSet = new Set(blockedDates.map((date) => isoDayKey(date)));
+	const min = minDate ? startOfDay(minDate) : undefined;
+	const max = maxDate ? startOfDay(maxDate) : undefined;
+
+	for (
+		let current = new Date(lowerBound);
+		current <= upperBound;
+		current = new Date(current.getTime() + 86400000)
+	) {
+		if (blockedSet.has(isoDayKey(current))) return false;
+		if (min && current < min) return false;
+		if (max && current > max) return false;
+	}
+
+	return true;
+}
+
 export function AvailabilityCalendar({
 	bookings,
 	value,
@@ -96,6 +133,9 @@ export function AvailabilityCalendar({
 				mode="range"
 				selected={value as DateRange | undefined}
 				onSelect={(range: DateRange | undefined) => {
+					if (!isRangeSelectable(range, blockedDays, minDate, maxDate)) {
+						return;
+					}
 					onChange?.({
 						from: range?.from,
 						to: range?.to,
