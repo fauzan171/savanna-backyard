@@ -10,13 +10,26 @@ describe('PublicApiService', () => {
 	let mockRepo: PublicApiRepository;
 	let mockConfigRepo: ConfigRepository;
 
+	const createPublicVehicle = (overrides: Record<string, unknown> = {}) =>
+		createTestVehicle({
+			category: 'Adventure',
+			description: 'Curated public fleet bike',
+			photoUrl: 'https://example.com/vehicle.jpg',
+			...overrides,
+		});
+
 	beforeEach(() => {
 		// Create mock repositories
 		mockRepo = {
 			getAvailableVehicles: vi.fn(),
 			getActiveVehicles: vi.fn(),
+			getPublicVehicles: vi.fn(),
+			getActivePackages: vi.fn(),
+			getActiveTrails: vi.fn(),
 			getVehicleById: vi.fn(),
+			getTrailById: vi.fn(),
 			getVehicleTypes: vi.fn(),
+			getVehicleBookingsInRange: vi.fn(),
 			isVehicleAvailableForDates: vi.fn().mockResolvedValue(true),
 			findBookingByNumber: vi.fn(),
 		} as unknown as PublicApiRepository;
@@ -41,8 +54,8 @@ describe('PublicApiService', () => {
 
 		it('[P0] should return available vehicles for date range', async () => {
 			const mockVehicles = [
-				createTestVehicle({ status: 'Available' }),
-				createTestVehicle({ status: 'Available' }),
+				createPublicVehicle({ status: 'Available' }),
+				createPublicVehicle({ status: 'Available' }),
 			];
 
 			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
@@ -59,7 +72,7 @@ describe('PublicApiService', () => {
 
 		it('[P0] should filter by vehicle type', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'TrailBike', status: 'Available' }),
+				createPublicVehicle({ type: 'TrailBike', status: 'Available' }),
 			];
 
 			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
@@ -75,7 +88,7 @@ describe('PublicApiService', () => {
 
 		it('[P0] should not expose sensitive vehicle data', async () => {
 			const mockVehicles = [
-				createTestVehicle({
+				createPublicVehicle({
 					status: 'Available',
 					plateNumber: 'B 1234 ABC',
 					totalKm: 50000,
@@ -123,10 +136,12 @@ describe('PublicApiService', () => {
 		// P1: Edge Cases
 		// ============================================
 
-		it('[P1] should separate maintenance vehicles as unavailable', async () => {
+		it('[P1] should exclude dirty or unpublished vehicles from availability output', async () => {
 			const mockVehicles = [
-				createTestVehicle({ status: 'Available' }),
-				createTestVehicle({ status: 'Maintenance' }),
+				createPublicVehicle({ status: 'Available', name: 'Honda CRF 150L' }),
+				createPublicVehicle({ status: 'Available', name: '' }),
+				createPublicVehicle({ status: 'Available', name: 'QA test bike' }),
+				createPublicVehicle({ status: 'Available', photoUrl: null }),
 			];
 
 			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
@@ -137,12 +152,12 @@ describe('PublicApiService', () => {
 			});
 
 			expect(result.availableVehicles).toHaveLength(1);
-			expect(result.unavailableVehicles).toHaveLength(1);
-			expect(result.unavailableVehicles[0].reason).toBe('Under maintenance');
+			expect(result.availableVehicles[0].name).toBe('Honda CRF 150L');
+			expect(result.unavailableVehicles).toHaveLength(0);
 		});
 
 		it('[P1] should handle same-day rental', async () => {
-			const mockVehicles = [createTestVehicle({ status: 'Available' })];
+			const mockVehicles = [createPublicVehicle({ status: 'Available' })];
 
 			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
 
@@ -168,24 +183,9 @@ describe('PublicApiService', () => {
 			expect(result.totalAvailable).toBe(0);
 		});
 
-		it('[P1] should show generic reason for inactive vehicles', async () => {
-			const mockVehicles = [
-				createTestVehicle({ status: 'Inactive' }),
-			];
-
-			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
-
-			const result = await publicApiService.checkAvailability({
-				startDate: '2026-03-01',
-				endDate: '2026-03-05',
-			});
-
-			expect(result.unavailableVehicles[0].reason).toBe('Currently unavailable');
-		});
-
 		it('[P1] should include photoUrl in available vehicles', async () => {
 			const mockVehicles = [
-				createTestVehicle({
+				createPublicVehicle({
 					status: 'Available',
 					photoUrl: 'https://example.com/photo.jpg',
 				}),
@@ -203,9 +203,9 @@ describe('PublicApiService', () => {
 
 		it('[P1] should return totalAvailable count', async () => {
 			const mockVehicles = [
-				createTestVehicle({ status: 'Available' }),
-				createTestVehicle({ status: 'Available' }),
-				createTestVehicle({ status: 'Maintenance' }),
+				createPublicVehicle({ status: 'Available' }),
+				createPublicVehicle({ status: 'Available' }),
+				createPublicVehicle({ status: 'Available', name: 'sample bike' }),
 			];
 
 			vi.mocked(mockRepo.getAvailableVehicles).mockResolvedValue(mockVehicles);
@@ -226,9 +226,9 @@ describe('PublicApiService', () => {
 
 		it('[P0] should return vehicle types with counts', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
-				createTestVehicle({ type: 'TrailBike', dailyRateIdr: 350000 }),
-				createTestVehicle({ type: 'StreetBike', dailyRateIdr: 300000 }),
+				createPublicVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
+				createPublicVehicle({ type: 'TrailBike', dailyRateIdr: 350000 }),
+				createPublicVehicle({ type: 'StreetBike', dailyRateIdr: 300000 }),
 			];
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
@@ -242,8 +242,8 @@ describe('PublicApiService', () => {
 
 		it('[P0] should calculate min and max daily rates', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
-				createTestVehicle({ type: 'TrailBike', dailyRateIdr: 350000 }),
+				createPublicVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
+				createPublicVehicle({ type: 'TrailBike', dailyRateIdr: 350000 }),
 			];
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
@@ -261,8 +261,8 @@ describe('PublicApiService', () => {
 
 		it('[P1] should return display names for vehicle types', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'TrailBike' }),
-				createTestVehicle({ type: 'StreetBike' }),
+				createPublicVehicle({ type: 'TrailBike' }),
+				createPublicVehicle({ type: 'StreetBike' }),
 			];
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
@@ -286,9 +286,9 @@ describe('PublicApiService', () => {
 
 		it('[P1] should sort types alphabetically', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'StreetBike' }),
-				createTestVehicle({ type: 'TrailBike' }),
-				createTestVehicle({ type: 'Car' }),
+				createPublicVehicle({ type: 'StreetBike' }),
+				createPublicVehicle({ type: 'TrailBike' }),
+				createPublicVehicle({ type: 'Car' }),
 			];
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
@@ -301,7 +301,7 @@ describe('PublicApiService', () => {
 
 		it('[P1] should handle all vehicle types', async () => {
 			const types = ['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other'];
-			const mockVehicles = types.map(type => createTestVehicle({ type: type as 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other' }));
+			const mockVehicles = types.map(type => createPublicVehicle({ type: type as 'TrailBike' | 'StreetBike' | 'Car' | 'Jeep' | 'Other' }));
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
 
@@ -312,7 +312,7 @@ describe('PublicApiService', () => {
 
 		it('[P1] should handle single vehicle per type', async () => {
 			const mockVehicles = [
-				createTestVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
+				createPublicVehicle({ type: 'TrailBike', dailyRateIdr: 450000 }),
 			];
 
 			vi.mocked(mockRepo.getActiveVehicles).mockResolvedValue(mockVehicles);
@@ -332,7 +332,7 @@ describe('PublicApiService', () => {
 		// ============================================
 
 		it('[P0] should return vehicle details for valid id', async () => {
-			const mockVehicle = createTestVehicle({
+			const mockVehicle = createPublicVehicle({
 				id: 'vehicle-123',
 				name: 'Honda CRF 250L',
 				type: 'TrailBike',
@@ -353,7 +353,7 @@ describe('PublicApiService', () => {
 		});
 
 		it('[P0] should filter out sensitive data from response', async () => {
-			const mockVehicle = createTestVehicle({
+			const mockVehicle = createPublicVehicle({
 				plateNumber: 'B 1234 ABC',
 				status: 'Available',
 				totalKm: 50000,
@@ -386,7 +386,7 @@ describe('PublicApiService', () => {
 		// ============================================
 
 		it('[P1] should include optional fields when present', async () => {
-			const mockVehicle = createTestVehicle({
+			const mockVehicle = createPublicVehicle({
 				brand: 'Honda',
 				model: 'CRF 250L',
 				year: 2023,
@@ -404,11 +404,10 @@ describe('PublicApiService', () => {
 		});
 
 		it('[P1] should handle null optional fields', async () => {
-			const mockVehicle = createTestVehicle({
+			const mockVehicle = createPublicVehicle({
 				brand: null,
 				model: null,
 				year: null,
-				photoUrl: null,
 			});
 
 			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(mockVehicle);
@@ -418,11 +417,11 @@ describe('PublicApiService', () => {
 			expect(result?.brand).toBeNull();
 			expect(result?.model).toBeNull();
 			expect(result?.year).toBeNull();
-			expect(result?.image).toBeNull();
+			expect(result?.image).toBe('https://example.com/vehicle.jpg');
 		});
 
 		it('[P1] should include specs object', async () => {
-			const mockVehicle = createTestVehicle();
+			const mockVehicle = createPublicVehicle();
 
 			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(mockVehicle);
 
@@ -432,13 +431,137 @@ describe('PublicApiService', () => {
 		});
 
 		it('[P1] should return dailyRateIdr field', async () => {
-			const mockVehicle = createTestVehicle({ dailyRateIdr: 450000 });
+			const mockVehicle = createPublicVehicle({ dailyRateIdr: 450000 });
 
 			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(mockVehicle);
 
 			const result = await publicApiService.getVehicleDetails('vehicle-123');
 
 			expect(result?.dailyRateIdr).toBe(450000);
+		});
+
+		it('[P1] should return null for non-publishable vehicle details', async () => {
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(
+				createTestVehicle({ name: '', category: null, description: null, photoUrl: null }),
+			);
+
+			const result = await publicApiService.getVehicleDetails('vehicle-123');
+
+			expect(result).toBeNull();
+		});
+	});
+
+	describe('public content publishability filters', () => {
+		it('[P0] should exclude dirty vehicles from public catalog', async () => {
+			vi.mocked((mockRepo as any).getPublicVehicles).mockResolvedValue([
+				createPublicVehicle({ name: 'Honda CRF 150L' }),
+				createPublicVehicle({ name: '' }),
+				createPublicVehicle({ name: 'beat carbu', category: null }),
+				createPublicVehicle({ name: 'mio', description: null }),
+				createPublicVehicle({ name: 'QA demo bike' }),
+			]);
+
+			const result = await publicApiService.getPublicVehicles();
+
+			expect(result).toHaveLength(1);
+			expect(result[0]?.name).toBe('Honda CRF 150L');
+		});
+
+		it('[P0] should exclude QA packages from public catalog', async () => {
+			vi.mocked((mockRepo as any).getActivePackages).mockResolvedValue([
+				{
+					id: 'pkg-1',
+					name: 'Bromo Sunrise Adventure',
+					tagline: 'Sunrise ride',
+					description: 'Curated package',
+					image: '/uploads/pkg.jpg',
+					duration: '2D1N',
+					distance: '120km',
+					groupSize: '1-4',
+					price: 1500000,
+					trailId: 'trail-1',
+					sortOrder: 1,
+					isActive: true,
+				},
+				{
+					id: 'pkg-qa',
+					name: 'QA-PKG-01',
+					tagline: null,
+					description: 'QA package',
+					image: '/uploads/pkg-qa.jpg',
+					duration: '1D',
+					distance: null,
+					groupSize: null,
+					price: 1000,
+					trailId: null,
+					sortOrder: 2,
+					isActive: true,
+				},
+			]);
+
+			const result = await publicApiService.getPublicPackages();
+
+			expect(result).toHaveLength(1);
+			expect(result[0]?.name).toBe('Bromo Sunrise Adventure');
+		});
+
+		it('[P0] should exclude incomplete or test trails from public catalog', async () => {
+			vi.mocked((mockRepo as any).getActiveTrails).mockResolvedValue([
+				{
+					id: 'trail-1',
+					name: 'Bromo Ridge Trail',
+					description: 'Scenic volcanic ridge trail',
+					terrain: 'Sand and gravel',
+					elevation: '2200m',
+					difficulty: 'Intermediate',
+					recommended: 'Sunrise',
+					image: '/uploads/trail.jpg',
+					mapImage: '/uploads/trail-map.jpg',
+					isActive: true,
+					sortOrder: 1,
+				},
+				{
+					id: 'trail-bad',
+					name: 'valid-trail-2026',
+					description: '',
+					terrain: null,
+					elevation: null,
+					difficulty: null,
+					recommended: null,
+					image: null,
+					mapImage: null,
+					isActive: true,
+					sortOrder: 2,
+				},
+				{
+					id: 'trail-qa',
+					name: 'sample trail',
+					description: 'Seed content',
+					terrain: 'Sand',
+					elevation: null,
+					difficulty: 'Easy',
+					recommended: 'Morning',
+					image: '/uploads/sample.jpg',
+					mapImage: null,
+					isActive: true,
+					sortOrder: 3,
+				},
+			]);
+
+			const result = await publicApiService.getPublicTrails();
+
+			expect(result).toHaveLength(1);
+			expect(result[0]?.name).toBe('Bromo Ridge Trail');
+		});
+
+		it('[P0] should reject availability calendar for unpublished vehicle', async () => {
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(
+				createTestVehicle({ id: 'veh-bad', name: '', category: null, description: null, photoUrl: null }),
+			);
+
+			await expect(
+				publicApiService.getVehicleAvailabilityForMonth('veh-bad', '2026-08'),
+			).rejects.toThrow('Vehicle not found');
 		});
 	});
 

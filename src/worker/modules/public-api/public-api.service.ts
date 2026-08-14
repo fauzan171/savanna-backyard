@@ -75,6 +75,27 @@ function resolveUrl(value: string | null | undefined, baseUrl: string): string |
   return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`;
 }
 
+function hasMeaningfulText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function normalizeForChecks(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function looksLikeSeedOrQaData(value: string | null | undefined): boolean {
+  const normalized = normalizeForChecks(value);
+  if (!normalized) return false;
+
+  return (
+    /(^|[\s\-_[(])(qa|test|dummy|sample|seed|staging|dev)([\s\-_)\]]|$)/i.test(normalized) ||
+    normalized.startsWith('qa') ||
+    normalized.startsWith('test') ||
+    normalized.includes('dummy') ||
+    normalized.includes('sample')
+  );
+}
+
 export class PublicApiService {
   /** Base URL of the API origin, e.g. "https://api.example.com". Used to resolve relative upload paths. */
   private readonly baseUrl: string;
@@ -107,7 +128,9 @@ export class PublicApiService {
       );
     }
 
-    const vehicles = await this.repo.getAvailableVehicles(query.type);
+    const vehicles = (await this.repo.getAvailableVehicles(query.type)).filter((vehicle) =>
+      this.isPublicVehiclePublishable(vehicle),
+    );
 
     // Filter by actual booking conflicts
     const availabilityChecks = await Promise.all(
@@ -171,7 +194,9 @@ export class PublicApiService {
       maxDailyRate: number;
     }>;
   }> {
-    const vehicles = await this.repo.getActiveVehicles();
+    const vehicles = (await this.repo.getActiveVehicles()).filter((vehicle) =>
+      this.isPublicVehiclePublishable(vehicle),
+    );
     const typeMap = new Map<string, { count: number; rates: number[] }>();
 
     for (const vehicle of vehicles) {
@@ -210,6 +235,7 @@ export class PublicApiService {
   } | null> {
     const vehicle = await this.repo.getVehicleById(id);
     if (!vehicle) return null;
+    if (!this.isPublicVehiclePublishable(vehicle)) return null;
 
     const parsedSpecs = safeJsonParse<Record<string, string> | null>(
       typeof vehicle.specs === "string" ? vehicle.specs : null,
@@ -251,6 +277,7 @@ export class PublicApiService {
   } | null> {
     const vehicle = await this.repo.getVehicleByCode(code);
     if (!vehicle) return null;
+    if (!this.isPublicVehiclePublishable(vehicle)) return null;
 
     const parsedSpecs = safeJsonParse<Record<string, string> | null>(
       typeof vehicle.specs === "string" ? vehicle.specs : null,
@@ -509,7 +536,9 @@ export class PublicApiService {
     description: string | null; available: boolean;
   }>> {
     const vehicles = await this.repo.getPublicVehicles();
-    return vehicles.map((v) => {
+    return vehicles
+      .filter((vehicle) => this.isPublicVehiclePublishable(vehicle))
+      .map((v) => {
       const parsedSpecs = safeJsonParse<Record<string, string> | null>(
         typeof v.specs === "string" ? v.specs : null,
         v.specs ? { details: String(v.specs) } : null,
@@ -536,7 +565,9 @@ export class PublicApiService {
     groupSize: string | null; price: number; trailId: string | null;
   }>> {
     const pkgs = await this.repo.getActivePackages();
-    return pkgs.map(p => ({
+    return pkgs
+      .filter((pkg) => this.isPublicPackagePublishable(pkg))
+      .map(p => ({
       id: p.id,
       name: p.name,
       tagline: p.tagline,
@@ -605,7 +636,9 @@ export class PublicApiService {
     image: string | null; mapImage: string | null;
   }>> {
     const trailList = await this.repo.getActiveTrails();
-    return trailList.map(t => ({
+    return trailList
+      .filter((trail) => this.isPublicTrailPublishable(trail))
+      .map(t => ({
       id: t.id,
       name: t.name,
       desc: t.description,
@@ -638,8 +671,7 @@ export class PublicApiService {
   } | null> {
     const trail = await this.repo.getTrailById(trailId);
     if (!trail) return null;
-    // BUG#5: never expose inactive/draft trails on the public surface.
-    if (!trail.isActive) return null;
+    if (!this.isPublicTrailPublishable(trail)) return null;
 
     return {
       id: trail.id,
@@ -812,6 +844,9 @@ export class PublicApiService {
 
     const vehicle = await this.repo.getVehicleById(vehicleId);
     if (!vehicle) throw new ValidationError('Vehicle not found');
+    if (!this.isPublicVehiclePublishable(vehicle)) {
+      throw new ValidationError('Vehicle not found');
+    }
 
     const bkgs = await this.repo.getVehicleBookingsInRange(vehicleId, monthStart, monthEnd);
     const bookedSet = new Set<string>();
@@ -853,5 +888,61 @@ export class PublicApiService {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
     }
     return (name.slice(0, 2)).toUpperCase();
+  }
+
+  private isPublicVehiclePublishable(vehicle: {
+    name: string;
+    status: string;
+    category?: string | null;
+    description?: string | null;
+    photoUrl?: string | null;
+    dailyRateIdr?: number | null;
+  }): boolean {
+    if (vehicle.status !== 'Available') return false;
+    if (!hasMeaningfulText(vehicle.name)) return false;
+    if (looksLikeSeedOrQaData(vehicle.name)) return false;
+    if (!hasMeaningfulText(vehicle.category)) return false;
+    if (!hasMeaningfulText(vehicle.description)) return false;
+    if (!hasMeaningfulText(vehicle.photoUrl)) return false;
+    if ((vehicle.dailyRateIdr ?? 0) <= 0) return false;
+    return true;
+  }
+
+  private isPublicPackagePublishable(pkg: {
+    name: string;
+    isActive?: boolean | null;
+    description?: string | null;
+    image?: string | null;
+    duration?: string | null;
+    price?: number | null;
+  }): boolean {
+    if (pkg.isActive === false) return false;
+    if (!hasMeaningfulText(pkg.name)) return false;
+    if (looksLikeSeedOrQaData(pkg.name)) return false;
+    if (!hasMeaningfulText(pkg.description)) return false;
+    if (!hasMeaningfulText(pkg.image)) return false;
+    if (!hasMeaningfulText(pkg.duration)) return false;
+    if ((pkg.price ?? 0) <= 0) return false;
+    return true;
+  }
+
+  private isPublicTrailPublishable(trail: {
+    name: string;
+    isActive?: boolean | null;
+    description?: string | null;
+    terrain?: string | null;
+    difficulty?: string | null;
+    recommended?: string | null;
+    image?: string | null;
+  }): boolean {
+    if (trail.isActive === false) return false;
+    if (!hasMeaningfulText(trail.name)) return false;
+    if (looksLikeSeedOrQaData(trail.name)) return false;
+    if (!hasMeaningfulText(trail.description)) return false;
+    if (!hasMeaningfulText(trail.terrain)) return false;
+    if (!hasMeaningfulText(trail.difficulty)) return false;
+    if (!hasMeaningfulText(trail.recommended)) return false;
+    if (!hasMeaningfulText(trail.image)) return false;
+    return true;
   }
 }

@@ -6,7 +6,15 @@ import { ValidationError } from '@/worker/core/types/errors';
 import type { Vehicle, Booking } from '@/worker/core/database/schema';
 
 function makeVehicle(): Vehicle {
-	return { id: 'v-1', name: 'CRF 150L', status: 'Available' } as unknown as Vehicle;
+	return {
+		id: 'v-1',
+		name: 'CRF 150L',
+		status: 'Available',
+		category: 'Adventure',
+		description: 'Curated public trail bike',
+		photoUrl: 'https://example.com/crf-150l.jpg',
+		dailyRateIdr: 450000,
+	} as unknown as Vehicle;
 }
 
 describe('PublicApiService — equipment + availability', () => {
