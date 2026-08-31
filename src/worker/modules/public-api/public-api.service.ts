@@ -411,6 +411,20 @@ export class PublicApiService {
       remainingAmount = Math.round(totalAmount - dpAmount);
     }
 
+    // B1: re-verify availability immediately before insert to narrow the
+    // TOCTOU window (D1 has no transactions). A concurrent booking that
+    // slipped in between the first check and here will be caught.
+    const recheck = await this.repo.isVehicleAvailableForDates(
+      data.vehicleId,
+      data.startDate,
+      data.endDate,
+    );
+    if (!recheck) {
+      throw new ConflictError(
+        "Vehicle was just booked by another customer. Please choose different dates or vehicle.",
+      );
+    }
+
     // Create booking
     const booking = await this.repo.createBooking({
       customerId: customer.id,
