@@ -2,6 +2,7 @@ import { bookings, payments, customers, vehicles } from '@/worker/core/database/
 import { eq, and, sql } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
 import type { EmailService } from '@/worker/core/services/email.service';
+import { timingSafeEqualSync } from '@/worker/core/lib/crypto-safe-equal';
 
 // Status mapping from Midtrans transaction_status to booking status + payment_status
 const MIDTRANS_STATUS_MAP: Record<string, { bookingStatus: string; paymentStatus: string }> = {
@@ -43,7 +44,7 @@ export class WebhooksService {
 		const computed = Array.from(new Uint8Array(hashBuffer))
 			.map(b => b.toString(16).padStart(2, '0'))
 			.join('');
-		return computed === data.signature_key;
+		return timingSafeEqualSync(computed, data.signature_key);
 	}
 
 	async handleMidtransNotification(data: Record<string, string>): Promise<void> {
