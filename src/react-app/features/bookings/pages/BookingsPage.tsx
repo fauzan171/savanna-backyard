@@ -22,12 +22,15 @@ import {
 	SelectValue,
 } from '@/react-app/components/ui/select';
 import { bookingStatusLabels } from '@/react-app/lib/labels';
+import { useAuthStore } from '@/react-app/features/auth/stores/authStore';
 
 export function BookingsPage() {
 	const navigate = useNavigate();
 	const [filters, setFilters] = useState<BookingFilters>({});
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [isScanOpen, setIsScanOpen] = useState(false);
+	const { user } = useAuthStore();
+	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
 	const { data, isLoading } = useBookings(filters);
 	const createBooking = useCreateBooking();
@@ -76,10 +79,12 @@ export function BookingsPage() {
 							<QrCode className="size-4 mr-2" />
 							Scan Motor
 						</Button>
-						<Button variant="outline" className="h-11 justify-center sm:h-10" onClick={() => setIsCreateOpen(true)}>
-							<Plus className="size-4 mr-2" />
-							Booking Baru
-						</Button>
+						{isSuperAdmin && (
+							<Button variant="outline" className="h-11 justify-center sm:h-10" onClick={() => setIsCreateOpen(true)}>
+								<Plus className="size-4 mr-2" />
+								Booking Baru
+							</Button>
+						)}
 					</div>
 				}
 			/>

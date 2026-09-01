@@ -81,10 +81,6 @@ export const routes: RouteObject[] = [
 						children: [
 							{ index: true, element: <DashboardPage /> },
 
-							// Customer routes
-							{ path: 'customers', element: <CustomersPage /> },
-							{ path: 'customers/:id', element: <CustomerDetailPage /> },
-
 							// Vehicle routes
 							{ path: 'vehicles', element: <VehiclesPage /> },
 							{ path: 'vehicles/availability', element: <VehicleAvailabilityPage /> },
@@ -97,11 +93,6 @@ export const routes: RouteObject[] = [
 							{ path: 'bookings', element: <BookingsPage /> },
 							{ path: 'bookings/:id', element: <BookingDetailPage /> },
 
-							// Payment routes
-							{ path: 'payments', element: <PaymentsPage /> },
-							{ path: 'payments/dashboard', element: <PaymentDashboardPage /> },
-							{ path: 'payments/:id', element: <PaymentDetailPage /> },
-
 							// Equipment routes
 							{ path: 'equipment', element: <EquipmentPage /> },
 							{ path: 'equipment/:id', element: <EquipmentDetailPage /> },
@@ -110,26 +101,35 @@ export const routes: RouteObject[] = [
 							{ path: 'maintenance', element: <MaintenancePage /> },
 							{ path: 'maintenance/:id', element: <MaintenanceDetailPage /> },
 
-							// Reports routes
-							{ path: 'reports', element: <ReportsPage /> },
-							{ path: 'reports/revenue', element: <RevenueReportPage /> },
-							{ path: 'reports/fleet', element: <FleetReportPage /> },
-							{ path: 'reports/payments', element: <PaymentReportPage /> },
-							{ path: 'reports/customers', element: <CustomerReportPage /> },
-
-							// Content management routes
-							{ path: 'packages', element: <PackagesPage /> },
-							{ path: 'packages/:id', element: <PackageDetailPage /> },
-							{ path: 'pricing', element: <PricingPage /> },
-							{ path: 'pricing/:id', element: <PricingDetailPage /> },
-							{ path: 'reviews', element: <ReviewsPage /> },
-							{ path: 'reviews/:id', element: <ReviewDetailPage /> },
-							{ path: 'trails', element: <TrailsPage /> },
-							{ path: 'trails/:id', element: <TrailDetailPage /> },
-							{ path: 'settings', element: <SettingsPage /> },
 							{
 								element: <RoleGuard allowedRoles={['SUPER_ADMIN']} />,
 								children: [
+									// Customer routes
+									{ path: 'customers', element: <CustomersPage /> },
+									{ path: 'customers/:id', element: <CustomerDetailPage /> },
+
+									// Payment routes
+									{ path: 'payments', element: <PaymentsPage /> },
+									{ path: 'payments/dashboard', element: <PaymentDashboardPage /> },
+									{ path: 'payments/:id', element: <PaymentDetailPage /> },
+
+									// Reports routes
+									{ path: 'reports', element: <ReportsPage /> },
+									{ path: 'reports/revenue', element: <RevenueReportPage /> },
+									{ path: 'reports/fleet', element: <FleetReportPage /> },
+									{ path: 'reports/payments', element: <PaymentReportPage /> },
+									{ path: 'reports/customers', element: <CustomerReportPage /> },
+
+									// Content management routes
+									{ path: 'packages', element: <PackagesPage /> },
+									{ path: 'packages/:id', element: <PackageDetailPage /> },
+									{ path: 'pricing', element: <PricingPage /> },
+									{ path: 'pricing/:id', element: <PricingDetailPage /> },
+									{ path: 'reviews', element: <ReviewsPage /> },
+									{ path: 'reviews/:id', element: <ReviewDetailPage /> },
+									{ path: 'trails', element: <TrailsPage /> },
+									{ path: 'trails/:id', element: <TrailDetailPage /> },
+									{ path: 'settings', element: <SettingsPage /> },
 									{ path: 'users', element: <UsersPage /> },
 									{ path: 'otp', element: <OtpLogsPage /> },
 								],

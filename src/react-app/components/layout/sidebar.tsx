@@ -31,6 +31,8 @@ import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
 import { useAuthStore, type User } from '@/react-app/features/auth/stores/authStore';
 
+const SUPER_ADMIN_ONLY: User['role'][] = ['SUPER_ADMIN'];
+
 // ============================================
 // TYPES
 // ============================================
@@ -88,6 +90,7 @@ const defaultNavItems: NavItem[] = [
 		label: 'Pembayaran',
 		href: '/payments',
 		icon: <CreditCard className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 		children: [
 			{ label: 'Semua Pembayaran', href: '/payments' },
 			{ label: 'Ringkasan', href: '/payments/dashboard' },
@@ -112,6 +115,7 @@ const defaultNavItems: NavItem[] = [
 		label: 'Pelanggan',
 		href: '/customers',
 		icon: <UserCircle className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Perlengkapan',
@@ -127,26 +131,31 @@ const defaultNavItems: NavItem[] = [
 		label: 'Paket',
 		href: '/packages',
 		icon: <Package className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Harga',
 		href: '/pricing',
 		icon: <Tag className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Ulasan',
 		href: '/reviews',
 		icon: <Star className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Rute',
 		href: '/trails',
 		icon: <Map className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Laporan',
 		href: '/reports',
 		icon: <BarChart3 className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 ];
 
@@ -155,18 +164,19 @@ const defaultFooterItems: NavItem[] = [
 		label: 'Pengaturan',
 		href: '/settings',
 		icon: <Settings className="size-5" />,
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'Pengguna',
 		href: '/users',
 		icon: <UserCog className="size-5" />,
-		allowedRoles: ['SUPER_ADMIN'],
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 	{
 		label: 'OTP',
 		href: '/otp',
 		icon: <KeyRound className="size-5" />,
-		allowedRoles: ['SUPER_ADMIN'],
+		allowedRoles: SUPER_ADMIN_ONLY,
 	},
 ];
 

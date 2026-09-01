@@ -12,11 +12,14 @@ import type { Equipment, EquipmentFilters, CreateEquipmentRequest } from '../typ
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
 import { EQUIPMENT_CATEGORY_LABELS, type EquipmentCategory } from '../types/equipment.types';
+import { useAuthStore } from '@/react-app/features/auth/stores/authStore';
 
 export function EquipmentPage() {
 	const navigate = useNavigate();
 	const [filters, setFilters] = useState<EquipmentFilters>({});
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const { user } = useAuthStore();
+	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 	const { data: equipment, isLoading } = useEquipmentList(filters);
 	const createEquipment = useCreateEquipment();
 
@@ -43,12 +46,12 @@ export function EquipmentPage() {
 			<PageHeader
 				title="Perlengkapan"
 				description="Kelola perlengkapan rental seperti helm, jersey, dan aksesori"
-				actions={
+				actions={isSuperAdmin ? (
 					<Button onClick={() => setIsCreateOpen(true)}>
 						<Plus className="size-4 mr-2" />
 						Tambah Perlengkapan
 					</Button>
-				}
+				) : null}
 			/>
 
 			<div className="flex gap-4 items-center">

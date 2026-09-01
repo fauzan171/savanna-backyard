@@ -12,12 +12,15 @@ import { VehicleForm } from '../components/VehicleForm';
 import { VehicleQrCard } from '../components/VehicleQrCard';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import type { Vehicle, VehicleFormData } from '../types/vehicle.types';
+import { useAuthStore } from '@/react-app/features/auth/stores/authStore';
 
 export default function VehiclesPage() {
 	const navigate = useNavigate();
 	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 	const [qrVehicle, setQrVehicle] = useState<Vehicle | null>(null);
 	const [deleteVehicle, setDeleteVehicle] = useState<Vehicle | null>(null);
+	const { user } = useAuthStore();
+	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
 	// Queries and mutations
 	const { data, isLoading } = useVehicles({ page: 1, limit: 25 });
@@ -69,20 +72,20 @@ export default function VehiclesPage() {
 			<PageHeader
 				title="Kendaraan"
 				description="Kelola data kendaraan, status armada, dan ketersediaannya"
-				actions={
+				actions={isSuperAdmin ? (
 					<Button onClick={() => setIsCreateDialogOpen(true)}>
 						<Plus className="size-4 mr-2" />
 						Tambah Kendaraan
 					</Button>
-				}
+				) : null}
 			/>
 
 			<VehicleTable
 				data={data?.items ?? []}
 				isLoading={isLoading}
 				onRowClick={handleRowClick}
-				onQrClick={handleQrClick}
-				onDelete={setDeleteVehicle}
+				onQrClick={isSuperAdmin ? handleQrClick : undefined}
+				onDelete={isSuperAdmin ? setDeleteVehicle : undefined}
 			/>
 
 			{/* Create Dialog */}
