@@ -5,7 +5,7 @@ import { Button } from '@/react-app/components/ui/button';
 import { Spinner } from '@/react-app/components/ui/spinner';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { StatusBadge } from '@/react-app/components/data-display/status-badge';
-import { usePayment, useVerifyPayment, useDeletePayment } from '../hooks/usePayments';
+import { usePayment, useVerifyPayment, useRejectPayment, useDeletePayment } from '../hooks/usePayments';
 import {
 	Dialog,
 	DialogContent,
@@ -212,13 +212,14 @@ function VerifyDialog({ paymentId }: { paymentId: string }) {
 	const [isVerify, setIsVerify] = useState(true);
 	const [rejectionReason, setRejectionReason] = useState('');
 	const verifyPayment = useVerifyPayment();
+	const rejectPayment = useRejectPayment();
 
 	const handleVerify = async () => {
-		await verifyPayment.mutateAsync({
-			id: paymentId,
-			verified: isVerify,
-			rejectionReason: isVerify ? undefined : rejectionReason,
-		});
+		if (isVerify) {
+			await verifyPayment.mutateAsync({ id: paymentId, verified: true });
+		} else {
+			await rejectPayment.mutateAsync({ id: paymentId, reason: rejectionReason });
+		}
 		setOpen(false);
 	};
 
@@ -253,15 +254,15 @@ function VerifyDialog({ paymentId }: { paymentId: string }) {
 					)}
 
 					<DialogFooter>
-						<Button variant="outline" onClick={() => setOpen(false)} disabled={verifyPayment.isPending}>
+						<Button variant="outline" onClick={() => setOpen(false)} disabled={verifyPayment.isPending || rejectPayment.isPending}>
 							Cancel
 						</Button>
 						<Button
 							variant={isVerify ? 'default' : 'destructive'}
 							onClick={handleVerify}
-							disabled={verifyPayment.isPending || (!isVerify && rejectionReason.length < 10)}
+							disabled={verifyPayment.isPending || rejectPayment.isPending || (!isVerify && rejectionReason.length < 10)}
 						>
-							{verifyPayment.isPending ? 'Processing...' : isVerify ? 'Verify' : 'Reject'}
+							{verifyPayment.isPending || rejectPayment.isPending ? 'Processing...' : isVerify ? 'Verify' : 'Reject'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
