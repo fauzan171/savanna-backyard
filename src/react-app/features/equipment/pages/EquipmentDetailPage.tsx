@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Spinner } from '@/react-app/components/ui/spinner';
@@ -92,6 +92,15 @@ export function EquipmentDetailPage() {
 						Out of Stock
 					</Badge>
 				)}
+				<Button
+					variant="ghost"
+					size="sm"
+					onClick={() => updateEquipment.mutate({ id: equipment.id, data: { isActive: !equipment.isActive } })}
+					disabled={updateEquipment.isPending}
+				>
+					{equipment.isActive ? <ToggleRight className="size-4" /> : <ToggleLeft className="size-4" />}
+					<span className="ml-1">{equipment.isActive ? 'Deactivate' : 'Activate'}</span>
+				</Button>
 			</div>
 
 			{/* Details Grid */}
