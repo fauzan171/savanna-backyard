@@ -28,6 +28,7 @@ import {
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
+import { useAuthStore, type User } from '@/react-app/features/auth/stores/authStore';
 
 // ============================================
 // TYPES
@@ -44,6 +45,8 @@ export interface NavItem {
 	badge?: string | number;
 	/** Children items (for nested navigation) */
 	children?: NavItem[];
+	/** Roles allowed to see this menu item. Empty means all authenticated users. */
+	allowedRoles?: User['role'][];
 }
 
 export interface SidebarProps {
@@ -156,6 +159,7 @@ const defaultFooterItems: NavItem[] = [
 		label: 'Pengguna',
 		href: '/users',
 		icon: <UserCog className="size-5" />,
+		allowedRoles: ['SUPER_ADMIN'],
 	},
 ];
 
@@ -227,6 +231,7 @@ function Sidebar({
 	mobileOpen: controlledMobileOpen,
 	onMobileOpenChange,
 }: SidebarProps) {
+	const { user } = useAuthStore();
 	// Internal state for uncontrolled mode
 	const [internalCollapsed, setInternalCollapsed] = React.useState(false);
 	const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
@@ -234,6 +239,9 @@ function Sidebar({
 	// Use controlled or internal state
 	const collapsed = controlledCollapsed ?? internalCollapsed;
 	const mobileOpen = controlledMobileOpen ?? internalMobileOpen;
+	const canSeeItem = (item: NavItem) => !item.allowedRoles || (user && item.allowedRoles.includes(user.role));
+	const visibleItems = items.filter(canSeeItem);
+	const visibleFooterItems = footerItems.filter(canSeeItem);
 
 	const handleCollapsedChange = (value: boolean) => {
 		setInternalCollapsed(value);
@@ -273,7 +281,7 @@ function Sidebar({
 
 			{/* Navigation */}
 			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted">
-				{items.map((item) => (
+				{visibleItems.map((item) => (
 					<SidebarItem
 						key={item.href}
 						item={item}
@@ -284,9 +292,9 @@ function Sidebar({
 			</nav>
 
 			{/* Footer Items */}
-			{footerItems.length > 0 && (
+			{visibleFooterItems.length > 0 && (
 				<div className="border-t border-border p-3 space-y-1 bg-card">
-					{footerItems.map((item) => (
+					{visibleFooterItems.map((item) => (
 						<SidebarItem
 							key={item.href}
 							item={item}
@@ -310,7 +318,7 @@ function Sidebar({
 					) : (
 						<>
 							<ChevronLeft className="size-4 mr-2" />
-							<span>Collapse</span>
+							<span>Tutup</span>
 						</>
 					)}
 				</Button>

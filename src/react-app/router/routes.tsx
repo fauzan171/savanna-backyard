@@ -1,6 +1,7 @@
 import { RouteObject } from 'react-router-dom';
 import { AuthGuard } from './guards/AuthGuard';
 import { GuestGuard } from './guards/GuestGuard';
+import { RoleGuard } from './guards/RoleGuard';
 
 // Layouts
 import RootLayout from './layouts/RootLayout';
@@ -125,7 +126,10 @@ export const routes: RouteObject[] = [
 							{ path: 'trails', element: <TrailsPage /> },
 							{ path: 'trails/:id', element: <TrailDetailPage /> },
 							{ path: 'settings', element: <SettingsPage /> },
-							{ path: 'users', element: <UsersPage /> },
+							{
+								element: <RoleGuard allowedRoles={['SUPER_ADMIN']} />,
+								children: [{ path: 'users', element: <UsersPage /> }],
+							},
 						],
 					},
 				],

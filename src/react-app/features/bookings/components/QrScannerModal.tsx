@@ -235,12 +235,12 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 							<div className="rounded-full bg-muted p-4 mb-4">
 								<Camera className="size-8 text-muted-foreground" />
 							</div>
-							<h3 className="font-medium mb-2">Camera Access Required</h3>
+							<h3 className="font-medium mb-2">Akses Kamera Diperlukan</h3>
 							<p className="text-sm text-muted-foreground mb-4">
-								We need camera access to identify vehicles from QR codes or barcodes.
+								Izinkan kamera untuk membaca QR atau barcode kendaraan.
 							</p>
 							<Button onClick={requestCameraPermission} className="w-full">
-								<Camera className="mr-2 size-4" /> Allow Camera Access
+								<Camera className="mr-2 size-4" /> Izinkan Kamera
 							</Button>
 						</div>
 						<div className="relative">
@@ -248,7 +248,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 								<span className="w-full border-t" />
 							</div>
 							<div className="relative flex justify-center text-xs uppercase">
-								<span className="bg-background px-2 text-muted-foreground">or</span>
+								<span className="bg-background px-2 text-muted-foreground">atau</span>
 							</div>
 						</div>
 						<Button
@@ -256,7 +256,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 							className="w-full"
 							onClick={() => setViewMode('manual')}
 						>
-							<Keyboard className="mr-2 size-4" /> Enter Plate Number Manually
+							<Keyboard className="mr-2 size-4" /> Input Plat Nomor Manual
 						</Button>
 					</div>
 				)}
@@ -275,7 +275,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 							className="w-full"
 							onClick={() => setViewMode('manual')}
 						>
-							<Keyboard className="mr-2 size-4" /> Enter Manually Instead
+							<Keyboard className="mr-2 size-4" /> Input Manual
 						</Button>
 					</div>
 				)}
@@ -286,11 +286,11 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 						<form onSubmit={handleManualSubmit} className="space-y-3">
 							<div>
 								<label className="text-sm font-medium text-muted-foreground mb-1 block">
-									Plate Number / QR / Barcode Value
+									Plat Nomor / QR / Barcode
 								</label>
 								<Input
 									type="text"
-									placeholder="e.g. B 1234 SVK or SVN:vehicle-id"
+									placeholder="Contoh: DK 1234 SV atau SVN:id-kendaraan"
 									value={manualPlate}
 									onChange={(e) => setManualPlate(e.target.value)}
 									autoFocus
@@ -303,7 +303,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 								) : (
 									<QrCode className="mr-2 size-4" />
 								)}
-								Find Vehicle
+								Cari Kendaraan
 							</Button>
 						</form>
 						{cameraPermission !== 'denied' && (
@@ -312,7 +312,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 								className="w-full"
 								onClick={() => setViewMode('scanner')}
 							>
-								<RefreshCw className="mr-2 size-4" /> Back to Camera
+								<RefreshCw className="mr-2 size-4" /> Kembali ke Kamera
 							</Button>
 						)}
 					</div>
@@ -335,7 +335,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 										setViewMode('permission');
 									}}
 								>
-									<RefreshCw className="mr-2 size-4" /> Try Again
+									<RefreshCw className="mr-2 size-4" /> Coba Lagi
 								</Button>
 							)}
 							<Button
@@ -346,7 +346,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 									setViewMode('manual');
 								}}
 							>
-								<Keyboard className="mr-2 size-4" /> Enter Manually
+								<Keyboard className="mr-2 size-4" /> Input Manual
 							</Button>
 						</div>
 					</div>
@@ -362,12 +362,12 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 						<div className="space-y-1 rounded-md border p-3 text-sm">
 							<Row label="Motor" value={result.vehicle.name} />
 							<Row label="Plat" value={result.vehicle.plateNumber ?? '-'} />
-							<Row label="Mode" value={result.scanMode} />
+							<Row label="Mode" value={result.scanMode === 'pickup_checklist' ? 'Checklist pickup' : 'Cek kondisi motor'} />
 							<Row label="Keterangan" value={result.message} />
 							{result.booking && (
 								<>
 									<Row label="Booking" value={result.booking.bookingNumber} />
-									<Row label="Customer" value={result.booking.customerName} />
+									<Row label="Pelanggan" value={result.booking.customerName} />
 									<Row label="Status" value={result.booking.status} />
 									<Row label="Periode" value={`${result.booking.startDate} → ${result.booking.endDate}`} />
 								</>
