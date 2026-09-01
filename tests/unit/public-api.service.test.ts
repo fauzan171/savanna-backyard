@@ -32,6 +32,7 @@ describe('PublicApiService', () => {
 			getVehicleBookingsInRange: vi.fn(),
 			isVehicleAvailableForDates: vi.fn().mockResolvedValue(true),
 			findBookingByNumber: vi.fn(),
+			findCustomerByPhone: vi.fn(),
 		} as unknown as PublicApiRepository;
 
 		mockConfigRepo = {
@@ -714,6 +715,54 @@ describe('PublicApiService', () => {
 			const result = await publicApiService.isPublicApiEnabled();
 
 			expect(result).toBe(false);
+		});
+	});
+
+	describe('getBookingStatus', () => {
+		const makeBooking = (overrides: Record<string, unknown> = {}) => ({
+			...createTestBooking({ paymentStatus: 'settlement', remainingAmount: 0 }),
+			publicUserId: 'pu-1',
+			paymentType: 'dp',
+			dpAmount: 225000,
+			remainingAmount: 0,
+			paymentPageUrl: 'https://checkout.xendit.co/web/abc',
+			...overrides,
+		});
+
+		it('[P0] returns DP fields and hides paymentPageUrl from anonymous caller', async () => {
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(makeBooking() as never);
+			vi.mocked(mockRepo.findCustomerByPhone).mockResolvedValue({ id: 'test-customer-id' } as never);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle({ name: 'Honda CRF 250L' }));
+
+			const result = await publicApiService.getBookingStatus('SVN-2026-0001', '+628123456789');
+
+			expect(result!.paymentType).toBe('dp');
+			expect(result!.remainingAmount).toBe(0);
+			expect(result!.paidAmount).toBe(result!.totalAmount);
+			expect(result!.vehicleName).toBe('Honda CRF 250L');
+			expect(result!.isFullyPaid).toBe(true);
+			expect(result!.paymentPageUrl).toBeNull();
+		});
+
+		it('[P0] sends paymentPageUrl only to the owner session', async () => {
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(makeBooking() as never);
+			vi.mocked(mockRepo.findCustomerByPhone).mockResolvedValue({ id: 'test-customer-id' } as never);
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createTestVehicle());
+
+			const owner = await publicApiService.getBookingStatus('SVN-2026-0001', '+628123456789', 'pu-1');
+			const other = await publicApiService.getBookingStatus('SVN-2026-0001', '+628123456789', 'pu-OTHER');
+
+			expect(owner!.paymentPageUrl).toBe('https://checkout.xendit.co/web/abc');
+			expect(other!.paymentPageUrl).toBeNull();
+		});
+
+		it('[P0] returns null when phone does not match booking owner', async () => {
+			vi.mocked(mockRepo.findBookingByNumber).mockResolvedValue(makeBooking() as never);
+			vi.mocked(mockRepo.findCustomerByPhone).mockResolvedValue(null);
+
+			const result = await publicApiService.getBookingStatus('SVN-2026-0001', '+628999999999');
+
+			expect(result).toBeNull();
 		});
 	});
 });
