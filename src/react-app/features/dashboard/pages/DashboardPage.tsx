@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, QrCode, ClipboardCheck } from 'lucide-react';
+import { CalendarDays, QrCode, ClipboardCheck, KeyRound } from 'lucide-react';
 import { OverviewStats } from '../components/OverviewStats';
 import { RevenueChart } from '../components/RevenueChart';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -13,10 +13,13 @@ import {
 	useDashboardActivities,
 } from '../hooks/useDashboard';
 import type { PeriodFilter as PeriodFilterType } from '../types/dashboard.types';
+import { useAuthStore } from '@/react-app/features/auth/stores/authStore';
 
 export default function DashboardPage() {
 	const [period, setPeriod] = useState<PeriodFilterType>('month');
 	const [isScanOpen, setIsScanOpen] = useState(false);
+	const { user } = useAuthStore();
+	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
 	const { data: overview, isLoading: overviewLoading } = useDashboardOverview({ period });
 	const { data: revenue, isLoading: revenueLoading } = useDashboardRevenue({ period });
@@ -76,6 +79,22 @@ export default function DashboardPage() {
 						</div>
 					</div>
 				</button>
+				{isSuperAdmin && (
+					<Link
+						to="/otp"
+						className="rounded-lg border p-4 transition hover:border-primary/40 hover:bg-muted/40"
+					>
+						<div className="flex items-center gap-3">
+							<div className="rounded-md bg-primary/10 p-2 text-primary">
+								<KeyRound className="size-5" />
+							</div>
+							<div>
+								<p className="font-medium">OTP Customer</p>
+								<p className="text-xs text-muted-foreground">Lihat kode login customer</p>
+							</div>
+						</div>
+					</Link>
+				)}
 			</div>
 
 			<OverviewStats data={overview} isLoading={overviewLoading} />
