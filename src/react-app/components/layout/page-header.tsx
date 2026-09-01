@@ -39,15 +39,15 @@ function PageHeader({
 	return (
 		<div
 			className={cn(
-				'bg-background pb-4 pt-2',
+				'bg-background pb-5 pt-2',
 				sticky && 'sticky top-0 z-10',
-				bordered && 'border-b border-border mb-6',
+				bordered && 'border-b border-border mb-5 md:mb-6',
 				className
 			)}
 		>
 			{/* Breadcrumb */}
 			{breadcrumb && breadcrumb.length > 0 && (
-				<nav className="mb-2 flex items-center gap-1 text-sm text-muted-foreground">
+				<nav className="mb-3 flex items-center gap-1 text-sm text-muted-foreground">
 					{breadcrumb.map((item, index) => (
 						<React.Fragment key={item.href || item.label}>
 							{index > 0 && <ChevronRight className="size-4" />}
@@ -67,19 +67,19 @@ function PageHeader({
 			)}
 
 			{/* Title row */}
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 				<div className="min-w-0 flex-1">
-					<h1 className="font-display text-2xl font-bold tracking-tight text-foreground truncate">
+					<h1 className="font-display text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
 						{title}
 					</h1>
 					{description && (
-						<p className="mt-1 text-sm text-muted-foreground">{description}</p>
+						<p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">{description}</p>
 					)}
 				</div>
 
 				{/* Actions */}
 				{actions && (
-					<div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div>
+					<div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">{actions}</div>
 				)}
 			</div>
 		</div>
@@ -95,8 +95,8 @@ function PageHeaderCompact({
 	className,
 }: Pick<PageHeaderProps, 'title' | 'actions' | 'className'>) {
 	return (
-		<div className={cn('flex items-center justify-between gap-4 mb-4', className)}>
-			<h1 className="font-display text-xl font-semibold tracking-tight text-foreground">
+		<div className={cn('mb-5 flex items-center justify-between gap-4', className)}>
+			<h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
 				{title}
 			</h1>
 			{actions && <div className="flex items-center gap-2">{actions}</div>}

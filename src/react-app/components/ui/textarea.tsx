@@ -3,7 +3,7 @@ import { cn } from '@/react-app/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const textareaVariants = cva(
-	'flex w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+	'flex w-full rounded-md border bg-background px-4 py-3 text-base ring-offset-background transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
 	{
 		variants: {
 			variant: {
@@ -11,8 +11,8 @@ const textareaVariants = cva(
 				error: 'border-destructive focus-visible:ring-destructive',
 			},
 			size: {
-				sm: 'min-h-[60px] text-xs',
-				md: 'min-h-[80px]',
+				sm: 'min-h-[72px] text-sm',
+				md: 'min-h-[104px]',
 				lg: 'min-h-[120px] text-base',
 			},
 		},
@@ -43,9 +43,9 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
 					{...props}
 				/>
 				{hint && !error && (
-					<p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>
+					<p className="mt-2 text-sm text-muted-foreground">{hint}</p>
 				)}
-				{error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
+				{error && <p className="mt-2 text-sm text-destructive">{error}</p>}
 			</div>
 		);
 	}

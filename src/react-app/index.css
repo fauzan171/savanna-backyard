@@ -173,13 +173,13 @@
 /* === DARK THEME === */
 .dark {
   /* Base */
-  --background: 25 30% 8%;
+  --background: 25 22% 13%;
   --foreground: 40 20% 95%;
 
   /* Surfaces */
-  --card: 25 25% 12%;
+  --card: 25 20% 17%;
   --card-foreground: 40 20% 95%;
-  --popover: 25 25% 10%;
+  --popover: 25 20% 16%;
   --popover-foreground: 40 20% 95%;
 
   /* Primary */
@@ -188,12 +188,12 @@
   --primary-hover: 38 90% 60%;
 
   /* Secondary */
-  --secondary: 25 20% 18%;
+  --secondary: 25 18% 23%;
   --secondary-foreground: 40 15% 85%;
 
   /* Muted */
-  --muted: 25 20% 16%;
-  --muted-foreground: 30 10% 55%;
+  --muted: 25 16% 22%;
+  --muted-foreground: 32 14% 70%;
 
   /* Accent */
   --accent: 200 60% 50%;
@@ -204,11 +204,11 @@
   --destructive-foreground: 0 0% 100%;
 
   /* Borders */
-  --border: 25 20% 20%;
-  --border-strong: 25 20% 30%;
+  --border: 25 15% 30%;
+  --border-strong: 25 16% 42%;
 
   /* Input */
-  --input: 25 20% 16%;
+  --input: 25 16% 28%;
   --input-foreground: 40 20% 95%;
 
   /* Ring */

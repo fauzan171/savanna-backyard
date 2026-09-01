@@ -197,7 +197,7 @@ function SidebarItem({ item, collapsed, onItemClick }: SidebarItemProps) {
 			onClick={onItemClick}
 			className={({ isActive }) =>
 				cn(
-					'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+					'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200',
 					'hover:bg-accent hover:text-accent-foreground',
 					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
 					isActive
@@ -274,16 +274,16 @@ function Sidebar({
 		<div
 			className={cn(
 				'flex h-full flex-col bg-card border-r border-border shadow-lg md:shadow-none transition-all duration-300',
-				collapsed ? 'w-16' : 'w-64',
+				collapsed ? 'w-[72px]' : 'w-72',
 				className
 			)}
 		>
 			{/* Logo Header */}
-			<div className="flex h-16 items-center justify-between border-b border-border px-4 bg-card">
+			<div className="flex h-[72px] min-h-[72px] items-center justify-between border-b border-border bg-card px-5">
 				{!collapsed && (
 					<Link to="/" className="flex items-center gap-2">
 						{logo || (
-							<span className="font-display text-xl font-bold text-primary">
+							<span className="font-display text-2xl font-bold text-primary">
 								Savanna
 							</span>
 						)}
@@ -297,7 +297,7 @@ function Sidebar({
 			</div>
 
 			{/* Navigation */}
-			<nav className="flex-1 overflow-y-auto p-3 space-y-1 bg-muted">
+			<nav className="flex-1 space-y-1.5 overflow-y-auto bg-muted p-3">
 				{visibleItems.map((item) => (
 					<SidebarItem
 						key={item.href}
@@ -310,7 +310,7 @@ function Sidebar({
 
 			{/* Footer Items */}
 			{visibleFooterItems.length > 0 && (
-				<div className="border-t border-border p-3 space-y-1 bg-card">
+				<div className="space-y-1.5 border-t border-border bg-card p-3">
 					{visibleFooterItems.map((item) => (
 						<SidebarItem
 							key={item.href}
@@ -323,7 +323,7 @@ function Sidebar({
 			)}
 
 			{/* Collapse Toggle (Desktop) */}
-			<div className="hidden md:flex border-t border-border p-2">
+			<div className="hidden border-t border-border p-3 md:flex">
 				<Button
 					variant="ghost"
 					size="sm"
@@ -349,7 +349,7 @@ function Sidebar({
 			<Button
 				variant="ghost"
 				size="icon"
-				className="md:hidden fixed top-3 left-3 z-[51] h-10 w-10 bg-card border border-border shadow-md"
+				className="fixed left-3 top-3 z-[51] border border-border bg-card shadow-md md:hidden"
 				onClick={() => handleMobileOpenChange(!mobileOpen)}
 			>
 				{mobileOpen ? (
@@ -374,7 +374,7 @@ function Sidebar({
 			{/* Mobile: Slide-in drawer */}
 			<div
 				className={cn(
-					'md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-card shadow-2xl transform transition-transform duration-300',
+					'fixed inset-y-0 left-0 z-50 w-72 transform bg-card shadow-2xl transition-transform duration-300 md:hidden',
 					mobileOpen ? 'translate-x-0' : '-translate-x-full'
 				)}
 			>

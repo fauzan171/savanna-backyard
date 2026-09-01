@@ -20,9 +20,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 				<input
 					type={type}
 					className={cn(
-						'flex h-12 w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm text-foreground ring-offset-background transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
-						leftIcon && 'pl-10',
-						rightIcon && 'pr-10',
+						'flex h-12 w-full rounded-md border border-input bg-background px-4 py-3 text-base text-foreground ring-offset-background transition-colors file:border-0 file:bg-transparent file:text-base file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+						leftIcon && 'pl-11',
+						rightIcon && 'pr-11',
 						error && 'border-destructive focus-visible:ring-destructive',
 						className
 					)}
@@ -35,10 +35,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 					</div>
 				)}
 				{hint && !error && (
-					<p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>
+					<p className="mt-2 text-sm text-muted-foreground">{hint}</p>
 				)}
 				{error && (
-					<p className="mt-1.5 text-xs text-destructive">{error}</p>
+					<p className="mt-2 text-sm text-destructive">{error}</p>
 				)}
 			</div>
 		);

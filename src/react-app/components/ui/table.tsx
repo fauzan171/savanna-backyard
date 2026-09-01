@@ -38,7 +38,7 @@ const Table = React.forwardRef<
 	<div className="relative w-full overflow-auto">
 		<table
 			ref={ref}
-			className={cn('w-full caption-bottom text-sm', className)}
+			className={cn('w-full caption-bottom text-base', className)}
 			{...props}
 		/>
 	</div>
@@ -102,7 +102,7 @@ const TableHead = React.forwardRef<
 	<th
 		ref={ref}
 		className={cn(
-			'h-12 px-5 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0',
+			'h-14 px-5 text-left align-middle font-semibold text-muted-foreground [&:has([role=checkbox])]:pr-0',
 			className
 		)}
 		{...props}
@@ -117,7 +117,7 @@ const TableCell = React.forwardRef<
 	<td
 		ref={ref}
 		className={cn(
-			'p-5 align-middle [&:has([role=checkbox])]:pr-0',
+			'p-5 align-middle leading-relaxed [&:has([role=checkbox])]:pr-0',
 			className
 		)}
 		{...props}
@@ -131,7 +131,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
 	<caption
 		ref={ref}
-		className={cn('mt-4 text-sm text-muted-foreground', className)}
+		className={cn('mt-4 text-base text-muted-foreground', className)}
 		{...props}
 	/>
 ));
@@ -254,16 +254,16 @@ function DataTable<TData, TValue>({
 		<div className={cn('space-y-4', className)}>
 			{/* Toolbar */}
 			{enableFiltering && (
-				<div className="flex items-center justify-between gap-4">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 					<Input
 						placeholder={searchPlaceholder}
 						value={globalFilter}
 						onChange={(e) => setGlobalFilter(e.target.value)}
-						className="max-w-sm"
+						className="w-full sm:max-w-md"
 					/>
 					{enableRowSelection && Object.keys(rowSelection).length > 0 && (
-						<span className="text-sm text-muted-foreground">
-							{Object.keys(rowSelection).length} selected
+						<span className="text-base text-muted-foreground">
+							{Object.keys(rowSelection).length} dipilih
 						</span>
 					)}
 				</div>
@@ -349,7 +349,7 @@ function DataTable<TData, TValue>({
 							key={row.id}
 							onClick={() => onRowClick?.(row.original)}
 							className={cn(
-								'rounded-lg border bg-card p-4 space-y-2',
+								'rounded-lg border bg-card p-4 space-y-3 shadow-sm',
 								onRowClick && 'cursor-pointer hover:bg-muted/50'
 							)}
 						>
@@ -358,11 +358,11 @@ function DataTable<TData, TValue>({
 							) : (
 								// Default card rendering - show all cells
 								row.getVisibleCells().map((cell) => (
-									<div key={cell.id} className="flex justify-between items-start">
-										<span className="text-sm text-muted-foreground">
+									<div key={cell.id} className="flex items-start justify-between gap-4">
+										<span className="text-sm font-medium text-muted-foreground">
 											{cell.column.columnDef.header as string}
 										</span>
-										<span className="text-sm font-medium">
+										<span className="text-base font-semibold text-right">
 											{flexRender(cell.column.columnDef.cell, cell.getContext())}
 										</span>
 									</div>
@@ -383,21 +383,21 @@ function DataTable<TData, TValue>({
 
 			{/* Pagination */}
 			{enablePagination && (
-				<div className="flex items-center justify-between px-2">
-					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+				<div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between sm:px-2">
+					<div className="flex items-center gap-2 text-base text-muted-foreground">
 						<span>
-							Page {table.getState().pagination.pageIndex + 1} of{' '}
+							Halaman {table.getState().pagination.pageIndex + 1} dari{' '}
 							{table.getPageCount()}
 						</span>
 						<span>|</span>
-						<span>{table.getFilteredRowModel().rows.length} total</span>
+						<span>{table.getFilteredRowModel().rows.length} data</span>
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						<Select
 							value={`${table.getState().pagination.pageSize}`}
 							onValueChange={(value) => table.setPageSize(Number(value))}
 						>
-							<SelectTrigger className="h-8 w-[70px]">
+							<SelectTrigger className="w-[86px]">
 								<SelectValue placeholder={table.getState().pagination.pageSize} />
 							</SelectTrigger>
 							<SelectContent side="top">
