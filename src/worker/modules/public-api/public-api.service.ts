@@ -467,6 +467,30 @@ export class PublicApiService {
       }
     }
 
+    // RACE-001: post-insert conflict check.
+    // D1 has no transactions, so two concurrent inserts can both succeed.
+    // After insert, re-check for conflicts. If another booking appeared
+    // for the same vehicle+dates, this one loses — cancel + restore stock.
+    const postCheck = await this.repo.isVehicleAvailableForDates(
+      data.vehicleId,
+      data.startDate,
+      data.endDate,
+    );
+    if (!postCheck) {
+      // Rollback: cancel the booking we just created and restore equipment stock
+      await this.repo.updateBooking(booking.id, {
+        status: 'Cancelled',
+        cancelledAt: new Date().toISOString(),
+        notes: 'Race condition — another concurrent booking won the slot',
+      });
+      for (const r of equipmentRows) {
+        await this.repo.restoreEquipmentStock(r.equipmentId, r.quantity);
+      }
+      throw new ConflictError(
+        "Vehicle was just booked by another customer. Please choose different dates or vehicle.",
+      );
+    }
+
     // Request payment page via the configured gateway
     let paymentPageUrl: string | null = null;
     let qrString: string | null = null;
