@@ -471,11 +471,12 @@ export class PublicApiService {
     // D1 has no transactions, so two concurrent inserts can both succeed.
     // After insert, re-check for conflicts. If another booking appeared
     // for the same vehicle+dates, this one loses — cancel + restore stock.
-    const postCheck = await this.repo.isVehicleAvailableForDates(
-      data.vehicleId,
-      data.startDate,
-      data.endDate,
-    );
+	const postCheck = await this.repo.isVehicleAvailableForDates(
+	  data.vehicleId,
+	  data.startDate,
+	  data.endDate,
+	  booking.id,
+	);
     if (!postCheck) {
       // Rollback: cancel the booking we just created and restore equipment stock
       await this.repo.updateBooking(booking.id, {

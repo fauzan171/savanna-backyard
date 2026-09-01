@@ -473,28 +473,31 @@ export class BookingsService {
 			if (!newVehicle) throw new ValidationError('Vehicle not found');
 			if (newVehicle.status !== 'Available') throw new ValidationError('Target vehicle is not available');
 			updateData.vehicleId = data.vehicleId;
-			updateData.baseAmount = Math.round(newVehicle.dailyRateIdr * calculateTwelveHourBlocks(booking.startDate, booking.endDate));
 		}
 
-		// Handle date change — re-check availability + re-price
+		// Handle date/vehicle change - re-check availability + re-price.
+		// Exclude the current booking so editing an existing row does not
+		// conflict with itself.
 		const newStart = data.startDate ?? booking.startDate;
 		const newEnd = data.endDate ?? booking.endDate;
-		if (data.startDate || data.endDate) {
+		const targetVehicleId = (updateData.vehicleId as string | undefined) ?? booking.vehicleId;
+		if (data.startDate || data.endDate || updateData.vehicleId) {
 			if (newStart > newEnd) throw new ValidationError('End date must be after start date');
-			const isAvail = await this.bookingRepo.isVehicleAvailableForDates(
-				updateData.vehicleId as string ?? booking.vehicleId,
+			const availability = await this.checkVehicleAvailability(
+				targetVehicleId,
 				newStart,
 				newEnd,
+				id,
 			);
-			if (!isAvail) throw new ConflictError('Vehicle is not available for the selected dates');
+			if (!availability.isAvailable) throw new ConflictError('Vehicle is not available for the selected dates');
 			updateData.startDate = newStart;
 			updateData.endDate = newEnd;
-			const vehicle = await this.vehicleRepo.findById(updateData.vehicleId as string ?? booking.vehicleId);
-			updateData.baseAmount = Math.round(vehicle!.dailyRateIdr * calculateTwelveHourBlocks(newStart, newEnd));
+			const vehicle = await this.vehicleRepo.findById(targetVehicleId);
+			if (!vehicle) throw new ValidationError('Vehicle not found');
+			updateData.baseAmount = Math.round(vehicle.dailyRateIdr * calculateTwelveHourBlocks(newStart, newEnd));
 		}
 
 		const updated = await this.bookingRepo.update(id, updateData as any);
-		});
 
 		if (!updated) {
 			throw new NotFoundError('Booking');

@@ -82,6 +82,8 @@ describe('BookingsService', () => {
 			cancelPendingPaymentsByBookingId: vi.fn().mockResolvedValue(undefined),
 			listBookingEquipment: vi.fn().mockResolvedValue([]),
 			restoreEquipmentStock: vi.fn().mockResolvedValue(undefined),
+			logStatusChange: vi.fn().mockResolvedValue(undefined),
+			getBookingHistory: vi.fn().mockResolvedValue([]),
 		} as unknown as BookingsRepository;
 
 		mockVehicleRepo = {

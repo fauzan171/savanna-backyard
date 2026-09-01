@@ -135,6 +135,9 @@ export interface CreateBookingRequest {
 
 export interface UpdateBookingRequest {
   notes?: string;
+  startDate?: string;
+  endDate?: string;
+  vehicleId?: string;
 }
 
 export interface CreateAddonRequest {

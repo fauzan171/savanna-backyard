@@ -1,4 +1,4 @@
-import { eq, and, or, gte, lte, lt, gt, like, sql, asc, inArray } from 'drizzle-orm';
+import { eq, and, or, gte, lte, lt, gt, like, sql, asc, inArray, not } from 'drizzle-orm';
 import { vehicles, bookings, customers, packages, pricingTiers, reviews, trails, equipment, bookingEquipment, type Vehicle, type Booking, type NewBooking, type Customer, type NewCustomer, type Package, type PricingTier, type Review, type Trail, type Equipment, type NewBookingEquipment } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 
@@ -32,21 +32,23 @@ export class PublicApiRepository {
 	}
 
 	// Check if vehicle is available for date range (no conflicting bookings)
-	async isVehicleAvailableForDates(vehicleId: string, startDate: string, endDate: string): Promise<boolean> {
+	async isVehicleAvailableForDates(vehicleId: string, startDate: string, endDate: string, excludeBookingId?: string): Promise<boolean> {
 		// B1: exclusive overlap (lt/gt) so back-to-back bookings (one returns on
 		// day N, another starts on day N) don't conflict — matching the admin
 		// bookings.repository.findConflictingBookings convention.
+		const conditions = [
+			eq(bookings.vehicleId, vehicleId),
+			inArray(bookings.status, ['Pending', 'pending_payment', 'Confirmed', 'Active']),
+			lt(bookings.startDate, endDate),
+			gt(bookings.endDate, startDate),
+		];
+		if (excludeBookingId) {
+			conditions.push(not(eq(bookings.id, excludeBookingId)));
+		}
 		const conflicts = await this.db
 			.select()
 			.from(bookings)
-			.where(
-				and(
-					eq(bookings.vehicleId, vehicleId),
-					inArray(bookings.status, ['Pending', 'pending_payment', 'Confirmed', 'Active']),
-					lt(bookings.startDate, endDate),
-					gt(bookings.endDate, startDate),
-				)
-			)
+			.where(and(...conditions))
 			.limit(1);
 		return conflicts.length === 0;
 	}
