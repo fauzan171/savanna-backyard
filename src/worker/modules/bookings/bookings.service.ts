@@ -74,6 +74,26 @@ export class BookingsService {
 		throw new NotFoundError('Vehicle');
 	}
 
+	private isBookingFullyPaid(booking: Booking): boolean {
+		return booking.paymentStatus === 'settlement' && (booking.remainingAmount ?? 0) <= 0;
+	}
+
+	private isPickupTime(booking: Booking, now = new Date()): boolean {
+		return now >= new Date(booking.startDate);
+	}
+
+	private assertPickupAllowed(booking: Booking): void {
+		if (booking.pickupConfirmed) {
+			throw new ValidationError('Pickup booking ini sudah pernah dikonfirmasi');
+		}
+		if (!this.isBookingFullyPaid(booking)) {
+			throw new ValidationError('Booking harus lunas sebelum pickup motor');
+		}
+		if (!this.isPickupTime(booking)) {
+			throw new ValidationError('Pickup belum dibuka. Tunggu sampai jadwal pengambilan dimulai');
+		}
+	}
+
 	/** Get cleaning duration in hours from config (default 4 hours) */
 	private async getCleaningDurationHours(): Promise<number> {
 		if (!this.configRepo) return 4;
@@ -463,7 +483,7 @@ export class BookingsService {
 		this.assertNotTerminal(booking, 'update');
 
 		// Build update payload
-		const updateData: Record<string, unknown> = {};
+		const updateData: Partial<Booking> = {};
 
 		if (data.notes !== undefined) updateData.notes = data.notes;
 
@@ -497,7 +517,7 @@ export class BookingsService {
 			updateData.baseAmount = Math.round(vehicle.dailyRateIdr * calculateTwelveHourBlocks(newStart, newEnd));
 		}
 
-		const updated = await this.bookingRepo.update(id, updateData as any);
+		const updated = await this.bookingRepo.update(id, updateData);
 
 		if (!updated) {
 			throw new NotFoundError('Booking');
@@ -540,6 +560,7 @@ export class BookingsService {
 		}
 
 		this.validateStatusTransition(booking.status, 'Active');
+		this.assertPickupAllowed(booking);
 
 		// Validate start km
 		if (data.startKm < 0) {
@@ -568,6 +589,9 @@ export class BookingsService {
 		// Check if already completed
 		if (booking.status === 'Completed') {
 			throw new ValidationError('Rental is already completed');
+		}
+		if (!booking.pickupConfirmed) {
+			throw new ValidationError('Return hanya bisa diproses setelah pickup dikonfirmasi');
 		}
 
 		// Validate return checklist exists + load pickup checklist for damage comparison
@@ -1033,17 +1057,13 @@ export class BookingsService {
 		const scanTime = new Date(scanTimeIso);
 		const booking = await this.bookingRepo.findUpcomingConfirmedByVehicle(vehicle.id);
 
-		const PICKUP_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-
 		let scanMode: QrScanResult['scanMode'] = 'motor_condition_check';
 		let message = 'Scan untuk pengecekan kondisi motor (control).';
 		let bookingSummary: QrScanResult['booking'] = null;
 
 		if (booking) {
-			const startDate = new Date(booking.startDate);
-			const diffMs = scanTime.getTime() - startDate.getTime();
-
-			if (diffMs >= -PICKUP_WINDOW_MS && diffMs <= PICKUP_WINDOW_MS) {
+			if (booking.status === 'Confirmed' && !booking.pickupConfirmed && scanTime >= new Date(booking.startDate)) {
+				this.assertPickupAllowed(booking);
 				scanMode = 'pickup_checklist';
 				message = 'Scan untuk serah-terima motor (pickup checklist).';
 			}
@@ -1144,6 +1164,10 @@ export class BookingsService {
 			if (!booking) {
 				throw new NotFoundError('No Confirmed/Active booking found for this vehicle');
 			}
+			if (booking.status !== 'Confirmed') {
+				throw new ValidationError('Pickup hanya bisa untuk booking yang sudah dikonfirmasi');
+			}
+			this.assertPickupAllowed(booking);
 
 			if (!this.checklistRepo) {
 				throw new ValidationError('Checklist repository not available');

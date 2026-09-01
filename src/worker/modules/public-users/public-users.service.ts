@@ -53,6 +53,8 @@ export interface PublicBookingSummary {
 	pickupConfirmedAt: string | null;
 	returnConfirmed: boolean | null;
 	returnConfirmedAt: string | null;
+	isFullyPaid: boolean;
+	isPickupTime: boolean;
 	pickupChecklistId: string | null;
 	returnChecklistId: string | null;
 	customerPickupChecklistId: string | null;
@@ -69,6 +71,15 @@ function toAccountInfo(u: PublicUser): PublicAccountInfo {
 		phoneVerified: u.phoneVerified,
 		avatarUrl: u.avatarUrl,
 	};
+}
+
+function isBookingFullyPaid(b: Booking): boolean {
+	const remaining = b.remainingAmount ?? 0;
+	return b.paymentStatus === 'settlement' && remaining <= 0;
+}
+
+function isBookingPickupTime(b: Booking, now = new Date()): boolean {
+	return now >= new Date(b.startDate);
 }
 
 function toBookingSummary(b: Booking): PublicBookingSummary {
@@ -88,6 +99,8 @@ function toBookingSummary(b: Booking): PublicBookingSummary {
 		pickupConfirmedAt: b.pickupConfirmedAt,
 		returnConfirmed: b.returnConfirmed,
 		returnConfirmedAt: b.returnConfirmedAt,
+		isFullyPaid: isBookingFullyPaid(b),
+		isPickupTime: isBookingPickupTime(b),
 		pickupChecklistId: b.pickupChecklistId,
 		returnChecklistId: b.returnChecklistId,
 		customerPickupChecklistId: b.customerPickupChecklistId,
@@ -484,8 +497,7 @@ export class PublicUsersService {
 		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
 
-		const isFullyPaid = b.paymentStatus === 'settlement' || b.fullyPaidAt !== null;
-		if (isFullyPaid) {
+		if (isBookingFullyPaid(b)) {
 			throw new ValidationError('Booking is already fully paid');
 		}
 
@@ -573,10 +585,8 @@ export class PublicUsersService {
 		let phase: 'pickup' | 'return';
 		if (!booking.pickupConfirmed) {
 			if (booking.status !== 'Confirmed') throw new ValidationError(`Booking berstatus ${booking.status} dan belum dapat diambil`);
-			const paymentReady = ['settlement', 'fully_paid'].includes(booking.paymentStatus ?? '') || booking.fullyPaidAt !== null;
-			if (!paymentReady) throw new ValidationError('Pembayaran harus lunas sebelum pengambilan motor');
-			const opensAt = new Date(booking.startDate).getTime() - 60 * 60 * 1000;
-			if (Date.now() < opensAt) throw new ValidationError('Scan pickup baru dibuka satu jam sebelum jadwal pengambilan');
+			if (!isBookingFullyPaid(booking)) throw new ValidationError('Pembayaran harus lunas sebelum pengambilan motor');
+			if (!isBookingPickupTime(booking)) throw new ValidationError('Scan pickup baru dibuka saat jadwal pengambilan sudah dimulai');
 			if (Date.now() > new Date(booking.endDate).getTime()) throw new ValidationError('Jadwal booking sudah berakhir. Hubungi admin untuk penjadwalan ulang');
 			phase = 'pickup';
 		} else {
