@@ -183,5 +183,11 @@ export function createReportsRouter(): Hono<ReportsEnv> {
 	router.get('/payments', paymentsReportHandler);
 	router.get('/customers', customersReportHandler);
 
+	// Legacy export aliases — frontend may call /export?format=csv
+	router.get('/revenue/export', revenueReportHandler);
+	router.get('/fleet-utilization/export', fleetUtilizationReportHandler);
+	router.get('/payments/export', paymentsReportHandler);
+	router.get('/customers/export', customersReportHandler);
+
 	return router;
 }
