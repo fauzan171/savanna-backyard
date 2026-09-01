@@ -47,6 +47,14 @@ import type {
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
+	// ── History ──
+
+	async getBookingHistory(bookingId: string) {
+		return this.bookingRepo.getBookingHistory(bookingId);
+	}
+
+	// ── Helpers ──
+
 	private normalizePlateNumber(value: string): string {
 		return value.trim().toUpperCase().replace(/\s+/g, ' ');
 	}
@@ -154,6 +162,9 @@ export class BookingsService {
 			dailyRateIdr: details.vehicle.dailyRateIdr,
 		};
 
+		// Fetch status change history
+		const statusHistory = await this.bookingRepo.getBookingHistory(booking.id);
+
 		return {
 			id: booking.id,
 			bookingNumber: booking.bookingNumber,
@@ -174,6 +185,7 @@ export class BookingsService {
 			penaltyPaid: booking.penaltyPaid ?? false,
 			returnConfirmed: booking.returnConfirmed ?? false,
 			totalAmount: booking.totalAmount,
+			statusHistory,
 			currency: booking.currency,
 			notes: booking.notes,
 			createdAt: booking.createdAt,
@@ -423,6 +435,9 @@ export class BookingsService {
 			createdBy: userId,
 		});
 
+		// Log initial status
+		await this.bookingRepo.logStatusChange(booking.id, null, 'Pending', userId, 'Booking created');
+
 		// Create addons
 		for (const addon of data.addons ?? []) {
 			await this.bookingRepo.createAddon({
@@ -469,6 +484,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Pending', 'Confirmed');
 
 		return this.toResponse(updated);
 	}
@@ -501,6 +517,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Confirmed', 'Active');
 
 		// Update vehicle status to Rented
 		await this.vehicleRepo.updateStatus(booking.vehicleId, 'Rented');
@@ -590,6 +607,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Active', 'Completed');
 
 		// Derive condition status (admin override wins) and update vehicle
 		const conditionStatus = (data.conditionStatus
@@ -748,6 +766,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, booking.status, 'Cancelled', undefined, reason);
 
 		return this.toResponse(updated);
 	}

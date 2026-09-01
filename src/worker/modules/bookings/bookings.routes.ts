@@ -266,6 +266,14 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 	// List bookings (with pagination and filters)
 	router.get('/', validateQuery(listBookingsQuerySchema), listBookingsHandler);
 
+	// Get booking history (status change log)
+	router.get('/:id/history', async (c: Context<BookingsEnv>) => {
+		const service = c.get('bookingsService');
+		const id = c.req.param('id');
+		const history = await service.getBookingHistory(id);
+		return c.json({ success: true, data: history });
+	});
+
 	// Get booking by ID
 	router.get('/:id', getBookingByIdHandler);
 

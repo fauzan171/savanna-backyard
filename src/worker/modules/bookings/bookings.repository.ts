@@ -3,6 +3,7 @@ import {
 	bookings,
 	bookingAddons,
 	bookingEquipment,
+	bookingStatusLogs,
 	equipment,
 	customers,
 	vehicles,
@@ -12,6 +13,7 @@ import {
 	type NewBooking,
 	type BookingAddon,
 	type NewBookingAddon,
+	type BookingStatusLog,
 } from '@/worker/core/database/schema';
 import type { Database } from '@/worker/core/database';
 import type { ListBookingsQuery } from './bookings.dto';
@@ -454,5 +456,34 @@ export class BookingsRepository {
 				sql`${bookings.endDate} < ${now}`,
 				sql`${bookings.actualReturnDate} IS NULL`,
 			));
+	}
+
+	// ── Status History Logging ──
+
+	/** Record a booking status change for the History tab. */
+	async logStatusChange(
+		bookingId: string,
+		fromStatus: string | null,
+		toStatus: string,
+		changedBy?: string,
+		note?: string,
+	): Promise<void> {
+		await this.db.insert(bookingStatusLogs).values({
+			id: crypto.randomUUID(),
+			bookingId,
+			fromStatus,
+			toStatus,
+			changedBy: changedBy ?? null,
+			note: note ?? null,
+		});
+	}
+
+	/** Fetch status history for a booking, newest first. */
+	async getBookingHistory(bookingId: string): Promise<BookingStatusLog[]> {
+		return this.db
+			.select()
+			.from(bookingStatusLogs)
+			.where(eq(bookingStatusLogs.bookingId, bookingId))
+			.orderBy(desc(bookingStatusLogs.createdAt));
 	}
 }
