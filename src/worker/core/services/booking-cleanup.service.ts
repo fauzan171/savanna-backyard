@@ -8,10 +8,13 @@ type CleanupResult = {
 	failed: number;
 };
 
+// ponytail: TTL hardcoded 15 min to match the FE countdown; move to system_config if ops needs to tune it
+export const PENDING_PAYMENT_TTL_MS = 15 * 60 * 1000;
+
 export class BookingCleanupService {
 	constructor(
 		private db: Database,
-		private pendingPaymentTtlMs = 60 * 60 * 1000,
+		private pendingPaymentTtlMs = PENDING_PAYMENT_TTL_MS,
 	) {}
 
 	async runCleanupExpiredBookings(now = new Date()): Promise<CleanupResult> {

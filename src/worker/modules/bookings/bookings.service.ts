@@ -1189,9 +1189,11 @@ export class BookingsService {
 
 			// Optionally start the rental (mark Active)
 			if (data.startRental && booking.status === 'Confirmed') {
-				await this.bookingRepo.update(booking.id, {
-					status: 'Active',
+				await this.bookingRepo.startRental(booking.id, {
+					startKm: data.kmReading,
+					pickupChecklistId: checklist.id,
 				});
+				await this.bookingRepo.logStatusChange(booking.id, 'Confirmed', 'Active', staffUserId, 'Rental started from QR pickup checklist');
 				await this.vehicleRepo.update(vehicleId, { status: 'Rented' });
 				rentalStarted = true;
 			}

@@ -746,6 +746,7 @@ export class PublicApiService {
     instagramUrl: string;
     bankAccount: { bankName: string; accountNumber: string; accountHolder: string };
     deposit: { amount: number; description: string };
+    depositPercent: number;
   }> {
     const getValue = async (key: string, fallback: string = ''): Promise<string> => {
       const val = await this.configRepo.getValue(key);
@@ -767,6 +768,8 @@ export class PublicApiService {
         amount: await this.configRepo.getNumber('deposit_amount', 0),
         description: await getValue('deposit_description'),
       },
+      // Single source of truth for the DP percentage (FE previously hardcoded 30%)
+      depositPercent: await this.configRepo.getNumber('dp_percentage', 30),
     };
   }
 
@@ -777,6 +780,7 @@ export class PublicApiService {
   async getBookingStatus(
     bookingNumber: string,
     customerPhone?: string,
+    ownerPublicUserId?: string,
   ): Promise<{
     id: string; bookingNumber: string; status: string; paymentStatus: string | null;
     vehicleName: string; startDate: string; endDate: string;
@@ -784,6 +788,7 @@ export class PublicApiService {
     totalAmount: number; paidAt: string | null;
     paymentPageUrl: string | null; qrString: string | null;
     paymentType: string; dpAmount: number; remainingAmount: number;
+    paidAmount: number;
     pickupConfirmed: boolean;
     isFullyPaid: boolean;
     isPickupTime: boolean;
@@ -824,11 +829,18 @@ export class PublicApiService {
       blocks: calculateTwelveHourBlocks(booking.startDate, booking.endDate),
       totalAmount: booking.totalAmount,
       paidAt: booking.paidAt,
-      paymentPageUrl: (booking as Record<string, unknown>).paymentPageUrl as string | null ?? null,
+      // paymentPageUrl only for the owner's session — booking number + phone
+      // are guessable, anonymous callers must not receive the payment link.
+      paymentPageUrl:
+        ownerPublicUserId &&
+        (booking as Record<string, unknown>).publicUserId === ownerPublicUserId
+          ? ((booking as Record<string, unknown>).paymentPageUrl as string | null) ?? null
+          : null,
       qrString: null,
       paymentType,
       dpAmount,
       remainingAmount,
+      paidAmount: Math.max(0, booking.totalAmount - remainingAmount),
       pickupConfirmed: booking.pickupConfirmed ?? false,
       isFullyPaid,
       isPickupTime,
@@ -868,6 +880,7 @@ export class PublicApiService {
   // ---- Per-vehicle availability calendar (for the motor detail page) ----
   async getVehicleAvailabilityForMonth(vehicleId: string, month: string): Promise<{
     vehicleId: string; month: string; availableDates: string[]; bookedDates: string[];
+    bookedRanges: Array<{ start: string; end: string }>;
   }> {
     const match = /^(\d{4})-(\d{2})$/.exec(month);
     if (!match) throw new ValidationError('Invalid month format (YYYY-MM)');
@@ -903,7 +916,14 @@ export class PublicApiService {
       const ds = `${year}-${mm}-${String(day).padStart(2, '0')}`;
       (bookedSet.has(ds) ? bookedDates : availableDates).push(ds);
     }
-    return { vehicleId, month, availableDates, bookedDates };
+
+    // Hour-level ranges so the FE can render free slots inside a partially
+    // booked day (e.g. motor back at 12:00 → morning still rentable).
+    const bookedRanges = bkgs
+      .filter((b) => b.status !== 'Cancelled' && b.status !== 'expired')
+      .map((b) => ({ start: b.startDate, end: b.endDate }));
+
+    return { vehicleId, month, availableDates, bookedDates, bookedRanges };
   }
 
   private getDisplayName(type: string): string {

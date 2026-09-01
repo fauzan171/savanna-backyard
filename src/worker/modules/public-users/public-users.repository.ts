@@ -397,13 +397,15 @@ export class PublicUsersRepository {
 	}
 
 	// ---------------- bookings (account-scoped) ----------------
-	async listBookingsByPublicUser(publicUserId: string, limit = 50): Promise<Booking[]> {
-		return this.db
-			.select()
+	async listBookingsByPublicUser(publicUserId: string, limit = 50): Promise<Array<{ booking: Booking; vehicleName: string | null }>> {
+		const rows = await this.db
+			.select({ booking: bookings, vehicleName: vehicles.name })
 			.from(bookings)
+			.leftJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
 			.where(eq(bookings.publicUserId, publicUserId))
 			.orderBy(desc(bookings.createdAt))
 			.limit(limit);
+		return rows.map((row) => ({ booking: row.booking, vehicleName: row.vehicleName }));
 	}
 
 	/**
@@ -411,15 +413,16 @@ export class PublicUsersRepository {
 	 * phone but publicUserId is still NULL (booking created before account linking was
 	 * added, or cookie was absent during booking creation).
 	 */
-	async listBookingsByPhone(phone: string, limit = 50): Promise<Booking[]> {
+	async listBookingsByPhone(phone: string, limit = 50): Promise<Array<{ booking: Booking; vehicleName: string | null }>> {
 		const rows = await this.db
-			.select({ booking: bookings })
+			.select({ booking: bookings, vehicleName: vehicles.name })
 			.from(bookings)
 			.innerJoin(customers, eq(customers.id, bookings.customerId))
+			.leftJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
 			.where(and(eq(customers.phone, phone), isNull(bookings.publicUserId)))
 			.orderBy(desc(bookings.createdAt))
 			.limit(limit);
-		return rows.map((row) => row.booking);
+		return rows.map((row) => ({ booking: row.booking, vehicleName: row.vehicleName }));
 	}
 
 	/** Link unlinked bookings to a public user by customer phone match. */

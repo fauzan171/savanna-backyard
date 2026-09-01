@@ -41,6 +41,7 @@ export interface PublicBookingSummary {
 	id: string;
 	bookingNumber: string;
 	vehicleId: string;
+	vehicleName: string | null;
 	startDate: string;
 	endDate: string;
 	status: string;
@@ -48,6 +49,7 @@ export interface PublicBookingSummary {
 	paymentType: string | null;
 	totalAmount: number;
 	dpAmount: number | null;
+	paidAmount: number;
 	remainingAmount: number | null;
 	pickupConfirmed: boolean | null;
 	pickupConfirmedAt: string | null;
@@ -82,11 +84,12 @@ function isBookingPickupTime(b: Booking, now = new Date()): boolean {
 	return now >= new Date(b.startDate);
 }
 
-function toBookingSummary(b: Booking): PublicBookingSummary {
+function toBookingSummary(b: Booking, vehicleName?: string | null): PublicBookingSummary {
 	return {
 		id: b.id,
 		bookingNumber: b.bookingNumber,
 		vehicleId: b.vehicleId,
+		vehicleName: vehicleName ?? null,
 		startDate: b.startDate,
 		endDate: b.endDate,
 		status: b.status,
@@ -94,6 +97,7 @@ function toBookingSummary(b: Booking): PublicBookingSummary {
 		paymentType: b.paymentType,
 		totalAmount: b.totalAmount,
 		dpAmount: b.dpAmount,
+		paidAmount: Math.max(0, b.totalAmount - (b.remainingAmount ?? b.totalAmount)),
 		remainingAmount: b.remainingAmount,
 		pickupConfirmed: b.pickupConfirmed,
 		pickupConfirmedAt: b.pickupConfirmedAt,
@@ -431,7 +435,7 @@ export class PublicUsersService {
 
 		// Fallback: bookings where customer phone matches but publicUserId is still NULL
 		// (legacy bookings created before account linking was implemented)
-		let phoneMatched: Booking[] = [];
+		let phoneMatched: Array<{ booking: Booking; vehicleName: string | null }> = [];
 		if (user?.phone) {
 			phoneMatched = await this.repo.listBookingsByPhone(user.phone);
 			// Auto-link any orphaned phone-matched bookings so they appear via the primary
@@ -443,21 +447,22 @@ export class PublicUsersService {
 
 		// Union (deduplicate by ID)
 		const seen = new Set<string>();
-		const all: Booking[] = [];
-		for (const b of [...linked, ...phoneMatched]) {
-			if (!seen.has(b.id)) {
-				seen.add(b.id);
-				all.push(b);
+		const all: Array<{ booking: Booking; vehicleName: string | null }> = [];
+		for (const row of [...linked, ...phoneMatched]) {
+			if (!seen.has(row.booking.id)) {
+				seen.add(row.booking.id);
+				all.push(row);
 			}
 		}
 
-		return all.map(toBookingSummary);
+		return all.map((row) => toBookingSummary(row.booking, row.vehicleName));
 	}
 
 	async myBookingDetail(publicUserId: string, bookingIdOrNumber: string): Promise<PublicBookingSummary> {
 		const b = await this.findBookingByIdOrNumberAndUser(publicUserId, bookingIdOrNumber);
 		if (!b) throw new NotFoundError('Booking');
-		return toBookingSummary(b);
+		const vehicle = await this.repo.findVehicleById(b.vehicleId);
+		return toBookingSummary(b, vehicle?.name);
 	}
 
 	/**
@@ -600,7 +605,7 @@ export class PublicUsersService {
 		return {
 			phase,
 			vehicle: { id: vehicle.id, name: vehicle.name, plateNumber: vehicle.plateNumber, type: vehicle.type, image: vehicle.photoUrl },
-			booking: toBookingSummary(booking),
+			booking: toBookingSummary(booking, vehicle.name),
 			checklistItems: this.checklistItems(phase),
 			message: phase === 'pickup' ? 'Catat kondisi awal sebelum motor digunakan.' : 'Catat kondisi akhir untuk diverifikasi admin.',
 		};
@@ -613,11 +618,16 @@ export class PublicUsersService {
 		const existing = await this.repo.findChecklist(booking.id, data.phase);
 		if (existing) {
 			if (existing.createdByPublicUserId !== publicUserId) throw new ValidationError(`Checklist ${data.phase} sudah pernah dikirim`);
-			const repaired = await this.repo.recordExistingCustomerInspection(booking.id, data.phase, existing.id);
-			return { booking: toBookingSummary(repaired), verificationStatus: 'pending_admin' as const };
+			if (data.phase === 'pickup' && booking.pickupConfirmed) throw new ValidationError('Pickup booking ini sudah pernah dikonfirmasi');
+			if (data.phase === 'return' && booking.returnConfirmed) throw new ValidationError('Pengembalian sudah diajukan dan sedang menunggu admin');
 		}
 		const scan = await this.scanCustomerVehicle(publicUserId, bookingIdOrNumber, data.qrCode);
 		if (scan.phase !== data.phase) throw new ValidationError('Tahap pemeriksaan tidak sesuai dengan status booking');
+		if (existing) {
+			const repaired = await this.repo.recordExistingCustomerInspection(booking.id, data.phase, existing.id);
+			const repairedVehicle = await this.repo.findVehicleById(repaired.vehicleId);
+			return { booking: toBookingSummary(repaired, repairedVehicle?.name), verificationStatus: 'pending_admin' as const };
+		}
 		const allowedItems = this.checklistItems(data.phase);
 		const allowedKeys = new Set(allowedItems.map((item) => item.key));
 		const required = allowedItems.filter((item) => item.required);
@@ -644,14 +654,15 @@ export class PublicUsersService {
 				notes: data.notes,
 				publicUserId,
 			});
-			return { booking: toBookingSummary(result.booking), verificationStatus: 'pending_admin' as const };
+			return { booking: toBookingSummary(result.booking, (await this.repo.findVehicleById(result.booking.vehicleId))?.name), verificationStatus: 'pending_admin' as const };
 		} catch (error) {
 			// A concurrent retry can lose the unique-index race. Recover the
 			// already committed customer submission instead of surfacing a 500.
 			const concurrent = await this.repo.findChecklist(booking.id, data.phase);
 			if (!concurrent || concurrent.createdByPublicUserId !== publicUserId) throw error;
 			const repaired = await this.repo.recordExistingCustomerInspection(booking.id, data.phase, concurrent.id);
-			return { booking: toBookingSummary(repaired), verificationStatus: 'pending_admin' as const };
+			const repairedVehicle = await this.repo.findVehicleById(repaired.vehicleId);
+			return { booking: toBookingSummary(repaired, repairedVehicle?.name), verificationStatus: 'pending_admin' as const };
 		}
 	}
 }

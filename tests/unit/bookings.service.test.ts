@@ -5,7 +5,7 @@ import { VehiclesRepository } from '@/worker/modules/vehicles/vehicles.repositor
 import { CustomersRepository } from '@/worker/modules/customers/customers.repository';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@/worker/core/types/errors';
 import { createTestCustomer, createTestVehicle } from '@test/utils';
-import type { Booking, BookingAddon } from '@/worker/core/database/schema';
+import type { Booking, BookingAddon, Payment } from '@/worker/core/database/schema';
 
 // Helper to create test booking
 function createTestBooking(overrides: Partial<Booking> = {}): Booking {
@@ -21,6 +21,11 @@ function createTestBooking(overrides: Partial<Booking> = {}): Booking {
 		endKm: null,
 		status: 'Pending',
 		paymentTerms: 'DP_Pickup',
+		paymentStatus: 'settlement',
+		paymentMethod: null,
+		snapToken: null,
+		paymentPageUrl: null,
+		paidAt: null,
 		baseAmount: 1350000,
 		addonsAmount: 0,
 		lateFee: 0,
@@ -29,6 +34,30 @@ function createTestBooking(overrides: Partial<Booking> = {}): Booking {
 		notes: null,
 		createdBy: 'test-user-id',
 		cancelledAt: null,
+		reminderDaySentAt: null,
+		reminderHourSentAt: null,
+		followupSentAt: null,
+		reviewRequestSentAt: null,
+		publicUserId: null,
+		equipmentTotalAmount: 0,
+		paymentType: 'full',
+		xenditInvoiceId: null,
+		dpAmount: 0,
+		dpPaidAt: null,
+		remainingAmount: 0,
+		fullyPaidAt: '2026-03-01T00:00:00.000Z',
+		pickupConfirmed: false,
+		pickupConfirmedAt: null,
+		returnConfirmed: false,
+		returnConfirmedAt: null,
+		damageFee: 0,
+		totalPenalty: 0,
+		penaltyPaid: false,
+		penaltyPaidAt: null,
+		pickupChecklistId: null,
+		returnChecklistId: null,
+		customerPickupChecklistId: null,
+		customerReturnChecklistId: null,
 		createdAt: new Date().toISOString(),
 		updatedAt: new Date().toISOString(),
 		...overrides,
@@ -283,7 +312,19 @@ describe('BookingsService', () => {
 			});
 			vi.mocked(mockBookingRepo.getAddons).mockResolvedValue([]);
 			vi.mocked(mockBookingRepo.getPaymentsByBookingId).mockResolvedValue([
-				{ id: 'pay-1', amount: 500000, method: 'QRIS', status: 'Verified', createdAt: new Date().toISOString() } as any,
+				{
+					id: 'pay-1',
+					bookingId: mockBooking.id,
+					amount: 500000,
+					method: 'QRIS',
+					status: 'Verified',
+					currency: 'IDR',
+					notes: null,
+					verifiedBy: null,
+					verifiedAt: null,
+					createdAt: new Date().toISOString(),
+					updatedAt: new Date().toISOString(),
+				} satisfies Payment,
 			]);
 
 			const result = await bookingsService.getById(mockBooking.id);
@@ -509,7 +550,7 @@ describe('BookingsService', () => {
 				creator: null,
 			});
 
-			const result = await bookingsService.create({
+			await bookingsService.create({
 				customerId: mockCustomer.id,
 				vehicleId: mockVehicle.id,
 				startDate: '2026-03-05',
@@ -730,6 +771,78 @@ describe('BookingsService', () => {
 		});
 	});
 
+	describe('submitChecklist QR pickup', () => {
+		it('[P0] starts rental through repository startRental so pickup flags and startKm are recorded', async () => {
+			const booking = createTestBooking({
+				status: 'Confirmed',
+				startDate: '2026-03-01',
+				endDate: '2027-03-08',
+				pickupConfirmed: false,
+				paymentStatus: 'settlement',
+				remainingAmount: 0,
+			});
+			const checklistRepo = {
+				create: vi.fn().mockResolvedValue({ id: 'pickup-checklist-1' }),
+			};
+			const conditionsRepo = {
+				create: vi.fn().mockResolvedValue({ id: 'condition-1' }),
+			};
+			const bookingRepo = {
+				...mockBookingRepo,
+				findUpcomingConfirmedByVehicle: vi.fn().mockResolvedValue(booking),
+				startRental: vi.fn().mockResolvedValue({ ...booking, status: 'Active', startKm: 15000, pickupConfirmed: true }),
+			};
+			const service = new BookingsService(
+				bookingRepo as unknown as BookingsRepository,
+				mockVehicleRepo,
+				mockCustomerRepo,
+				checklistRepo as never,
+				undefined,
+				conditionsRepo as never,
+			);
+
+			vi.mocked(mockVehicleRepo.findById).mockResolvedValue(createTestVehicle({ id: booking.vehicleId }));
+			vi.mocked(mockVehicleRepo.update).mockResolvedValue(createTestVehicle({ id: booking.vehicleId, status: 'Rented' }));
+
+			const result = await service.submitChecklist({
+				qrCode: booking.vehicleId,
+				scanMode: 'pickup_checklist',
+				items: {
+					fuel_level: true,
+					tire_condition: true,
+					brake_function: true,
+					lights_function: true,
+					horn_mirror: true,
+					oil_level: true,
+					body_condition: true,
+					helmet_count: true,
+				},
+				kmReading: 15000,
+				fuelLevel: 80,
+				photos: [],
+				startRental: true,
+			}, 'staff-1');
+
+			expect(result.rentalStarted).toBe(true);
+			expect(bookingRepo.startRental).toHaveBeenCalledWith(booking.id, {
+				startKm: 15000,
+				pickupChecklistId: 'pickup-checklist-1',
+			});
+			expect(bookingRepo.logStatusChange).toHaveBeenCalledWith(
+				booking.id,
+				'Confirmed',
+				'Active',
+				'staff-1',
+				'Rental started from QR pickup checklist',
+			);
+			expect(checklistRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+				bookingId: booking.id,
+				type: 'pickup',
+				kmReading: 15000,
+			}));
+		});
+	});
+
 	describe('completeRental', () => {
 		// ============================================
 		// P0: Happy Path
@@ -739,6 +852,7 @@ describe('BookingsService', () => {
 			const mockBooking = createTestBooking({
 				status: 'Active',
 				startKm: 15000,
+				pickupConfirmed: true,
 				endDate: '2026-03-08',
 			});
 			const mockVehicle = createTestVehicle({ dailyRateIdr: 450000 });
@@ -776,6 +890,7 @@ describe('BookingsService', () => {
 			const mockBooking = createTestBooking({
 				status: 'Active',
 				startKm: 15000,
+				pickupConfirmed: true,
 				endDate: '2026-03-08',
 				totalAmount: 1350000,
 			});
@@ -831,6 +946,7 @@ describe('BookingsService', () => {
 			const mockBooking = createTestBooking({
 				status: 'Active',
 				startKm: null,
+				pickupConfirmed: true,
 			});
 			vi.mocked(mockBookingRepo.findById).mockResolvedValue(mockBooking);
 
@@ -846,6 +962,7 @@ describe('BookingsService', () => {
 			const mockBooking = createTestBooking({
 				status: 'Active',
 				startKm: 15000,
+				pickupConfirmed: true,
 			});
 			vi.mocked(mockBookingRepo.findById).mockResolvedValue(mockBooking);
 
@@ -872,6 +989,7 @@ describe('BookingsService', () => {
 			const mockBooking = createTestBooking({
 				status: 'Active',
 				startKm: 15000,
+				pickupConfirmed: true,
 				endDate: '2026-03-10',
 				totalAmount: 1350000,
 			});

@@ -212,15 +212,18 @@ export function createPublicApiRouter(): Hono<PublicApiEnv> {
 	});
 
 	// Get booking status — A4: require ?phone= matching the booking owner to
-	// prevent enumeration via sequential booking numbers.
-	router.get('/bookings/:bookingNumber/status', async (c: Context<PublicApiEnv>) => {
+	// prevent enumeration via sequential booking numbers. paymentPageUrl is only
+	// sent when the request carries the booking owner's session (cookie), not
+	// for anonymous phone-only callers (booking number + phone are guessable).
+	router.get('/bookings/:bookingNumber/status', optionalPublicUserAuth(), async (c: Context<PublicApiEnv>) => {
 		const service = c.get('publicApiService');
 		const bookingNumber = c.req.param('bookingNumber');
 		const phone = c.req.query('phone');
 		if (!phone) {
 			return c.json({ success: false, message: 'Phone parameter is required', error: { code: 'BAD_REQUEST', message: 'Phone parameter is required' } }, 400);
 		}
-		const result = await service.getBookingStatus(bookingNumber, phone);
+		const ownerPublicUserId = c.get('publicUser')?.publicUserId;
+		const result = await service.getBookingStatus(bookingNumber, phone, ownerPublicUserId);
 		if (!result) {
 			return c.json({ success: false, message: 'Booking not found', error: { code: 'NOT_FOUND', message: 'Booking not found' } }, 404);
 		}

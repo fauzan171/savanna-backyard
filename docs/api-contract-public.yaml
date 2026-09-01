@@ -522,6 +522,10 @@ components:
             description:
               type: string
               example: "Deposit required at pickup"
+        depositPercent:
+          type: number
+          description: Persentase DP (% dari totalAmount) — satu sumber kebenaran untuk hitung nominal DP di FE
+          example: 30
 
     # ---- Payment Methods ----
     PaymentMethods:
@@ -597,6 +601,10 @@ components:
     BookingStatus:
       type: object
       properties:
+        id:
+          type: string
+          example: "bkg_abc123"
+          description: UUID booking (untuk endpoint me/bookings/:id)
         bookingNumber:
           type: string
           example: "SVN-2026-0001"
@@ -608,6 +616,9 @@ components:
           type: string
           nullable: true
           enum: [pending, dp_paid, settlement, expire, deny, cancel, refund]
+          description: |
+            dp_paid = pembayaran parsial (DP) diterima, belum lunas.
+            settlement = lunas penuh (istilah final; `fully_paid` tidak dipakai).
           example: "settlement"
         vehicleName:
           type: string
@@ -627,11 +638,41 @@ components:
         totalAmount:
           type: number
           example: 750000
+        paidAmount:
+          type: number
+          description: Total yang sudah dibayar (totalAmount - remainingAmount)
+          example: 225000
+        paymentType:
+          type: string
+          enum: [full, dp]
+          example: "dp"
+        dpAmount:
+          type: number
+          example: 225000
+        remainingAmount:
+          type: number
+          example: 525000
+        isFullyPaid:
+          type: boolean
+          description: true hanya bila paymentStatus = settlement dan remainingAmount <= 0
+          example: false
+        isPickupTime:
+          type: boolean
+          description: true bila waktu sekarang >= startDate
+          example: true
+        pickupConfirmed:
+          type: boolean
+          example: false
         paidAt:
           type: string
           nullable: true
           format: date-time
           example: "2026-06-25T14:30:00.000Z"
+        paymentPageUrl:
+          type: string
+          nullable: true
+          description: Hanya terkirim bila request bawa session (cookie) pemilik booking. Anonymous/null untuk caller lain.
+          example: "https://checkout.xendit.co/web/abc123"
 
     # ---- Booking Create Response ----
     BookingCreateResponse:
@@ -1703,6 +1744,14 @@ paths:
                       month: { type: string, example: "2026-07" }
                       availableDates: { type: array, items: { type: string }, example: ["2026-07-01","2026-07-03"] }
                       bookedDates: { type: array, items: { type: string }, example: ["2026-07-05"] }
+                      bookedRanges:
+                        type: array
+                        description: Rentang jam eksak booking aktif — pakai untuk render slot per jam di hari yang tercatat booked
+                        items:
+                          type: object
+                          properties:
+                            start: { type: string, example: "2026-07-05T12:00:00+07:00" }
+                            end: { type: string, example: "2026-07-06T00:00:00+07:00" }
         "400": { description: Invalid month }
 
   # ============================================================
@@ -1851,6 +1900,115 @@ paths:
                       totalAmount: { type: number }
                       remainingAmount: { type: number, nullable: true }
         "400": { description: Already fully paid }
+        "404": { description: Not owned by caller }
+
+  /me/bookings/{id}/scan-vehicle:
+    post:
+      tags: [Bookings]
+      summary: Scan QR motor untuk tahap pickup/return — balikkan phase + checklist
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: bookingId atau bookingNumber }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrCode]
+              properties:
+                qrCode: { type: string, description: Isi QR yang discan (vehicleId) }
+      responses:
+        "200":
+          description: Phase + checklist items untuk diisi customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      phase: { type: string, enum: [pickup, return] }
+                      vehicle:
+                        type: object
+                        properties:
+                          id: { type: string }
+                          name: { type: string }
+                          plateNumber: { type: string }
+                          type: { type: string }
+                          image: { type: string, nullable: true }
+                      booking:
+                        $ref: "#/components/schemas/BookingStatus"
+                      checklistItems:
+                        type: array
+                        description: FE wajib menolak submit sampai semua item required dijawab
+                        items:
+                          type: object
+                          properties:
+                            key: { type: string }
+                            label: { type: string }
+                            required: { type: boolean }
+                      message: { type: string }
+        "400": { description: Booking belum lunas / bukan waktu pickup / sudah confirmed }
+        "404": { description: Not owned by caller }
+
+  /me/bookings/{id}/inspection-photos:
+    post:
+      tags: [Bookings]
+      summary: Upload foto inspeksi (multipart/form-data)
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: URL foto tersimpan }
+
+  /me/bookings/{id}/inspections:
+    post:
+      tags: [Bookings]
+      summary: Submit checklist inspeksi customer (pickup/return)
+      description: |
+        Validasi server-side: scan pickup hanya jika booking lunas + isPickupTime + belum pickupConfirmed.
+        Return hanya saat status Active dan belum returnConfirmed. Semua item required wajib diisi;
+        item bernilai 'issue' mewajibkan notes.
+      security: [ { ApiKeyAuth: [] }, { CookieAuth: [] } ]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [qrCode, phase, items]
+              properties:
+                qrCode: { type: string }
+                phase: { type: string, enum: [pickup, return] }
+                items:
+                  type: object
+                  description: "{itemKey: 'ok' | 'issue'}"
+                  additionalProperties: { type: string, enum: [ok, issue] }
+                kmReading: { type: number }
+                fuelLevel: { type: number, nullable: true }
+                photos: { type: array, items: { type: string } }
+                notes: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Submitted, menunggu verifikasi admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      booking:
+                        $ref: "#/components/schemas/BookingStatus"
+                      verificationStatus: { type: string, example: "pending_admin" }
+        "400": { description: Validasi gagal (item wajib kosong / QR salah / fase salah) }
         "404": { description: Not owned by caller }
 
 # ============================================================
