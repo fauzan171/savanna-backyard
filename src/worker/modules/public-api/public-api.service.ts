@@ -331,6 +331,12 @@ export class PublicApiService {
       throw new ValidationError("End date must be after start date");
     }
 
+    // Reject past start times (allow ~5 min margin for clock skew)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    if (data.startDate < fiveMinutesAgo) {
+      throw new ValidationError("Start date is in the past");
+    }
+
     // Check vehicle exists and is available
     const vehicle = await this.repo.getVehicleById(data.vehicleId);
     if (!vehicle) throw new ValidationError("Vehicle not found");

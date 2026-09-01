@@ -10,7 +10,7 @@ const customer: Customer = { id: 'c1', name: 'Budi', phone: '6281', email: null 
 function makeBooking(): Booking {
 	return {
 		id: 'b1', bookingNumber: 'SVN-2026-0001', customerId: 'c1', vehicleId: 'v1',
-		startDate: '2026-07-01', endDate: '2026-07-03', status: 'pending_payment',
+		startDate: '2030-07-01', endDate: '2030-07-03', status: 'pending_payment',
 		totalAmount: 0, baseAmount: 0, equipmentTotalAmount: 0, dpAmount: 0, remainingAmount: 0,
 		paymentType: 'full', paymentStatus: 'pending',
 	} as unknown as Booking;
@@ -44,7 +44,7 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 		]);
 
 		const result = await service.createPublicBooking(
-			{ vehicleId: 'v1', startDate: '2026-07-01', endDate: '2026-07-03', customerName: 'Budi', customerPhone: '6281', equipment: [{ equipmentId: 'e1', quantity: 1 }, { equipmentId: 'e2', quantity: 2 }] },
+			{ vehicleId: 'v1', startDate: '2030-07-01', endDate: '2030-07-03', customerName: 'Budi', customerPhone: '6281', equipment: [{ equipmentId: 'e1', quantity: 1 }, { equipmentId: 'e2', quantity: 2 }] },
 			{ vendor: 'manual', config: {} },
 		);
 
@@ -59,7 +59,7 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 
 	it('[P0] should compute the DP amount from dp_percentage for paymentType=dp', async () => {
 		const result = await service.createPublicBooking(
-			{ vehicleId: 'v1', startDate: '2026-07-01', endDate: '2026-07-03', customerName: 'Budi', customerPhone: '6281', paymentType: 'dp' },
+			{ vehicleId: 'v1', startDate: '2030-07-01', endDate: '2030-07-03', customerName: 'Budi', customerPhone: '6281', paymentType: 'dp' },
 			{ vendor: 'manual', config: {} },
 		);
 
@@ -73,7 +73,7 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 
 	it('[P0] should link the booking to the public user when provided', async () => {
 		await service.createPublicBooking(
-			{ vehicleId: 'v1', startDate: '2026-07-01', endDate: '2026-07-03', customerName: 'Budi', customerPhone: '6281' },
+			{ vehicleId: 'v1', startDate: '2030-07-01', endDate: '2030-07-03', customerName: 'Budi', customerPhone: '6281' },
 			{ vendor: 'manual', config: {} },
 			{ publicUserId: 'pu-1' },
 		);
@@ -84,7 +84,7 @@ describe('PublicApiService.createPublicBooking — equipment + DP', () => {
 		vi.mocked(repo.getActiveEquipmentByIds).mockResolvedValue([]); // none found
 		await expect(
 			service.createPublicBooking(
-				{ vehicleId: 'v1', startDate: '2026-07-01', endDate: '2026-07-03', customerName: 'Budi', customerPhone: '6281', equipment: [{ equipmentId: 'nope', quantity: 1 }] },
+				{ vehicleId: 'v1', startDate: '2030-07-01', endDate: '2030-07-03', customerName: 'Budi', customerPhone: '6281', equipment: [{ equipmentId: 'nope', quantity: 1 }] },
 				{ vendor: 'manual', config: {} },
 			),
 		).rejects.toThrow();

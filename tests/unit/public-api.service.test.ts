@@ -765,4 +765,40 @@ describe('PublicApiService', () => {
 			expect(result).toBeNull();
 		});
 	});
+
+	describe('createPublicBooking — past start date', () => {
+		const bookingRequest = (startDate: string) => ({
+			vehicleId: 'test-vehicle-id',
+			startDate,
+			endDate: '2099-12-31T23:59:00+07:00',
+			customerName: 'Budi',
+			customerPhone: '+628123456789',
+			paymentType: 'full' as const,
+		});
+
+		it('[P0] rejects startDate in the past with VALIDATION_ERROR', async () => {
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createPublicVehicle() as never);
+
+			await expect(
+				publicApiService.createPublicBooking(
+					{ vehicleId: 'test-vehicle-id', startDate: '2020-01-01T00:00:00+07:00', endDate: '2099-01-02T00:00:00+07:00', customerName: 'Budi', customerPhone: '+628123456789' } as never,
+					{ vendor: 'manual', config: {} },
+				),
+			).rejects.toThrow('Start date is in the past');
+		});
+
+		it('[P1] allows startDate within 5-minute clock-skew margin', async () => {
+			vi.mocked(mockRepo.getVehicleById).mockResolvedValue(createPublicVehicle() as never);
+			vi.mocked(mockRepo.getVehicleBookingsInRange).mockResolvedValue([]);
+
+			// Downstream deps (createCustomer) unmocked — reaching that failure
+			// proves the past-date gate let the request through.
+			await expect(
+				publicApiService.createPublicBooking(
+					{ vehicleId: 'test-vehicle-id', startDate: new Date(Date.now() + 60 * 60 * 1000).toISOString(), endDate: '2099-01-02T00:00:00+07:00', customerName: 'Budi', customerPhone: '+628123456789' } as never,
+					{ vendor: 'manual', config: {} },
+				),
+			).rejects.not.toThrow('Start date is in the past');
+		});
+	});
 });
