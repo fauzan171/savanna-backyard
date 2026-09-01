@@ -90,7 +90,7 @@ export default function FleetReportPage() {
 				/>
 				<StatCard
 					title="Avg Utilization"
-					value={report ? `${report.summary.averageUtilization.toFixed(1)}%` : '-'}
+					value={report ? `${(report.summary.averageUtilization ?? 0).toFixed(1)}%` : '-'}
 					icon={<TrendingUp className="h-4 w-4" />}
 					loading={isLoading}
 				/>
@@ -111,7 +111,7 @@ export default function FleetReportPage() {
 				]}
 				loading={isLoading}
 				empty={!trendData || trendData.length === 0}
-				formatY={(v) => `${v.toFixed(1)}%`}
+				formatY={(v) => `${(v ?? 0).toFixed(1)}%`}
 			/>
 
 			<BarChart
@@ -123,7 +123,7 @@ export default function FleetReportPage() {
 				]}
 				loading={isLoading}
 				empty={!vehicleData || vehicleData.length === 0}
-				formatY={(v) => `${v.toFixed(1)}%`}
+				formatY={(v) => `${(v ?? 0).toFixed(1)}%`}
 			/>
 
 			<BarChart
@@ -135,7 +135,7 @@ export default function FleetReportPage() {
 				]}
 				loading={isLoading}
 				empty={!typeData || typeData.length === 0}
-				formatY={(v) => `${v.toFixed(1)}%`}
+				formatY={(v) => `${(v ?? 0).toFixed(1)}%`}
 			/>
 		</div>
 	);
