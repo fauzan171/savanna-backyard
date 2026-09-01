@@ -47,15 +47,20 @@ export function PaymentTable({ data, isLoading, onRowClick }: PaymentTableProps)
 		{
 			accessorKey: 'booking.bookingNumber',
 			header: 'Booking',
-			cell: ({ row }) => (
-				<Link
-					to={`/bookings/${row.original.bookingId}`}
-					className="font-mono text-sm font-medium hover:underline text-primary"
-					onClick={(e) => e.stopPropagation()}
-				>
-					{row.original.booking?.bookingNumber ?? '-'}
-				</Link>
-			),
+			cell: ({ row }) => {
+				const bookingId = row.original.bookingId ?? row.original.booking?.id;
+				return bookingId ? (
+					<Link
+						to={`/bookings/${bookingId}`}
+						className="font-mono text-sm font-medium hover:underline text-primary"
+						onClick={(e) => e.stopPropagation()}
+					>
+						{row.original.booking?.bookingNumber ?? '-'}
+					</Link>
+				) : (
+					<span className="font-mono text-sm text-muted-foreground">-</span>
+				);
+			},
 		},
 		{
 			accessorKey: 'booking.customer.name',

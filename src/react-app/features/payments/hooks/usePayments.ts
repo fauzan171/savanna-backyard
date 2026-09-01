@@ -104,13 +104,26 @@ export function useUpdatePayment() {
 	});
 }
 
-/** Verify or reject payment */
+/** Verify payment */
 export function useVerifyPayment() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
 		mutationFn: ({ id, ...data }: { id: string } & VerifyPaymentRequest) =>
 			api.post<ApiSuccessResponse<Payment>>(`${BASE_PATH}/${id}/verify`, data),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: paymentKeys.all });
+		},
+	});
+}
+
+/** Reject payment — calls /reject instead of /verify */
+export function useRejectPayment() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+			api.post<ApiSuccessResponse<Payment>>(`${BASE_PATH}/${id}/reject`, { reason }),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: paymentKeys.all });
 		},

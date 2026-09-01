@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Plus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, ToggleLeft, ToggleRight, Pencil, Trash2 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
-import { useUsers, useCreateUser, useToggleUser } from '../hooks/useUsers';
+import { useUsers, useCreateUser, useToggleUser, useUpdateUser } from '../hooks/useUsers';
 import { toast } from '@/react-app/hooks/useToast';
 import type { CreateUserRequest } from '../api/users';
 
@@ -79,8 +79,10 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 
 export default function UsersPage() {
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const [editingUser, setEditingUser] = useState<any>(null);
 	const { data: users, isLoading } = useUsers();
 	const toggleMutation = useToggleUser();
+	const updateMutation = useUpdateUser();
 
 	return (
 		<div className="space-y-6">
@@ -97,7 +99,7 @@ export default function UsersPage() {
 								<th className="text-left p-3 text-sm font-medium">Email</th>
 								<th className="text-left p-3 text-sm font-medium">Role</th>
 								<th className="text-left p-3 text-sm font-medium">Status</th>
-								<th className="text-left p-3 text-sm font-medium">Toggle</th>
+								<th className="text-left p-3 text-sm font-medium">Actions</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y">
@@ -107,12 +109,58 @@ export default function UsersPage() {
 									<td className="p-3 text-sm">{user.email}</td>
 									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${user.role === 'SUPER_ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{user.role}</span></td>
 									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{user.isActive ? 'Active' : 'Inactive'}</span></td>
-									<td className="p-3"><Button variant="ghost" size="sm" onClick={() => toggleMutation.mutate(user.id)}>{user.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button></td>
+									<td className="p-3 flex gap-1">
+									<Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}><Pencil className="size-4" /></Button>
+									<Button variant="ghost" size="sm" onClick={() => { if (window.confirm(`Deactivate ${user.name}? They won't be able to log in.`)) toggleMutation.mutate(user.id); }}><Trash2 className="size-4 text-destructive" /></Button>
+									<Button variant="ghost" size="sm" onClick={() => toggleMutation.mutate(user.id)}>{user.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button>
+								</td>
 								</tr>
 							))}
 						</tbody>
 					</table>
 				</div>
+			)}
+			{editingUser && (
+				<Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
+					<DialogContent>
+						<DialogHeader><DialogTitle>Edit User: {editingUser.name}</DialogTitle></DialogHeader>
+						<form onSubmit={async (e) => {
+							e.preventDefault();
+							const fd = new FormData(e.target as HTMLFormElement);
+							const name = (fd.get('name') as string || '').trim();
+							const email = (fd.get('email') as string || '').trim();
+							const role = fd.get('role') as string;
+							if (!name || !email) return;
+							try {
+								await updateMutation.mutateAsync({ id: editingUser.id, data: { name, email, role } });
+								setEditingUser(null);
+								toast({ title: 'User updated' });
+							} catch (err) {
+								toast({ variant: 'destructive', title: 'Gagal update', description: (err as Error).message });
+							}
+						}} className="space-y-4">
+							<div className="space-y-1">
+								<label className="text-sm font-medium">Name</label>
+								<Input name="name" defaultValue={editingUser.name} required />
+							</div>
+							<div className="space-y-1">
+								<label className="text-sm font-medium">Email</label>
+								<Input name="email" type="email" defaultValue={editingUser.email} required />
+							</div>
+							<div className="space-y-1">
+								<label className="text-sm font-medium">Role</label>
+								<select name="role" defaultValue={editingUser.role} className="w-full border rounded-md px-3 py-2 text-sm">
+									<option value="STAFF">Staff</option>
+									<option value="SUPER_ADMIN">Super Admin</option>
+								</select>
+							</div>
+							<div className="flex justify-end gap-2">
+								<Button type="button" variant="outline" onClick={() => setEditingUser(null)}>Cancel</Button>
+								<Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? 'Saving...' : 'Save'}</Button>
+							</div>
+						</form>
+					</DialogContent>
+				</Dialog>
 			)}
 			<CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
 		</div>

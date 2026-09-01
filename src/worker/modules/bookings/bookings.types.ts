@@ -83,6 +83,14 @@ export interface BookingResponse {
 	notes: string | null;
 	createdAt: string;
 	updatedAt: string;
+	statusHistory?: Array<{
+		id: string;
+		fromStatus: string | null;
+		toStatus: string;
+		changedBy: string | null;
+		note: string | null;
+		createdAt: string;
+	}>;
 }
 
 export interface BookingWithDetails extends BookingResponse {

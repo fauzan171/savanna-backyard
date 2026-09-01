@@ -35,14 +35,28 @@ export const createBookingSchema = z.object({
 );
 
 // Update booking schema (limited fields)
-export const updateBookingSchema = z.object({
-	notes: z
-		.string()
-		.max(2000)
-		.optional()
-		.nullable()
-		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
-});
+export const updateBookingSchema = z
+	.object({
+		notes: z
+			.string()
+			.max(2000)
+			.optional()
+			.nullable()
+			.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+		startDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional(),
+		endDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional(),
+		vehicleId: z.string().uuid().optional(),
+	})
+	.refine((data) => {
+		if (data.startDate && data.endDate) return data.startDate <= data.endDate;
+		return true;
+	}, { message: 'End date must be after start date' });
 
 // Start rental schema
 export const startRentalSchema = z.object({
@@ -103,6 +117,12 @@ export const cancelBookingSchema = z.object({
 // Scan-return schema: admin scans the vehicle QR to resolve the active booking
 export const scanReturnSchema = z.object({
 	qrCode: z.string().min(1, 'QR code is required'),
+});
+
+// Scan-qr schema: resolve vehicle from QR/plate scan for pickup condition check
+export const scanQrSchema = z.object({
+	qrCode: z.string().min(1, 'QR code or plate number is required'),
+	scanTime: z.string().optional(),
 });
 
 // Add addon schema

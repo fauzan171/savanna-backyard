@@ -81,13 +81,16 @@ export function AvailabilityCalendar({
 	showLegend = true,
 	className,
 }: AvailabilityCalendarProps) {
-	// Convert bookings to blocked date ranges
+	// Convert bookings to blocked date ranges (skip invalid dates)
 	const blockedRanges = React.useMemo(() => {
-		return bookings.map((booking) => ({
-			from: parseISO(booking.startDate),
-			to: parseISO(booking.endDate),
-			booking,
-		}));
+		return bookings
+			.filter((b) => b.startDate && b.endDate)
+			.map((booking) => ({
+				from: parseISO(booking.startDate),
+				to: parseISO(booking.endDate),
+				booking,
+			}))
+			.filter((r) => !Number.isNaN(r.from.getTime()) && !Number.isNaN(r.to.getTime()));
 	}, [bookings]);
 
 	// Get all blocked dates as individual days

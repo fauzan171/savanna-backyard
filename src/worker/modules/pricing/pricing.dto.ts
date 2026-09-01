@@ -8,8 +8,10 @@ const safeOptText = z
 	.transform((v) => (v == null ? v : (sanitizeText(v) as string)));
 
 // PRIC-02: prices must be positive (reject 0) with an upper bound
+// FIX: use coerce to accept strings from forms and convert to numbers
 const priceField = (label: string) =>
 	z
+		.coerce
 		.number()
 		.int()
 		.min(1, `${label} must be greater than 0`)
@@ -29,7 +31,7 @@ export const createPricingSchema = z.object({
 	notIncluded: z.array(z.string()),
 	highlighted: z.boolean().optional().default(false),
 	icon: z.string().optional().nullable(),
-	sortOrder: z.number().int().optional().default(0),
+	sortOrder: z.coerce.number().int().optional().default(0),
 	isActive: z.boolean().optional().default(true),
 });
 

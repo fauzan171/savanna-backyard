@@ -411,6 +411,20 @@ export class PublicApiService {
       remainingAmount = Math.round(totalAmount - dpAmount);
     }
 
+    // B1: re-verify availability immediately before insert to narrow the
+    // TOCTOU window (D1 has no transactions). A concurrent booking that
+    // slipped in between the first check and here will be caught.
+    const recheck = await this.repo.isVehicleAvailableForDates(
+      data.vehicleId,
+      data.startDate,
+      data.endDate,
+    );
+    if (!recheck) {
+      throw new ConflictError(
+        "Vehicle was just booked by another customer. Please choose different dates or vehicle.",
+      );
+    }
+
     // Create booking
     const booking = await this.repo.createBooking({
       customerId: customer.id,
@@ -451,6 +465,30 @@ export class PublicApiService {
       for (const r of equipmentRows) {
         await this.repo.decrementEquipmentStock(r.equipmentId, r.quantity);
       }
+    }
+
+    // RACE-001: post-insert conflict check.
+    // D1 has no transactions, so two concurrent inserts can both succeed.
+    // After insert, re-check for conflicts. If another booking appeared
+    // for the same vehicle+dates, this one loses — cancel + restore stock.
+    const postCheck = await this.repo.isVehicleAvailableForDates(
+      data.vehicleId,
+      data.startDate,
+      data.endDate,
+    );
+    if (!postCheck) {
+      // Rollback: cancel the booking we just created and restore equipment stock
+      await this.repo.updateBooking(booking.id, {
+        status: 'Cancelled',
+        cancelledAt: new Date().toISOString(),
+        notes: 'Race condition — another concurrent booking won the slot',
+      });
+      for (const r of equipmentRows) {
+        await this.repo.restoreEquipmentStock(r.equipmentId, r.quantity);
+      }
+      throw new ConflictError(
+        "Vehicle was just booked by another customer. Please choose different dates or vehicle.",
+      );
     }
 
     // Request payment page via the configured gateway

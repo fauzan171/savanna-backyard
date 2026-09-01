@@ -28,6 +28,7 @@ import { NotificationService } from './core/services/notification.service';
 import { VehiclesRepository } from './modules/vehicles/vehicles.repository';
 import { BookingsRepository } from './modules/bookings/bookings.repository';
 import { calculateLateFee } from './modules/bookings/availability.helper';
+import { BookingCleanupService } from './core/services/booking-cleanup.service';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -245,6 +246,16 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
       console.error('[Scheduled] Error completing overdue bookings:', error);
     }
 
+    // 5. Cleanup expired pending_payment bookings (vehicle lock leak prevention)
+    let cleanupResult: { processed: number; stockRestored: number; failed: number } | null = null;
+    try {
+      const cleanupService = new BookingCleanupService(db);
+      cleanupResult = await cleanupService.runCleanupExpiredBookings();
+      console.log('[Scheduled] Expired booking cleanup:', cleanupResult);
+    } catch (error) {
+      console.error('[Scheduled] Error running expired booking cleanup:', error);
+    }
+
     console.log('[Scheduled] All jobs completed:', {
       cleanableVehicles,
       dailyReminders,
@@ -252,6 +263,7 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
       followups,
       activated: activatedCount,
       overdueCompleted: completedCount,
+      cleanupExpired: cleanupResult,
     });
   } catch (error) {
     console.error('[Scheduled] Error running notification jobs:', error);

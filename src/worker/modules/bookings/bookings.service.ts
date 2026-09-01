@@ -9,6 +9,7 @@ import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@
 import {
 	generateBookingNumber,
 	calculateDays,
+	calculateTwelveHourBlocks,
 	calculateLateFee,
 	getHourlyRate,
 	LATE_FEE_MULTIPLIER,
@@ -47,6 +48,14 @@ import type {
 import type { Booking, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
+	// ── History ──
+
+	async getBookingHistory(bookingId: string) {
+		return this.bookingRepo.getBookingHistory(bookingId);
+	}
+
+	// ── Helpers ──
+
 	private normalizePlateNumber(value: string): string {
 		return value.trim().toUpperCase().replace(/\s+/g, ' ');
 	}
@@ -154,6 +163,9 @@ export class BookingsService {
 			dailyRateIdr: details.vehicle.dailyRateIdr,
 		};
 
+		// Fetch status change history
+		const statusHistory = await this.bookingRepo.getBookingHistory(booking.id);
+
 		return {
 			id: booking.id,
 			bookingNumber: booking.bookingNumber,
@@ -174,6 +186,7 @@ export class BookingsService {
 			penaltyPaid: booking.penaltyPaid ?? false,
 			returnConfirmed: booking.returnConfirmed ?? false,
 			totalAmount: booking.totalAmount,
+			statusHistory,
 			currency: booking.currency,
 			notes: booking.notes,
 			createdAt: booking.createdAt,
@@ -423,6 +436,9 @@ export class BookingsService {
 			createdBy: userId,
 		});
 
+		// Log initial status
+		await this.bookingRepo.logStatusChange(booking.id, null, 'Pending', userId, 'Booking created');
+
 		// Create addons
 		for (const addon of data.addons ?? []) {
 			await this.bookingRepo.createAddon({
@@ -446,8 +462,38 @@ export class BookingsService {
 
 		this.assertNotTerminal(booking, 'update');
 
-		const updated = await this.bookingRepo.update(id, {
-			notes: data.notes,
+		// Build update payload
+		const updateData: Record<string, unknown> = {};
+
+		if (data.notes !== undefined) updateData.notes = data.notes;
+
+		// Handle vehicle change
+		if (data.vehicleId && data.vehicleId !== booking.vehicleId) {
+			const newVehicle = await this.vehicleRepo.findById(data.vehicleId);
+			if (!newVehicle) throw new ValidationError('Vehicle not found');
+			if (newVehicle.status !== 'Available') throw new ValidationError('Target vehicle is not available');
+			updateData.vehicleId = data.vehicleId;
+			updateData.baseAmount = Math.round(newVehicle.dailyRateIdr * calculateTwelveHourBlocks(booking.startDate, booking.endDate));
+		}
+
+		// Handle date change — re-check availability + re-price
+		const newStart = data.startDate ?? booking.startDate;
+		const newEnd = data.endDate ?? booking.endDate;
+		if (data.startDate || data.endDate) {
+			if (newStart > newEnd) throw new ValidationError('End date must be after start date');
+			const isAvail = await this.bookingRepo.isVehicleAvailableForDates(
+				updateData.vehicleId as string ?? booking.vehicleId,
+				newStart,
+				newEnd,
+			);
+			if (!isAvail) throw new ConflictError('Vehicle is not available for the selected dates');
+			updateData.startDate = newStart;
+			updateData.endDate = newEnd;
+			const vehicle = await this.vehicleRepo.findById(updateData.vehicleId as string ?? booking.vehicleId);
+			updateData.baseAmount = Math.round(vehicle!.dailyRateIdr * calculateTwelveHourBlocks(newStart, newEnd));
+		}
+
+		const updated = await this.bookingRepo.update(id, updateData as any);
 		});
 
 		if (!updated) {
@@ -469,6 +515,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Pending', 'Confirmed');
 
 		return this.toResponse(updated);
 	}
@@ -501,6 +548,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Confirmed', 'Active');
 
 		// Update vehicle status to Rented
 		await this.vehicleRepo.updateStatus(booking.vehicleId, 'Rented');
@@ -590,6 +638,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, 'Active', 'Completed');
 
 		// Derive condition status (admin override wins) and update vehicle
 		const conditionStatus = (data.conditionStatus
@@ -748,6 +797,7 @@ export class BookingsService {
 		if (!updated) {
 			throw new NotFoundError('Booking');
 		}
+		await this.bookingRepo.logStatusChange(id, booking.status, 'Cancelled', undefined, reason);
 
 		return this.toResponse(updated);
 	}
