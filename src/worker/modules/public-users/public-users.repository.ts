@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, sql, isNull } from 'drizzle-orm';
+import { eq, desc, and, gte, sql, isNull, or } from 'drizzle-orm';
 import type { Database } from '@/worker/core/database';
 import {
 	publicUsers,
@@ -7,6 +7,7 @@ import {
 	customers,
 	vehicles,
 	vehicleChecklists,
+	publicUserNotifications,
 	type PublicUser,
 	type NewPublicUser,
 	type VerificationCode,
@@ -14,6 +15,8 @@ import {
 	type Booking,
 	type Vehicle,
 	type VehicleChecklist,
+	type PublicUserNotification,
+	type NewPublicUserNotification,
 } from '@/worker/core/database/schema';
 
 export class PublicUsersRepository {
@@ -121,6 +124,57 @@ export class PublicUsersRepository {
 
 	async updateVerification(id: string, data: Partial<NewVerificationCode>): Promise<void> {
 		await this.db.update(verificationCodes).set(data).where(eq(verificationCodes.id, id));
+	}
+
+	async listVerificationCodes(limit = 100): Promise<VerificationCode[]> {
+		return this.db
+			.select()
+			.from(verificationCodes)
+			.orderBy(desc(verificationCodes.createdAt))
+			.limit(limit);
+	}
+
+	// ---------------- public_user_notifications ----------------
+	async createNotification(data: Omit<NewPublicUserNotification, 'id' | 'createdAt'>): Promise<PublicUserNotification> {
+		const id = crypto.randomUUID();
+		await this.db.insert(publicUserNotifications).values({ id, ...data, createdAt: new Date().toISOString() });
+		const [created] = await this.db.select().from(publicUserNotifications).where(eq(publicUserNotifications.id, id)).limit(1);
+		return created!;
+	}
+
+	async listNotifications(publicUserId: string, phone: string, limit = 50): Promise<PublicUserNotification[]> {
+		return this.db
+			.select()
+			.from(publicUserNotifications)
+			.where(or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)))
+			.orderBy(desc(publicUserNotifications.createdAt))
+			.limit(limit);
+	}
+
+	async markNotificationRead(id: string, publicUserId: string, phone: string): Promise<PublicUserNotification | null> {
+		await this.db
+			.update(publicUserNotifications)
+			.set({ readAt: new Date().toISOString() })
+			.where(and(
+				eq(publicUserNotifications.id, id),
+				or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
+			));
+		const [updated] = await this.db
+			.select()
+			.from(publicUserNotifications)
+			.where(and(
+				eq(publicUserNotifications.id, id),
+				or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
+			))
+			.limit(1);
+		return updated ?? null;
+	}
+
+	async attachNotificationsToPublicUser(phone: string, publicUserId: string): Promise<void> {
+		await this.db
+			.update(publicUserNotifications)
+			.set({ publicUserId })
+			.where(and(eq(publicUserNotifications.phone, phone), isNull(publicUserNotifications.publicUserId)));
 	}
 
 	// ---------------- bookings (account-scoped) ----------------

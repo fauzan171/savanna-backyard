@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 // Start WhatsApp phone login (no auth — this IS the login entry point)
 export const phoneInitSchema = z.object({
-	phone: z.string().regex(/^\d{8,15}$/, 'Phone must be 8-15 digits (no spaces)'),
+	phone: z.string().min(8, 'Nomor WhatsApp wajib diisi').max(30),
 });
 export type PhoneInitRequest = z.infer<typeof phoneInitSchema>;
 
 // Verify the WhatsApp OTP
 export const phoneVerifySchema = z.object({
-	phone: z.string().regex(/^\d{8,15}$/, 'Phone must be 8-15 digits'),
-	code: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+	phone: z.string().min(8, 'Nomor WhatsApp wajib diisi').max(30),
+	code: z.string().regex(/^\d{6}$/, 'OTP harus 6 digit'),
 });
 export type PhoneVerifyRequest = z.infer<typeof phoneVerifySchema>;
 

@@ -43,6 +43,10 @@ declare namespace Cloudflare {
 		WHATSAPP_WEBHOOK_TOKEN?: string;
 		/** Comma-separated developer emails allowed to use /public/auth/dev/login (no OTP). Empty in production = disabled. */
 		DEVELOPER_ALLOWLIST?: string;
+		/** Temporary customer OTP delivery channel: web | whatsapp */
+		OTP_DELIVERY_CHANNEL?: string;
+		/** Customer notification channel: web | whatsapp */
+		NOTIFICATION_CHANNEL?: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

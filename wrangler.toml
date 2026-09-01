@@ -35,6 +35,8 @@ IFORTEPAY_SUCCESS_REDIRECT_URL = ""
 IFORTEPAY_FAILED_REDIRECT_URL = ""
 # Active payment gateway vendor: xendit | ifortepay | midtrans | manual
 PAYMENT_GATEWAY_VENDOR = "xendit"
+OTP_DELIVERY_CHANNEL = "web"
+NOTIFICATION_CHANNEL = "web"
 # XENDIT_API_KEY - set via: npx wrangler secret put XENDIT_API_KEY
 # XENDIT_WEBHOOK_TOKEN - set via: npx wrangler secret put XENDIT_WEBHOOK_TOKEN
 

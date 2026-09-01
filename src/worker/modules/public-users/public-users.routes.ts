@@ -6,6 +6,7 @@ import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { JwtService } from '@/worker/core/services/jwt.service';
 import { TokenBlacklistRepository } from '@/worker/core/repositories/token-blacklist.repository';
 import { createWhatsAppProvider } from '@/worker/core/services/providers';
+import { CustomerNotificationService } from '@/worker/core/services/customer-notification.service';
 import { publicUserAuthMiddleware, optionalPublicUserAuth, requirePhoneVerified } from '@/worker/core/middleware/public-auth';
 import {
 	publicAuthInitRateLimit,
@@ -45,7 +46,10 @@ export const publicUsersServicesMiddleware = () => async (c: Context<PublicUsers
 	const jwtService = new JwtService(c.env.JWT_SECRET);
 	const repo = new PublicUsersRepository(db);
 	const whatsapp = await createWhatsAppProvider(configRepo);
-	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo);
+	const otpDeliveryChannel = c.env.OTP_DELIVERY_CHANNEL === 'whatsapp' ? 'whatsapp' : 'web';
+	const notificationChannel = c.env.NOTIFICATION_CHANNEL === 'whatsapp' ? 'whatsapp' : 'web';
+	const notifications = new CustomerNotificationService(repo, whatsapp, notificationChannel);
+	const service = new PublicUsersService(repo, jwtService, whatsapp, configRepo, otpDeliveryChannel, notifications);
 	c.set('publicUsersService', service);
 	c.set('jwtService', jwtService);
 	await next();
@@ -83,7 +87,7 @@ const phoneInitHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const body = getValidatedBody<PhoneInitRequest>(c);
 	const result = await service.phoneInit(body);
-	return c.json({ success: true, message: 'Send the Ref code to our WhatsApp number', data: result });
+	return c.json({ success: true, message: 'OTP berhasil dibuat', data: result });
 };
 
 const phoneVerifyHandler = async (c: Context<PublicUsersEnv>) => {
@@ -202,6 +206,20 @@ const myBookingDetailHandler = async (c: Context<PublicUsersEnv>) => {
 	return c.json({ success: true, data: result });
 };
 
+const notificationsHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const result = await service.listNotifications(pu.publicUserId);
+	return c.json({ success: true, data: result });
+};
+
+const markNotificationReadHandler = async (c: Context<PublicUsersEnv>) => {
+	const service = c.get('publicUsersService');
+	const pu = c.get('publicUser');
+	const result = await service.markNotificationRead(pu.publicUserId, c.req.param('id'));
+	return c.json({ success: true, data: result });
+};
+
 const payRemainingHandler = async (c: Context<PublicUsersEnv>) => {
 	const service = c.get('publicUsersService');
 	const pu = c.get('publicUser');
@@ -313,6 +331,8 @@ export function createPublicMeRouter(): Hono<PublicUsersEnv> {
 
 	router.get('/bookings', myBookingsHandler);
 	router.get('/bookings/:id', myBookingDetailHandler);
+	router.get('/notifications', notificationsHandler);
+	router.post('/notifications/:id/read', markNotificationReadHandler);
 	// Pay the remainder requires a verified account (anti-abuse)
 	router.post('/bookings/:bookingId/pay-remaining', requirePhoneVerified(), payRemainingHandler);
 	router.post('/bookings/:id/scan-vehicle', requirePhoneVerified(), publicVehicleScanRateLimit(), validateBody(confirmPickupSchema), scanCustomerVehicleHandler);

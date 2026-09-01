@@ -5,6 +5,8 @@ JWT_SECRET=your-super-secret-jwt-key-change-in-production
 # Payment Gateway Configuration
 # Active vendor: xendit | ifortepay | midtrans | manual
 PAYMENT_GATEWAY_VENDOR=xendit
+OTP_DELIVERY_CHANNEL=web
+NOTIFICATION_CHANNEL=web
 
 # Xendit (staging/development mode)
 # Get these from https://dashboard.xendit.co > Settings > API Keys

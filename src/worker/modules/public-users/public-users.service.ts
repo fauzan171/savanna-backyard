@@ -4,11 +4,11 @@ import { ConfigRepository } from '@/worker/core/repositories/config.repository';
 import { decodeVehicleQr } from '@/worker/core/lib/qr';
 import { PaymentGatewayFactory } from '@/worker/core/services/payment-gateway/factory';
 import type { WhatsAppProvider } from '@/worker/core/services/providers';
+import { CustomerNotificationService } from '@/worker/core/services/customer-notification.service';
 import { ValidationError, NotFoundError } from '@/worker/core/types/errors';
 import type { PhoneInitRequest, PhoneVerifyRequest, UpdateProfileRequest, DevLoginRequest, CustomerInspectionRequest } from './public-users.dto';
-import type { PublicUser, Booking } from '@/worker/core/database/schema';
+import type { PublicUser, Booking, PublicUserNotification } from '@/worker/core/database/schema';
 
-const REF_EXPIRY_MIN = 5;
 const OTP_EXPIRY_MIN = 5;
 const MAX_INIT_PER_HOUR = 3;
 const MAX_OTP_ATTEMPTS = 5;
@@ -16,6 +16,7 @@ const MAX_OTP_ATTEMPTS = 5;
 // reading server logs. Only used when whatsapp provider = 'stub' (dev default).
 // Prod runs on Fonnte → random OTP via genOtp(). Remove when real WA is wired.
 const DEV_OTP = '123456';
+type OtpDeliveryChannel = 'web' | 'whatsapp';
 
 export interface PublicAccountInfo {
 	id: string;
@@ -24,6 +25,16 @@ export interface PublicAccountInfo {
 	email: string | null;
 	phoneVerified: boolean;
 	avatarUrl: string | null;
+}
+
+export interface PublicNotificationInfo {
+	id: string;
+	type: string;
+	title: string;
+	message: string;
+	metadata: Record<string, unknown> | null;
+	readAt: string | null;
+	createdAt: string;
 }
 
 export interface PublicBookingSummary {
@@ -83,6 +94,37 @@ function toBookingSummary(b: Booking): PublicBookingSummary {
 		customerReturnChecklistId: b.customerReturnChecklistId,
 		createdAt: b.createdAt,
 	};
+}
+
+function toNotificationInfo(n: PublicUserNotification): PublicNotificationInfo {
+	let metadata: Record<string, unknown> | null = null;
+	if (n.metadata) {
+		try {
+			const parsed = JSON.parse(n.metadata) as unknown;
+			metadata = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+				? parsed as Record<string, unknown>
+				: null;
+		} catch {
+			metadata = null;
+		}
+	}
+	return {
+		id: n.id,
+		type: n.type,
+		title: n.title,
+		message: n.message,
+		metadata,
+		readAt: n.readAt,
+		createdAt: n.createdAt,
+	};
+}
+
+function normalizePhone(phone: string): string {
+	const digits = phone.replace(/\D/g, '');
+	if (digits.length < 8 || digits.length > 15) {
+		throw new ValidationError('Nomor WhatsApp harus berisi 8-15 digit angka.');
+	}
+	return digits;
 }
 
 // Ref code: 4 chars, no ambiguous chars (0/O/1/I)
@@ -148,6 +190,8 @@ export class PublicUsersService {
 		private jwtService: JwtService,
 		private whatsapp: WhatsAppProvider,
 		private configRepo: ConfigRepository,
+		private otpDeliveryChannel: OtpDeliveryChannel = 'web',
+		private notifications: CustomerNotificationService = new CustomerNotificationService(repo, whatsapp, 'web'),
 	) {}
 
 	/**
@@ -159,25 +203,31 @@ export class PublicUsersService {
 		refCode: string;
 		waMeUrl: string;
 		expiresAt: string;
-		devOtp?: string;
+		webOtp?: string;
 	}> {
+		const phone = normalizePhone(data.phone);
 		const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
 		// Per-phone throttle (protects a victim's number from spam)
-		const recent = await this.repo.countRecentVerificationByPhone(data.phone, oneHourAgo);
+		const recent = await this.repo.countRecentVerificationByPhone(phone, oneHourAgo);
 		if (recent >= MAX_INIT_PER_HOUR) {
-			throw new ValidationError('Too many OTP requests for this number. Please try again later.');
+			throw new ValidationError('Terlalu banyak permintaan OTP untuk nomor ini. Coba lagi nanti.');
 		}
 		// ponytail: per-user throttle (BUG#6) needs an authenticated caller; phoneInit
 		// is pre-auth (only phone known), so per-phone throttle is the only applicable
 		// gate here. Apply BUG#6 once a session/publicUserId exists in the caller context.
 
 		const refCode = genRefCode();
-		const expiresAt = new Date(Date.now() + REF_EXPIRY_MIN * 60 * 1000).toISOString();
+		const expiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
+		const webOtp = this.otpDeliveryChannel === 'web' ? genOtp() : undefined;
+		const otpHash = webOtp ? await sha256Hex(webOtp) : null;
 		await this.repo.createVerificationCode({
 			publicUserId: null,
-			phone: data.phone,
+			phone,
 			refCode,
-			otpHash: null,
+			otpCode: webOtp ?? null,
+			otpHash,
+			deliveryChannel: this.otpDeliveryChannel,
+			status: 'otp_sent',
 			type: 'phone_otp',
 			consumed: false,
 			attempts: 0,
@@ -186,18 +236,24 @@ export class PublicUsersService {
 
 		const businessNumber = (await this.configRepo.getValue('whatsapp_number')) ?? '';
 		const msg = encodeURIComponent(`Savanna Bromo - Login. Ref: ${refCode}`);
-		const waMeUrl = businessNumber ? `https://wa.me/${businessNumber}?text=${msg}` : '';
+		const waMeUrl = this.otpDeliveryChannel === 'web'
+			? ''
+			: businessNumber ? `https://wa.me/${businessNumber}?text=${msg}` : '';
 
-		// In stub/dev mode, simulate the inbound step so OTP generation still happens
-		// without a real WhatsApp round-trip (keeps the flow testable end-to-end).
-		// Surface the dev OTP so the client can auto-verify without server logs.
-		let devOtp: string | undefined;
-		if (this.whatsapp.name === 'stub') {
+		if (this.otpDeliveryChannel === 'web' && webOtp) {
+			await this.notifications.sendCustomerNotification({
+				phone,
+				type: 'otp',
+				title: 'Kode OTP Login',
+				message: `Kode OTP Savanna Bromo Anda: ${webOtp}. Berlaku ${OTP_EXPIRY_MIN} menit. Jangan bagikan kode ini ke siapapun.`,
+				metadata: { refCode, expiresAt },
+			});
+		} else if (this.whatsapp.name === 'stub') {
 			const simulated = await this.handleWhatsappInbound({ message: `Ref: ${refCode}` });
-			devOtp = simulated.otp;
+			return { refCode, waMeUrl, expiresAt, webOtp: simulated.otp };
 		}
 
-		return { refCode, waMeUrl, expiresAt, devOtp };
+		return { refCode, waMeUrl, expiresAt, ...(webOtp ? { webOtp } : {}) };
 	}
 
 	/**
@@ -217,7 +273,13 @@ export class PublicUsersService {
 		const otp = isStub ? DEV_OTP : genOtp();
 		const otpHash = await sha256Hex(otp);
 		const otpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MIN * 60 * 1000).toISOString();
-		await this.repo.updateVerification(code.id, { otpHash, expiresAt: otpExpiresAt });
+		await this.repo.updateVerification(code.id, {
+			otpCode: null,
+			otpHash,
+			deliveryChannel: 'whatsapp',
+			status: 'otp_sent',
+			expiresAt: otpExpiresAt,
+		});
 
 		const result = await this.whatsapp.sendMessage(
 			code.phone,
@@ -238,34 +300,35 @@ export class PublicUsersService {
 		user: PublicAccountInfo;
 		token: string;
 	}> {
+		const phone = normalizePhone(data.phone);
 		// ponytail: C4 user-scoping needs a known publicUserId; verify is keyed by
 		// phone+OTP and the code row is bound to the phone at init, so plain lookup
 		// is sufficient. Re-add the user filter when a session user is in context.
-		const code = await this.repo.findLatestVerificationByPhone(data.phone);
+		const code = await this.repo.findLatestVerificationByPhone(phone);
 		if (!code) {
-			throw new ValidationError('No active verification for this number. Please request a new OTP.');
+			throw new ValidationError('Tidak ada OTP aktif untuk nomor ini. Silakan minta OTP baru.');
 		}
 		if (!code.otpHash) {
-			throw new ValidationError('OTP not yet generated. Send the Ref code to our WhatsApp number first.');
+			throw new ValidationError('OTP belum dibuat. Silakan minta OTP baru.');
 		}
 		if (code.attempts >= MAX_OTP_ATTEMPTS) {
-			throw new ValidationError('Too many wrong attempts. Please request a new OTP.');
+			throw new ValidationError('Terlalu banyak percobaan salah. Silakan minta OTP baru.');
 		}
 
 		const hash = await sha256Hex(data.code);
 		if (hash !== code.otpHash) {
 			await this.repo.updateVerification(code.id, { attempts: code.attempts + 1 });
-			throw new ValidationError('Invalid OTP code.');
+			throw new ValidationError('Kode OTP tidak valid.');
 		}
 
-		await this.repo.updateVerification(code.id, { consumed: true });
+		await this.repo.updateVerification(code.id, { consumed: true, status: 'verified' });
 
 		// Find-or-create the account by phone (this is the login)
-		let user = await this.repo.findByPhone(data.phone);
+		let user = await this.repo.findByPhone(phone);
 		if (!user) {
 			user = await this.repo.create({
-				phone: data.phone,
-				name: null,
+				phone,
+				name: 'Customer',
 				email: null,
 				phoneVerified: true,
 				deviceFingerprint: null,
@@ -275,6 +338,7 @@ export class PublicUsersService {
 		} else if (!user.phoneVerified) {
 			user = await this.repo.update(user.id, { phoneVerified: true });
 		}
+		await this.repo.attachNotificationsToPublicUser(phone, user.id);
 
 		const { token } = await this.jwtService.sign({ userId: user.id, type: 'public' });
 		return { user: toAccountInfo(user), token };
@@ -321,6 +385,21 @@ export class PublicUsersService {
 		const user = await this.repo.findById(publicUserId);
 		if (!user) throw new NotFoundError('Account');
 		return toAccountInfo(user);
+	}
+
+	async listNotifications(publicUserId: string): Promise<PublicNotificationInfo[]> {
+		const user = await this.repo.findById(publicUserId);
+		if (!user) throw new NotFoundError('Account');
+		const notifications = await this.repo.listNotifications(publicUserId, user.phone);
+		return notifications.map(toNotificationInfo);
+	}
+
+	async markNotificationRead(publicUserId: string, notificationId: string): Promise<PublicNotificationInfo> {
+		const user = await this.repo.findById(publicUserId);
+		if (!user) throw new NotFoundError('Account');
+		const notification = await this.repo.markNotificationRead(notificationId, publicUserId, user.phone);
+		if (!notification) throw new NotFoundError('Notification');
+		return toNotificationInfo(notification);
 	}
 
 	async updateProfile(publicUserId: string, data: UpdateProfileRequest): Promise<PublicAccountInfo> {

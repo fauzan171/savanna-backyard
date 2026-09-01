@@ -54,6 +54,7 @@ import { ReviewsPage, ReviewDetailPage } from '@/react-app/features/reviews';
 import { TrailsPage, TrailDetailPage } from '@/react-app/features/trails';
 import SettingsPage from '@/react-app/features/settings/pages/SettingsPage';
 import UsersPage from '@/react-app/features/users/pages/UsersPage';
+import { OtpLogsPage } from '@/react-app/features/otp';
 
 export const routes: RouteObject[] = [
 	{
@@ -128,7 +129,10 @@ export const routes: RouteObject[] = [
 							{ path: 'settings', element: <SettingsPage /> },
 							{
 								element: <RoleGuard allowedRoles={['SUPER_ADMIN']} />,
-								children: [{ path: 'users', element: <UsersPage /> }],
+								children: [
+									{ path: 'users', element: <UsersPage /> },
+									{ path: 'otp', element: <OtpLogsPage /> },
+								],
 							},
 						],
 					},

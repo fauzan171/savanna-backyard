@@ -12,7 +12,10 @@ export const verificationCodes = sqliteTable('verification_codes', {
 	publicUserId: text('public_user_id').references(() => publicUsers.id),
 	phone: text('phone').notNull(), // number being verified
 	refCode: text('ref_code').notNull(), // e.g. "A3F9" — user types this into WhatsApp
+	otpCode: text('otp_code'), // temporary web-delivery audit value; null for WhatsApp-only hashed OTPs
 	otpHash: text('otp_hash'), // SHA-256 hex of the 6-digit OTP (set when WA inbound arrives)
+	deliveryChannel: text('delivery_channel', { enum: ['web', 'whatsapp'] }).notNull().default('whatsapp'),
+	status: text('status', { enum: ['otp_sent', 'verified', 'expired'] }).notNull().default('otp_sent'),
 	type: text('type', { enum: ['phone_otp'] }).notNull().default('phone_otp'),
 	consumed: integer('consumed', { mode: 'boolean' }).notNull().default(false),
 	attempts: integer('attempts').notNull().default(0), // wrong-OTP attempts on /verify

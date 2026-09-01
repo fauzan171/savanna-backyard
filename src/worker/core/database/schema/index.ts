@@ -21,3 +21,4 @@ export * from './verification-codes';
 export * from './equipment';
 export * from './booking-equipment';
 export * from './booking-status-logs';
+export * from './public-user-notifications';

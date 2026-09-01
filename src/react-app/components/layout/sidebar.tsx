@@ -24,6 +24,7 @@ import {
 	CalendarDays,
 	Shirt,
 	Car,
+	KeyRound,
 } from 'lucide-react';
 import { cn } from '@/react-app/lib/utils';
 import { Button } from '@/react-app/components/ui/button';
@@ -159,6 +160,12 @@ const defaultFooterItems: NavItem[] = [
 		label: 'Pengguna',
 		href: '/users',
 		icon: <UserCog className="size-5" />,
+		allowedRoles: ['SUPER_ADMIN'],
+	},
+	{
+		label: 'OTP',
+		href: '/otp',
+		icon: <KeyRound className="size-5" />,
 		allowedRoles: ['SUPER_ADMIN'],
 	},
 ];

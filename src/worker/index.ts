@@ -21,6 +21,7 @@ import { createUploadRouter } from './modules/uploads/uploads.routes';
 import { createEmailsRouter } from './modules/emails/emails.routes';
 import { createChecklistsRouter } from './modules/checklists/checklists.routes';
 import { createEquipmentRouter } from './modules/equipment/equipment.routes';
+import { createOtpRouter } from './modules/otp/otp.routes';
 import { createDb } from './core/database';
 import { ConfigRepository } from './core/repositories/config.repository';
 import { EmailService } from './core/services/email.service';
@@ -131,6 +132,9 @@ v1Routes.route('/checklists', createChecklistsRouter() as unknown as Hono<{ Bind
 
 // Equipment management (admin CRUD; public read is under /public)
 v1Routes.route('/equipment', createEquipmentRouter() as unknown as Hono<{ Bindings: Env }>);
+
+// OTP audit list (SUPER_ADMIN only)
+v1Routes.route('/otp', createOtpRouter() as unknown as Hono<{ Bindings: Env }>);
 
 // Mount v1 routes under /api/v1
 app.route('/api/v1', v1Routes);
