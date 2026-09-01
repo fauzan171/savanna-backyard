@@ -29,7 +29,7 @@ export function DarkModeToggle() {
 	};
 
 	return (
-		<Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle dark mode">
+		<Button variant="ghost" size="icon" onClick={toggle} aria-label="Ganti mode terang atau gelap">
 			{isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
 		</Button>
 	);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, QrCode } from 'lucide-react';
+import { Plus, QrCode, Search } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { BookingTable } from '../components/BookingTable';
@@ -52,17 +52,31 @@ export function BookingsPage() {
 	};
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-5 pb-24 md:pb-0">
+			<div className="rounded-lg border border-[hsl(var(--color-info-border))] bg-[hsl(var(--color-info-bg))] p-4 md:hidden">
+				<div className="flex items-start gap-3">
+					<div className="rounded-md bg-background/80 p-2">
+						<QrCode className="size-5 text-[hsl(var(--color-info))]" />
+					</div>
+					<div className="min-w-0 flex-1">
+						<p className="font-semibold">Mode kerja staf</p>
+						<p className="mt-1 text-sm text-muted-foreground">
+							Scan QR atau barcode motor untuk cek identitas, booking aktif, KM, dan kondisi kendaraan.
+						</p>
+					</div>
+				</div>
+			</div>
+
 			<PageHeader
 				title="Booking"
 				description="Kelola jadwal rental, customer, kendaraan, dan status booking"
 				actions={
-					<div className="flex gap-2">
-						<Button variant="outline" onClick={() => setIsScanOpen(true)}>
+					<div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+						<Button className="h-11 justify-center sm:h-10" onClick={() => setIsScanOpen(true)}>
 							<QrCode className="size-4 mr-2" />
-							Scan QR
+							Scan Motor
 						</Button>
-						<Button onClick={() => setIsCreateOpen(true)}>
+						<Button variant="outline" className="h-11 justify-center sm:h-10" onClick={() => setIsCreateOpen(true)}>
 							<Plus className="size-4 mr-2" />
 							Booking Baru
 						</Button>
@@ -71,7 +85,7 @@ export function BookingsPage() {
 			/>
 
 			{/* Filters */}
-			<div className="flex gap-4 items-center">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 				<Select
 					value={filters.status || 'all'}
 					onValueChange={(value) =>
@@ -81,7 +95,7 @@ export function BookingsPage() {
 						})
 					}
 				>
-					<SelectTrigger className="w-[180px]">
+					<SelectTrigger className="w-full sm:w-[180px]">
 						<SelectValue placeholder="Semua status" />
 					</SelectTrigger>
 					<SelectContent>
@@ -120,6 +134,14 @@ export function BookingsPage() {
 
 			{/* QR Scanner Modal (admin scans vehicle to resolve active rental) */}
 			<QrScannerModal open={isScanOpen} onOpenChange={setIsScanOpen} />
+
+			<Button
+				className="fixed inset-x-4 bottom-4 z-30 h-14 justify-center shadow-xl md:hidden"
+				onClick={() => setIsScanOpen(true)}
+			>
+				<Search className="mr-2 size-5" />
+				Scan / Cek Motor
+			</Button>
 		</div>
 	);
 }

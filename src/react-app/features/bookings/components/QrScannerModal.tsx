@@ -141,8 +141,8 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 			console.error('Scanner start error:', err);
 			setError(
 				err instanceof Error
-					? `Camera error: ${err.message}`
-					: 'Failed to start camera. Please check camera permissions.'
+					? `Kamera bermasalah: ${err.message}`
+					: 'Kamera tidak bisa dibuka. Periksa izin kamera di browser.'
 			);
 			setViewMode('error');
 		}
@@ -161,11 +161,11 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 		} catch (err) {
 			console.error('Permission request error:', err);
 			if (err instanceof DOMException && err.name === 'NotAllowedError') {
-				setError('Camera permission denied. Please allow camera access in your browser settings.');
+				setError('Izin kamera ditolak. Aktifkan izin kamera dari pengaturan browser.');
 			} else if (err instanceof DOMException && err.name === 'NotFoundError') {
-				setError('No camera found on this device.');
+				setError('Kamera tidak ditemukan di perangkat ini.');
 			} else {
-				setError('Unable to access camera. Please check your device settings.');
+				setError('Kamera tidak bisa diakses. Periksa pengaturan perangkat.');
 			}
 			setViewMode('error');
 		}
@@ -218,7 +218,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 
 	return (
 		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className="max-w-md">
+			<DialogContent className="max-h-[96dvh] w-[calc(100vw-1rem)] max-w-md overflow-y-auto rounded-lg p-4 sm:p-6">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<QrCode className="size-5" /> Scan QR / Barcode Motor
@@ -231,15 +231,15 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 				{/* Permission View */}
 				{viewMode === 'permission' && (
 					<div className="space-y-4">
-						<div className="flex flex-col items-center justify-center py-6 text-center">
-							<div className="rounded-full bg-muted p-4 mb-4">
+						<div className="flex flex-col items-center justify-center rounded-lg border bg-card px-4 py-6 text-center">
+							<div className="rounded-full bg-[hsl(var(--color-info-bg))] p-4 mb-4">
 								<Camera className="size-8 text-muted-foreground" />
 							</div>
 							<h3 className="font-medium mb-2">Akses Kamera Diperlukan</h3>
 							<p className="text-sm text-muted-foreground mb-4">
 								Izinkan kamera untuk membaca QR atau barcode kendaraan.
 							</p>
-							<Button onClick={requestCameraPermission} className="w-full">
+							<Button onClick={requestCameraPermission} className="h-12 w-full">
 								<Camera className="mr-2 size-4" /> Izinkan Kamera
 							</Button>
 						</div>
@@ -253,7 +253,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 						</div>
 						<Button
 							variant="outline"
-							className="w-full"
+							className="h-12 w-full"
 							onClick={() => setViewMode('manual')}
 						>
 							<Keyboard className="mr-2 size-4" /> Input Plat Nomor Manual
@@ -269,10 +269,12 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 								<Loader2 className="size-4 animate-spin" /> Memindai QR...
 							</div>
 						)}
-						<div id={SCANNER_ID} className="min-h-[300px] overflow-hidden rounded-md bg-muted" />
+						<div className="rounded-lg border bg-card p-2">
+							<div id={SCANNER_ID} className="min-h-[320px] overflow-hidden rounded-md bg-muted sm:min-h-[360px]" />
+						</div>
 						<Button
 							variant="outline"
-							className="w-full"
+							className="h-12 w-full"
 							onClick={() => setViewMode('manual')}
 						>
 							<Keyboard className="mr-2 size-4" /> Input Manual
@@ -294,10 +296,10 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 									value={manualPlate}
 									onChange={(e) => setManualPlate(e.target.value)}
 									autoFocus
-									className="font-mono text-lg"
+									className="h-12 font-mono text-lg"
 								/>
 							</div>
-							<Button type="submit" className="w-full" disabled={!manualPlate.trim()}>
+							<Button type="submit" className="h-12 w-full" disabled={!manualPlate.trim()}>
 								{scanning ? (
 									<Loader2 className="mr-2 size-4 animate-spin" />
 								) : (
@@ -309,7 +311,7 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 						{cameraPermission !== 'denied' && (
 							<Button
 								variant="outline"
-								className="w-full"
+								className="h-12 w-full"
 								onClick={() => setViewMode('scanner')}
 							>
 								<RefreshCw className="mr-2 size-4" /> Kembali ke Kamera
@@ -359,6 +361,14 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 							<CheckCircle2 className="size-5" />
 							<span className="font-medium">Kendaraan berhasil dikenali</span>
 						</div>
+						<div className="rounded-lg border bg-card p-4">
+							<div className="grid grid-cols-2 gap-3 text-sm">
+								<Metric label="Motor" value={result.vehicle.name} />
+								<Metric label="Plat" value={result.vehicle.plateNumber ?? '-'} />
+								<Metric label="Mode" value={result.scanMode === 'pickup_checklist' ? 'Checklist pickup' : 'Cek kondisi'} />
+								<Metric label="Status" value={result.booking?.status ?? 'Tanpa booking'} />
+							</div>
+						</div>
 						<div className="space-y-1 rounded-md border p-3 text-sm">
 							<Row label="Motor" value={result.vehicle.name} />
 							<Row label="Plat" value={result.vehicle.plateNumber ?? '-'} />
@@ -373,11 +383,11 @@ export function QrScannerModal({ open, onOpenChange }: Props) {
 								</>
 							)}
 						</div>
-						<Button className="w-full" onClick={handleOpenVehicle}>
+						<Button className="h-12 w-full" onClick={handleOpenVehicle}>
 							<ExternalLink className="mr-2 size-4" /> Buka Detail Kendaraan
 						</Button>
 						{result.booking && (
-							<Button variant="outline" className="w-full" onClick={handleOpenBooking}>
+							<Button variant="outline" className="h-12 w-full" onClick={handleOpenBooking}>
 								<ExternalLink className="mr-2 size-4" /> Buka Booking Terkait
 							</Button>
 						)}
@@ -393,6 +403,15 @@ function Row({ label, value }: { label: string; value: string }) {
 		<div className="flex justify-between gap-4">
 			<span className="text-muted-foreground">{label}</span>
 			<span className="text-right font-medium">{value}</span>
+		</div>
+	);
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+	return (
+		<div className="rounded-md bg-muted/60 p-3">
+			<p className="text-xs text-muted-foreground">{label}</p>
+			<p className="mt-1 truncate font-semibold">{value}</p>
 		</div>
 	);
 }

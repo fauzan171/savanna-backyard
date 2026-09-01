@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, QrCode } from 'lucide-react';
+import { CalendarDays, QrCode, ClipboardCheck } from 'lucide-react';
 import { OverviewStats } from '../components/OverviewStats';
 import { RevenueChart } from '../components/RevenueChart';
 import { ActivityFeed } from '../components/ActivityFeed';
@@ -23,7 +23,7 @@ export default function DashboardPage() {
 	const { data: activities, isLoading: activitiesLoading } = useDashboardActivities(10);
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-5 pb-24 md:pb-0">
 			<PageHeader
 				title="Beranda"
 				description="Ringkasan operasional rental kendaraan hari ini"
@@ -31,7 +31,22 @@ export default function DashboardPage() {
 			/>
 
 			{/* Quick actions */}
-			<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+				<button
+					type="button"
+					onClick={() => setIsScanOpen(true)}
+					className="rounded-lg border border-primary/40 bg-primary/10 p-4 text-left shadow-sm transition hover:border-primary hover:bg-primary/15"
+				>
+					<div className="flex items-center gap-3">
+						<div className="rounded-md bg-primary p-2 text-primary-foreground">
+							<QrCode className="size-5" />
+						</div>
+						<div>
+							<p className="font-semibold">Scan / Cek Motor</p>
+							<p className="text-xs text-muted-foreground">Buka kamera, cek KM dan kondisi</p>
+						</div>
+					</div>
+				</button>
 				<Link
 					to="/calendar"
 					className="rounded-lg border p-4 transition hover:border-primary/40 hover:bg-muted/40"
@@ -53,11 +68,11 @@ export default function DashboardPage() {
 				>
 					<div className="flex items-center gap-3">
 						<div className="rounded-md bg-primary/10 p-2 text-primary">
-							<QrCode className="size-5" />
+							<ClipboardCheck className="size-5" />
 						</div>
 						<div>
-							<p className="font-medium">Scan QR Kendaraan</p>
-							<p className="text-xs text-muted-foreground">Cari & proses rental aktif</p>
+							<p className="font-medium">Checklist Lapangan</p>
+							<p className="text-xs text-muted-foreground">Cek kondisi motor setelah scan</p>
 						</div>
 					</div>
 				</button>
@@ -71,6 +86,14 @@ export default function DashboardPage() {
 			</div>
 
 			<QrScannerModal open={isScanOpen} onOpenChange={setIsScanOpen} />
+			<button
+				type="button"
+				onClick={() => setIsScanOpen(true)}
+				className="fixed inset-x-4 bottom-4 z-30 flex h-14 items-center justify-center rounded-md bg-primary font-semibold text-primary-foreground shadow-xl md:hidden"
+			>
+				<QrCode className="mr-2 size-5" />
+				Scan / Cek Motor
+			</button>
 		</div>
 	);
 }

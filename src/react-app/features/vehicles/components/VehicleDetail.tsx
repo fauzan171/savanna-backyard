@@ -1,4 +1,4 @@
-import { Edit, Wrench, Calendar, Gauge, Car, Trash2 } from 'lucide-react';
+import { Edit, Wrench, Calendar, Gauge, Car, Trash2, Camera, BadgeCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/react-app/components/ui/card';
 import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
@@ -69,35 +69,61 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<div className="flex items-start justify-between">
-				<div>
-					<div className="flex items-center gap-3">
-						<h2 className="text-2xl font-bold">{vehicle.name}</h2>
+			<div className="rounded-lg border bg-card p-4 sm:p-5">
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+					<div className="min-w-0">
+						<div className="flex flex-wrap items-center gap-2">
+						<h2 className="text-xl font-bold sm:text-2xl">{vehicle.name}</h2>
 						<Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
 					</div>
-					<p className="text-muted-foreground mt-1">
-		{vehicle.plateNumber} - {vehicleTypeLabels[vehicle.type] || vehicle.type}
+					<p className="mt-1 text-sm text-muted-foreground">
+						{vehicle.plateNumber} - {vehicleTypeLabels[vehicle.type] || vehicle.type}
 					</p>
 				</div>
-				<div className="flex gap-2">
+				<div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
 					{onEdit && (
-						<Button variant="outline" onClick={onEdit}>
+						<Button variant="outline" className="h-11" onClick={onEdit}>
 							<Edit className="size-4 mr-2" />
 							Edit
 						</Button>
 					)}
 					{onStatusChange && (
-						<Button variant="outline" onClick={onStatusChange}>
+						<Button variant="outline" className="h-11" onClick={onStatusChange}>
 							<Wrench className="size-4 mr-2" />
 							Ubah Status
 						</Button>
 					)}
 					{onDelete && (
-						<Button variant="destructive" onClick={onDelete}>
+						<Button variant="destructive" className="col-span-2 h-11 sm:col-span-1" onClick={onDelete}>
 							<Trash2 className="size-4 mr-2" />
 							Hapus
 						</Button>
 					)}
+				</div>
+			</div>
+				<div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+					<div className="rounded-md bg-muted/70 p-3">
+						<p className="text-xs text-muted-foreground">KM Saat Ini</p>
+						<p className="mt-1 text-xl font-bold">
+							{vehicle.totalKm ? vehicle.totalKm.toLocaleString('id-ID') : '-'}
+						</p>
+						<p className="text-xs text-muted-foreground">kilometer</p>
+					</div>
+					<div className="rounded-md bg-muted/70 p-3">
+						<p className="text-xs text-muted-foreground">Kondisi</p>
+						<p className="mt-1 flex items-center gap-1 font-semibold">
+							<BadgeCheck className="size-4 text-[hsl(var(--forest-green))]" />
+							{statusInfo.label}
+						</p>
+					</div>
+					<div className="rounded-md bg-muted/70 p-3">
+						<p className="text-xs text-muted-foreground">Tahun</p>
+						<p className="mt-1 font-semibold">{vehicle.year || '-'}</p>
+					</div>
+					<div className="rounded-md bg-muted/70 p-3">
+						<p className="text-xs text-muted-foreground">Tarif</p>
+						<p className="mt-1 font-semibold">{formatCurrency(vehicle.dailyRateIdr, 'IDR')}</p>
+					</div>
 				</div>
 			</div>
 
@@ -176,13 +202,16 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{vehicle.photoUrl && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Foto</CardTitle>
+						<CardTitle className="flex items-center gap-2 text-lg">
+							<Camera className="size-4" />
+							Foto Kondisi Kendaraan
+						</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<img
 							src={vehicle.photoUrl}
 							alt={vehicle.name}
-							className="max-w-md rounded-lg border"
+							className="w-full max-w-md rounded-lg border object-cover"
 						/>
 					</CardContent>
 				</Card>

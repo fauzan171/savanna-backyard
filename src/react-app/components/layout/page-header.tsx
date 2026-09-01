@@ -67,7 +67,7 @@ function PageHeader({
 			)}
 
 			{/* Title row */}
-			<div className="flex items-center justify-between gap-4">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
 				<div className="min-w-0 flex-1">
 					<h1 className="font-display text-2xl font-bold tracking-tight text-foreground truncate">
 						{title}
@@ -79,7 +79,7 @@ function PageHeader({
 
 				{/* Actions */}
 				{actions && (
-					<div className="flex items-center gap-2 shrink-0">{actions}</div>
+					<div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div>
 				)}
 			</div>
 		</div>

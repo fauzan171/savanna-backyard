@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, User, CheckCircle, AlertCircle, ExternalLink, Bike } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, User, CheckCircle, AlertCircle, ExternalLink, Bike, Gauge, ClipboardCheck } from 'lucide-react';
 import { format, isWithinInterval, parseISO, differenceInDays } from 'date-fns';
 import { Button } from '@/react-app/components/ui/button';
 import { Badge } from '@/react-app/components/ui/badge';
@@ -15,6 +15,7 @@ import { VehicleDetail } from '../components/VehicleDetail';
 import { VehicleForm } from '../components/VehicleForm';
 import { VehicleQrCard } from '../components/VehicleQrCard';
 import type { VehicleFormData, VehicleStatus } from '../types/vehicle.types';
+import { labelFromMap, vehicleStatusLabels } from '@/react-app/lib/labels';
 
 const formatCurrency = (amount: number) =>
 	new Intl.NumberFormat('id-ID', {
@@ -24,6 +25,7 @@ const formatCurrency = (amount: number) =>
 	}).format(amount);
 
 const formatDate = (date: string) => format(parseISO(date), 'd MMM yyyy');
+const statusLabel = (status: string) => labelFromMap(vehicleStatusLabels, status);
 
 export default function VehicleDetailPage() {
 	const { id } = useParams<{ id: string }>();
@@ -83,7 +85,7 @@ export default function VehicleDetailPage() {
 			setIsEditDialogOpen(false);
 		} catch (error) {
 			toast({
-				title: 'Failed to update vehicle',
+					title: 'Gagal memperbarui kendaraan',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -93,13 +95,13 @@ export default function VehicleDetailPage() {
 	const handleDelete = async () => {
 		try {
 			await deleteMutation.mutateAsync(id!);
-			toast({ title: 'Vehicle deleted', description: 'The vehicle has been removed.' });
+			toast({ title: 'Kendaraan dihapus', description: 'Kendaraan sudah dihapus.' });
 			navigate('/vehicles');
 		} catch (error: unknown) {
 			const message =
 				(error as { error?: { message?: string } })?.error?.message ??
-				'Failed to delete vehicle';
-			toast({ title: 'Cannot delete vehicle', description: message, variant: 'destructive' });
+				'Gagal menghapus kendaraan';
+			toast({ title: 'Kendaraan tidak bisa dihapus', description: message, variant: 'destructive' });
 		}
 	};
 
@@ -117,13 +119,13 @@ export default function VehicleDetailPage() {
 				<Button variant="ghost" asChild>
 					<Link to="/vehicles">
 						<ArrowLeft className="size-4 mr-2" />
-						Back to Vehicles
+						Kembali ke Kendaraan
 					</Link>
 				</Button>
 				<div className="rounded-lg border border-error/50 bg-error/10 p-6 text-center">
-					<h2 className="text-lg font-semibold text-error">Vehicle Not Found</h2>
+					<h2 className="text-lg font-semibold text-error">Kendaraan Tidak Ditemukan</h2>
 					<p className="text-muted-foreground mt-2">
-						The vehicle you're looking for doesn't exist or has been deleted.
+						Kendaraan tidak tersedia atau sudah dihapus.
 					</p>
 				</div>
 			</div>
@@ -131,41 +133,41 @@ export default function VehicleDetailPage() {
 	}
 
 	return (
-		<div className="space-y-6">
-			<Button variant="ghost" asChild>
+		<div className="space-y-5 pb-6">
+			<Button variant="ghost" className="px-0 sm:px-3" asChild>
 				<Link to="/vehicles">
 					<ArrowLeft className="size-4 mr-2" />
-					Back to Vehicles
+					Kembali ke Kendaraan
 				</Link>
 			</Button>
 
 			{scannedFromQr && (
-				<div className="rounded-lg border border-[hsl(var(--color-success-border))] bg-[hsl(var(--color-success-bg))] p-4">
+				<div className="rounded-lg border border-[hsl(var(--color-success-border))] bg-[hsl(var(--color-success-bg))] p-4 shadow-sm">
 					<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
 						<div className="flex items-start gap-3">
 							<div className="rounded-full bg-background/70 p-2">
 								<Bike className="size-5 text-[hsl(var(--forest-green))]" />
 							</div>
 							<div>
-								<p className="font-medium">Hasil scan kendaraan</p>
+								<p className="font-semibold">Hasil scan kendaraan</p>
 								<p className="text-sm text-muted-foreground">
-									Halaman ini adalah identity kendaraan untuk update kondisi, status operasional, dan cek booking terhubung.
+									Cek identitas, status, KM, kondisi motor, dan booking terkait dari halaman ini.
 								</p>
 							</div>
 						</div>
-						<div className="flex flex-wrap gap-2">
+						<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
 							{linkedBooking && (
-								<Button asChild size="sm">
+								<Button asChild size="sm" className="h-10">
 									<Link to={`/bookings/${linkedBooking.id}`}>
 										<ExternalLink className="mr-2 size-4" />
 										Buka Booking Terkait
 									</Link>
 								</Button>
 							)}
-							<Button variant="outline" size="sm" asChild>
+							<Button variant="outline" size="sm" className="h-10" asChild>
 								<Link to="/calendar">
 									<Calendar className="mr-2 size-4" />
-									Buka Fleet Schedule
+									Buka Kalender
 								</Link>
 							</Button>
 						</div>
@@ -181,36 +183,36 @@ export default function VehicleDetailPage() {
 			/>
 
 			{/* QR code generation */}
-			<div className="rounded-lg border p-5 flex flex-wrap items-center justify-between gap-3">
+			<div className="rounded-lg border bg-card p-4 sm:p-5 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<h3 className="text-base font-semibold">Pickup QR Code</h3>
+					<h3 className="text-base font-semibold">QR Pickup Kendaraan</h3>
 					<p className="text-sm text-muted-foreground">
-						Generate &amp; print the QR customers scan on pickup day to confirm they received the bike.
+						Cetak dan tempel QR ini pada motor. Customer dan staff dapat scan untuk cek kondisi atau pickup.
 					</p>
 				</div>
 				<VehicleQrCard vehicleId={vehicle.id} vehicleName={vehicle.name} />
 			</div>
 
-			<div className="rounded-lg border p-5 space-y-4">
-				<div className="flex flex-wrap items-center justify-between gap-3">
+			<div className="rounded-lg border bg-card p-4 sm:p-5 space-y-4">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<h3 className="text-base font-semibold">Operations & Schedule</h3>
+						<h3 className="text-base font-semibold">Operasional & Jadwal</h3>
 						<p className="text-sm text-muted-foreground">
-							Hub operasional kendaraan ini: status armada, booking terkait, dan jadwal bulan berjalan.
+							Ringkasan cepat untuk staf lapangan: status armada, KM, booking aktif, dan jadwal bulan ini.
 						</p>
 					</div>
-					<div className="flex flex-wrap gap-2">
+					<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
 						<Button variant="outline" asChild>
 							<Link to="/calendar">
 								<Calendar className="mr-2 size-4" />
-								Fleet Calendar
+								Kalender
 							</Link>
 						</Button>
 						{activeBookings[0] && (
 							<Button asChild>
 								<Link to={`/bookings/${activeBookings[0].id}`}>
 									<ExternalLink className="mr-2 size-4" />
-									Active Booking
+									Booking Aktif
 								</Link>
 							</Button>
 						)}
@@ -218,17 +220,26 @@ export default function VehicleDetailPage() {
 				</div>
 
 				<div className="grid gap-3 md:grid-cols-3">
-					<div className="rounded-lg border p-4">
+					<div className="rounded-lg border bg-muted/40 p-4">
 						<p className="text-sm text-muted-foreground">Status kendaraan</p>
-						<p className="mt-1 text-lg font-semibold">{vehicle.status}</p>
+						<p className="mt-1 text-lg font-semibold">{statusLabel(vehicle.status)}</p>
 					</div>
-					<div className="rounded-lg border p-4">
+					<div className="rounded-lg border bg-muted/40 p-4">
+						<p className="flex items-center gap-2 text-sm text-muted-foreground">
+							<Gauge className="size-4" />
+							KM sekarang
+						</p>
+						<p className="mt-1 text-lg font-semibold">
+							{vehicle.totalKm ? `${vehicle.totalKm.toLocaleString('id-ID')} km` : '-'}
+						</p>
+					</div>
+					<div className="rounded-lg border bg-muted/40 p-4">
 						<p className="text-sm text-muted-foreground">Hari ter-book bulan ini</p>
 						<p className="mt-1 text-lg font-semibold">
 							{calendarLoading ? '...' : `${bookedDaysThisMonth} hari`}
 						</p>
 					</div>
-					<div className="rounded-lg border p-4">
+					<div className="rounded-lg border bg-muted/40 p-4 md:col-span-3">
 						<p className="text-sm text-muted-foreground">Booking berikutnya</p>
 						<p className="mt-1 text-sm font-semibold">
 							{nextScheduledBooking
@@ -240,8 +251,11 @@ export default function VehicleDetailPage() {
 			</div>
 
 			{/* Availability & Bookings Section */}
-			<div className="rounded-lg border p-5 space-y-4">
-				<h3 className="text-base font-semibold">Availability & Bookings</h3>
+			<div className="rounded-lg border bg-card p-4 sm:p-5 space-y-4">
+				<h3 className="flex items-center gap-2 text-base font-semibold">
+					<ClipboardCheck className="size-4" />
+					Ketersediaan & Booking
+				</h3>
 
 				{bookingsLoading ? (
 					<div className="flex items-center justify-center py-8">
@@ -262,12 +276,12 @@ export default function VehicleDetailPage() {
 							)}
 							<div>
 								<p className="font-medium text-sm">
-									{isAvailableToday ? 'Available Today' : 'Currently Unavailable'}
+									{isAvailableToday ? 'Tersedia Hari Ini' : 'Sedang Dipakai'}
 								</p>
 								<p className="text-xs text-muted-foreground">
 									{isAvailableToday
-										? `${vehicle.name} has no active bookings today`
-										: `${vehicle.name} is currently on an active rental`}
+										? `${vehicle.name} tidak memiliki booking aktif hari ini`
+										: `${vehicle.name} sedang dalam masa rental aktif`}
 								</p>
 							</div>
 						</div>
@@ -277,7 +291,7 @@ export default function VehicleDetailPage() {
 							<div className="space-y-2">
 								<h4 className="text-sm font-semibold flex items-center gap-2">
 									<Clock className="size-4 text-[hsl(var(--status-active))]" />
-									Active Rentals
+									Rental Aktif
 								</h4>
 								{activeBookings.map((booking) => {
 									const daysRemaining = differenceInDays(parseISO(booking.endDate), today);
@@ -288,7 +302,7 @@ export default function VehicleDetailPage() {
 													{booking.bookingNumber}
 												</span>
 												<Badge variant="outline" size="sm" className="text-[hsl(var(--status-active))] border-[hsl(var(--status-active))]">
-													Active
+													Aktif
 												</Badge>
 											</div>
 											<div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -301,7 +315,7 @@ export default function VehicleDetailPage() {
 												<span className={`ml-auto text-xs font-medium ${
 													daysRemaining <= 1 ? 'text-[hsl(var(--color-error))]' : 'text-muted-foreground'
 												}`}>
-													{daysRemaining <= 0 ? 'Overdue' : `${daysRemaining}d left`}
+													{daysRemaining <= 0 ? 'Terlambat' : `${daysRemaining} hari lagi`}
 												</span>
 											</div>
 										</div>
@@ -315,7 +329,7 @@ export default function VehicleDetailPage() {
 							<div className="space-y-2">
 								<h4 className="text-sm font-semibold flex items-center gap-2">
 									<Calendar className="size-4 text-[hsl(var(--status-confirmed))]" />
-									Upcoming Reservations
+									Booking Mendatang
 								</h4>
 								{upcomingBookings.map((booking) => {
 									const daysUntil = differenceInDays(parseISO(booking.startDate), today);
@@ -333,7 +347,7 @@ export default function VehicleDetailPage() {
 														: 'text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending))]'
 													}
 												>
-													{booking.status}
+													{booking.status === 'Confirmed' ? 'Terkonfirmasi' : booking.status === 'Pending' ? 'Menunggu' : booking.status}
 												</Badge>
 											</div>
 											<div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -344,7 +358,7 @@ export default function VehicleDetailPage() {
 												<Calendar className="size-3.5" />
 												<span>{formatDate(booking.startDate)} → {formatDate(booking.endDate)}</span>
 												<span className="ml-auto text-xs font-medium text-muted-foreground">
-													in {daysUntil}d
+													{daysUntil} hari lagi
 												</span>
 											</div>
 											<div className="text-xs text-muted-foreground">
@@ -360,7 +374,7 @@ export default function VehicleDetailPage() {
 						{activeAndUpcoming.length === 0 && (
 							<div className="text-center py-6 text-muted-foreground text-sm">
 								<Calendar className="size-8 mx-auto mb-2 opacity-30" />
-								<p>No active or upcoming bookings</p>
+								<p>Tidak ada booking aktif atau mendatang</p>
 							</div>
 						)}
 					</div>
@@ -371,7 +385,7 @@ export default function VehicleDetailPage() {
 			<Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
 				<DialogContent className="max-w-2xl">
 					<DialogHeader>
-						<DialogTitle>Edit Vehicle</DialogTitle>
+						<DialogTitle>Edit Kendaraan</DialogTitle>
 					</DialogHeader>
 					<VehicleForm
 						vehicle={vehicle}
@@ -386,11 +400,11 @@ export default function VehicleDetailPage() {
 			<Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Change Vehicle Status</DialogTitle>
+						<DialogTitle>Ubah Status Kendaraan</DialogTitle>
 					</DialogHeader>
 					<div className="space-y-4">
 						<p className="text-muted-foreground">
-							Select the new status for this vehicle.
+							Pilih status baru untuk kendaraan ini.
 						</p>
 							<div className="grid grid-cols-2 gap-2">
 								{(['Available', 'Rented', 'Maintenance', 'Inactive'] as VehicleStatus[]).map((status) => (
@@ -403,7 +417,7 @@ export default function VehicleDetailPage() {
 												setIsStatusDialogOpen(false);
 											} catch (error) {
 												toast({
-													title: 'Failed to change status',
+													title: 'Gagal mengubah status',
 													description: extractApiError(error),
 													variant: 'destructive',
 												});
@@ -423,9 +437,9 @@ export default function VehicleDetailPage() {
 				<ConfirmationDialog
 					open={isDeleteDialogOpen}
 					onOpenChange={setIsDeleteDialogOpen}
-					title={`Delete ${vehicle.name}?`}
-					description="This action cannot be undone. The vehicle will be permanently removed. Vehicles with active bookings or maintenance cannot be deleted."
-					confirmLabel="Delete"
+					title={`Hapus ${vehicle.name}?`}
+					description="Aksi ini tidak bisa dibatalkan. Kendaraan akan dihapus permanen. Kendaraan dengan booking aktif atau perawatan aktif tidak bisa dihapus."
+					confirmLabel="Hapus"
 					variant="danger"
 					onConfirm={handleDelete}
 					isLoading={deleteMutation.isPending}
