@@ -25,8 +25,8 @@ export default function DashboardPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Dashboard"
-				description="Overview of your vehicle rental business"
+				title="Beranda"
+				description="Ringkasan operasional rental kendaraan hari ini"
 				actions={<PeriodFilter value={period} onChange={setPeriod} />}
 			/>
 
@@ -41,7 +41,7 @@ export default function DashboardPage() {
 							<CalendarDays className="size-5" />
 						</div>
 						<div>
-							<p className="font-medium">Fleet Schedule</p>
+							<p className="font-medium">Jadwal Kendaraan</p>
 							<p className="text-xs text-muted-foreground">Kalender ketersediaan motor</p>
 						</div>
 					</div>
@@ -56,7 +56,7 @@ export default function DashboardPage() {
 							<QrCode className="size-5" />
 						</div>
 						<div>
-							<p className="font-medium">Scan QR Motor</p>
+							<p className="font-medium">Scan QR Kendaraan</p>
 							<p className="text-xs text-muted-foreground">Cari & proses rental aktif</p>
 						</div>
 					</div>

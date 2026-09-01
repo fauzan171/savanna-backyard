@@ -4,6 +4,7 @@ import { Badge } from '@/react-app/components/ui/badge';
 import { Button } from '@/react-app/components/ui/button';
 import { Timeline } from '@/react-app/components/ui/timeline';
 import type { VehicleWithDetails, VehicleStatus } from '../types/vehicle.types';
+import { labelFromMap, vehicleStatusLabels, vehicleTypeLabels } from '@/react-app/lib/labels';
 
 interface VehicleDetailProps {
 	vehicle: VehicleWithDetails;
@@ -13,19 +14,11 @@ interface VehicleDetailProps {
 }
 
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
-	Available: { variant: 'success', label: 'Available' },
-	Rented: { variant: 'info', label: 'Rented' },
-	Cleaning: { variant: 'default', label: 'Cleaning' },
-	Maintenance: { variant: 'warning', label: 'Maintenance' },
-	Inactive: { variant: 'default', label: 'Inactive' },
-};
-
-const typeLabels: Record<string, string> = {
-	TrailBike: 'Trail Bike',
-	StreetBike: 'Street Bike',
-	Car: 'Car',
-	Jeep: 'Jeep',
-	Other: 'Other',
+	Available: { variant: 'success', label: vehicleStatusLabels.available },
+	Rented: { variant: 'info', label: vehicleStatusLabels.rented },
+	Cleaning: { variant: 'default', label: vehicleStatusLabels.cleaning },
+	Maintenance: { variant: 'warning', label: vehicleStatusLabels.maintenance },
+	Inactive: { variant: 'default', label: vehicleStatusLabels.inactive },
 };
 
 export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: VehicleDetailProps) {
@@ -57,7 +50,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 	// Convert status logs to timeline items
 	const statusLogItems = vehicle.statusLogs?.map((log) => ({
 		id: log.createdAt,
-		title: `${log.statusFrom} → ${log.statusTo}`,
+		title: `${labelFromMap(vehicleStatusLabels, log.statusFrom)} -> ${labelFromMap(vehicleStatusLabels, log.statusTo)}`,
 		description: log.notes || undefined,
 		date: log.createdAt,
 		status: log.statusTo === 'Available' ? 'completed' as const :
@@ -83,7 +76,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 						<Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
 					</div>
 					<p className="text-muted-foreground mt-1">
-						{vehicle.plateNumber} • {typeLabels[vehicle.type] || vehicle.type}
+		{vehicle.plateNumber} - {vehicleTypeLabels[vehicle.type] || vehicle.type}
 					</p>
 				</div>
 				<div className="flex gap-2">
@@ -96,13 +89,13 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 					{onStatusChange && (
 						<Button variant="outline" onClick={onStatusChange}>
 							<Wrench className="size-4 mr-2" />
-							Change Status
+							Ubah Status
 						</Button>
 					)}
 					{onDelete && (
 						<Button variant="destructive" onClick={onDelete}>
 							<Trash2 className="size-4 mr-2" />
-							Delete
+							Hapus
 						</Button>
 					)}
 				</div>
@@ -111,14 +104,14 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{/* Vehicle Info */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-lg">Vehicle Details</CardTitle>
+					<CardTitle className="text-lg">Detail Kendaraan</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 						<div className="flex items-center gap-3">
 							<Car className="size-4 text-muted-foreground" />
 							<div>
-								<span className="text-muted-foreground text-sm">Brand/Model: </span>
+								<span className="text-muted-foreground text-sm">Merek/Model: </span>
 								<span className="font-medium">
 									{[vehicle.brand, vehicle.model].filter(Boolean).join(' ') || '-'}
 								</span>
@@ -127,7 +120,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 						<div className="flex items-center gap-3">
 							<Calendar className="size-4 text-muted-foreground" />
 							<div>
-								<span className="text-muted-foreground text-sm">Year: </span>
+								<span className="text-muted-foreground text-sm">Tahun: </span>
 								<span className="font-medium">{vehicle.year || '-'}</span>
 							</div>
 						</div>
@@ -147,17 +140,17 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{/* Pricing */}
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-lg">Pricing</CardTitle>
+					<CardTitle className="text-lg">Harga</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="grid gap-4 md:grid-cols-2">
 						<div>
-							<span className="text-muted-foreground text-sm">Daily Rate (IDR)</span>
+							<span className="text-muted-foreground text-sm">Tarif Harian (IDR)</span>
 							<p className="text-2xl font-bold">{formatCurrency(vehicle.dailyRateIdr, 'IDR')}</p>
 						</div>
 						{vehicle.dailyRateUsd && (
 							<div>
-								<span className="text-muted-foreground text-sm">Daily Rate (USD)</span>
+								<span className="text-muted-foreground text-sm">Tarif Harian (USD)</span>
 								<p className="text-2xl font-bold">{formatCurrency(vehicle.dailyRateUsd, 'USD')}</p>
 							</div>
 						)}
@@ -169,7 +162,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{vehicle.description && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Description</CardTitle>
+						<CardTitle className="text-lg">Deskripsi</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<p className="text-muted-foreground whitespace-pre-line leading-relaxed">
@@ -183,7 +176,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{vehicle.photoUrl && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Photo</CardTitle>
+						<CardTitle className="text-lg">Foto</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<img
@@ -199,7 +192,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{vehicle.upcomingBookings && vehicle.upcomingBookings.length > 0 && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Upcoming Bookings</CardTitle>
+						<CardTitle className="text-lg">Booking Mendatang</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<div className="space-y-3">
@@ -220,7 +213,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{statusLogItems.length > 0 && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Status History</CardTitle>
+						<CardTitle className="text-lg">Riwayat Status</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<Timeline items={statusLogItems.slice(0, 5)} />
@@ -232,7 +225,7 @@ export function VehicleDetail({ vehicle, onEdit, onStatusChange, onDelete }: Veh
 			{maintenanceItems.length > 0 && (
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-lg">Maintenance History</CardTitle>
+						<CardTitle className="text-lg">Riwayat Perawatan</CardTitle>
 					</CardHeader>
 					<CardContent>
 						<Timeline items={maintenanceItems} />

@@ -11,18 +11,18 @@ import type { CreatePricingRequest } from '../api/pricing';
 // PRIC-02: prices must be positive (match backend DTO). The form collects
 // features/notIncluded as comma-separated text, transformed to arrays on submit.
 const pricingFormSchema = z.object({
-	name: z.string().trim().min(2, 'Name must be at least 2 characters').max(200),
+	name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(200),
 	description: z.string().max(1000).optional().nullable(),
 	dailyPrice: z
-		.number({ invalid_type_error: 'Daily price is required' })
-		.int('Daily price must be a whole number')
-		.min(1, 'Daily price must be greater than 0')
-		.max(1_000_000_000, 'Daily price is too large'),
+		.number({ invalid_type_error: 'Harga harian wajib diisi' })
+		.int('Harga harian harus berupa angka bulat')
+		.min(1, 'Harga harian harus lebih dari 0')
+		.max(1_000_000_000, 'Harga harian terlalu besar'),
 	multiDayPrice: z
-		.number({ invalid_type_error: 'Multi-day price is required' })
-		.int('Multi-day price must be a whole number')
-		.min(1, 'Multi-day price must be greater than 0')
-		.max(1_000_000_000, 'Multi-day price is too large'),
+		.number({ invalid_type_error: 'Harga multi-hari wajib diisi' })
+		.int('Harga multi-hari harus berupa angka bulat')
+		.min(1, 'Harga multi-hari harus lebih dari 0')
+		.max(1_000_000_000, 'Harga multi-hari terlalu besar'),
 	featuresText: z.string().max(2000).optional().default(''),
 	notIncludedText: z.string().max(2000).optional().default(''),
 	highlighted: z.boolean().optional().default(false),
@@ -123,64 +123,64 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 		<form onSubmit={handleSubmit(processSubmit)} className="space-y-4">
 			<div className="grid grid-cols-2 gap-4">
 				<div className="col-span-2">
-					<FormField label="Name" required error={errors.name?.message}>
+					<FormField label="Nama Paket" required error={errors.name?.message}>
 						<Input {...register('name')} />
 					</FormField>
 				</div>
 				<div className="col-span-2">
-					<FormField label="Description" error={errors.description?.message}>
+					<FormField label="Deskripsi" error={errors.description?.message}>
 						<Textarea {...register('description')} rows={2} />
 					</FormField>
 				</div>
-				<FormField label="Daily Price (IDR)" required error={errors.dailyPrice?.message}>
+				<FormField label="Harga Harian (IDR)" required error={errors.dailyPrice?.message}>
 					<Input type="number" min={1} {...register('dailyPrice', { valueAsNumber: true })} />
 				</FormField>
-				<FormField label="Multi-Day Price (IDR)" required error={errors.multiDayPrice?.message}>
+				<FormField label="Harga Multi-hari (IDR)" required error={errors.multiDayPrice?.message}>
 					<Input type="number" min={1} {...register('multiDayPrice', { valueAsNumber: true })} />
 				</FormField>
 				<div className="col-span-2">
 					<FormField
-						label="Features (comma-separated)"
+						label="Fasilitas (pisahkan dengan koma)"
 						error={errors.featuresText?.message}
 					>
 						<Textarea
 							{...register('featuresText')}
 							rows={2}
-							placeholder="e.g. Motorcycle rental, Standard helmet, Basic insurance"
+							placeholder="Contoh: Rental motor, Helm standar, Asuransi dasar"
 						/>
 					</FormField>
 				</div>
 				<div className="col-span-2">
 					<FormField
-						label="Not Included (comma-separated)"
+						label="Tidak Termasuk (pisahkan dengan koma)"
 						error={errors.notIncludedText?.message}
 					>
 						<Textarea
 							{...register('notIncludedText')}
 							rows={2}
-							placeholder="e.g. Riding gear, Raincoat"
+							placeholder="Contoh: Riding gear, Jas hujan"
 						/>
 					</FormField>
 				</div>
-				<FormField label="Icon" error={errors.icon?.message}>
-					<Input {...register('icon')} placeholder="e.g. Bike" />
+				<FormField label="Ikon" error={errors.icon?.message}>
+					<Input {...register('icon')} placeholder="Contoh: Bike" />
 				</FormField>
-				<FormField label="Sort Order" error={errors.sortOrder?.message}>
+				<FormField label="Urutan Tampil" error={errors.sortOrder?.message}>
 					<Input type="number" {...register('sortOrder', { valueAsNumber: true })} />
 				</FormField>
 				<div className="flex items-center gap-2">
 					<input type="checkbox" id="highlighted" {...register('highlighted')} />
 					<label htmlFor="highlighted" className="text-sm font-medium">
-						Highlighted
+						Unggulan
 					</label>
 				</div>
 			</div>
 			<div className="flex justify-end gap-2 pt-4">
 				<Button type="button" variant="outline" onClick={onCancel}>
-					Cancel
+					Batal
 				</Button>
 				<Button type="submit" disabled={isLoading}>
-					{isLoading ? 'Saving...' : 'Save'}
+					{isLoading ? 'Menyimpan...' : 'Simpan'}
 				</Button>
 			</div>
 		</form>

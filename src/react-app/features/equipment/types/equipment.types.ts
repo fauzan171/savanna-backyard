@@ -21,14 +21,14 @@ export interface EquipmentFilters {
 }
 
 export const createEquipmentSchema = z.object({
-	name: z.string().min(1, 'Name is required').max(200),
+	name: z.string().min(1, 'Nama wajib diisi').max(200),
 	category: z.enum(['Safety', 'Apparel', 'Accessories', 'Electronics']),
 	description: z.string().max(1000).optional().nullable(),
-	dailyRateIdr: z.number().min(0, 'Daily rate must be >= 0'),
+	dailyRateIdr: z.number().min(0, 'Tarif harian tidak boleh negatif'),
 	image: z.string().url().optional().nullable(),
-	stock: z.number().int().min(0, 'Stock must be >= 0'),
+	stock: z.number().int().min(0, 'Stok tidak boleh negatif'),
 	isActive: z.boolean().default(true),
-	minRentalDays: z.number().int().min(1, 'Min rental days must be >= 1').default(1),
+	minRentalDays: z.number().int().min(1, 'Minimal hari rental harus 1 atau lebih').default(1),
 	sortOrder: z.number().int().default(0),
 });
 
@@ -38,10 +38,10 @@ export type CreateEquipmentRequest = z.infer<typeof createEquipmentSchema>;
 export type UpdateEquipmentRequest = z.infer<typeof updateEquipmentSchema>;
 
 export const EQUIPMENT_CATEGORY_LABELS: Record<EquipmentCategory, string> = {
-	Safety: 'Safety',
-	Apparel: 'Apparel',
-	Accessories: 'Accessories',
-	Electronics: 'Electronics',
+	Safety: 'Keselamatan',
+	Apparel: 'Pakaian',
+	Accessories: 'Aksesori',
+	Electronics: 'Elektronik',
 };
 
 export function formatCurrency(amount: number): string {

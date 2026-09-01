@@ -18,7 +18,7 @@ interface RevenueChartProps {
 
 export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 	const chartData = (data?.trend ?? []).map((item) => ({
-		date: new Date(item.date).toLocaleDateString('en-US', {
+		date: new Date(item.date).toLocaleDateString('id-ID', {
 			month: 'short',
 			day: 'numeric',
 		}),
@@ -43,10 +43,10 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 	return (
 		<ChartContainer
 			title="Revenue Trend"
-			description={periodLabel ? `Period: ${periodLabel}` : undefined}
+			description={periodLabel ? `Periode: ${periodLabel}` : undefined}
 			loading={isLoading}
 			empty={!data?.trend || data.trend.length === 0}
-			emptyMessage="No revenue data for the selected period"
+			emptyMessage="Belum ada data pendapatan pada periode ini"
 		>
 			<ResponsiveContainer width="100%" height={300}>
 				<LineChart data={chartData}>
@@ -70,7 +70,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 							borderRadius: '8px',
 							color: 'hsl(var(--card-foreground))',
 						}}
-						formatter={(value: number | undefined) => value !== undefined ? [formatCurrency(value), 'Revenue'] : ['', 'Revenue']}
+						formatter={(value: number | undefined) => value !== undefined ? [formatCurrency(value), 'Pendapatan'] : ['', 'Pendapatan']}
 					/>
 					<Line
 						type="monotone"
@@ -78,7 +78,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 						stroke="hsl(var(--primary))"
 						strokeWidth={2}
 						dot={false}
-						name="Daily Revenue"
+						name="Pendapatan Harian"
 					/>
 				</LineChart>
 			</ResponsiveContainer>

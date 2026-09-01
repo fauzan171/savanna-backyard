@@ -353,27 +353,27 @@ export const addonTypeSchema = z.enum([
 
 export const createAddonSchema = z.object({
   type: addonTypeSchema,
-  description: z.string().min(1, "Description is required"),
-  amount: z.number().positive("Amount must be positive"),
+  description: z.string().min(1, "Deskripsi wajib diisi"),
+  amount: z.number().positive("Nominal harus lebih dari 0"),
   isMandatory: z.boolean().optional(),
 });
 
 export const bookingFormSchema = z
   .object({
-    customerId: z.string().min(1, "Customer is required"),
-    vehicleId: z.string().min(1, "Vehicle is required"),
+    customerId: z.string().min(1, "Pelanggan wajib dipilih"),
+    vehicleId: z.string().min(1, "Kendaraan wajib dipilih"),
     startDate: z.date({
-      required_error: "Start date is required",
-      invalid_type_error: "Invalid start date",
+      required_error: "Tanggal mulai wajib diisi",
+      invalid_type_error: "Tanggal mulai tidak valid",
     }),
     endDate: z.date({
-      required_error: "End date is required",
-      invalid_type_error: "Invalid end date",
+      required_error: "Tanggal selesai wajib diisi",
+      invalid_type_error: "Tanggal selesai tidak valid",
     }),
     paymentTerms: z.enum(
       ["DP_Pickup", "Full_Upfront", "DP_After", "Flexible"],
       {
-        required_error: "Payment terms are required",
+        required_error: "Skema pembayaran wajib dipilih",
       },
     ),
     currency: currencySchema.optional(),
@@ -384,7 +384,7 @@ export const bookingFormSchema = z
     (data: { startDate: Date; endDate: Date }) =>
       data.endDate >= data.startDate,
     {
-      message: "End date must be on or after start date",
+      message: "Tanggal selesai harus sama atau setelah tanggal mulai",
       path: ["endDate"],
     },
   );
@@ -392,17 +392,17 @@ export const bookingFormSchema = z
 export const extendBookingSchema = z
   .object({
     newEndDate: z.date({
-      required_error: "New end date is required",
+      required_error: "Tanggal selesai baru wajib diisi",
     }),
     notes: z.string().optional(),
   })
   .refine((data) => data.newEndDate > new Date(), {
-    message: "New end date must be in the future",
+    message: "Tanggal selesai baru harus di masa depan",
     path: ["newEndDate"],
   });
 
 export const cancelBookingSchema = z.object({
-  reason: z.string().min(10, "Reason must be at least 10 characters"),
+  reason: z.string().min(10, "Alasan minimal 10 karakter"),
 });
 
 export const confirmBookingSchema = z.object({
@@ -416,7 +416,7 @@ export const startRentalSchema = z.object({
 });
 
 export const completeRentalSchema = z.object({
-  actualReturnDate: z.string().min(1, "Return date is required"),
+  actualReturnDate: z.string().min(1, "Tanggal pengembalian wajib diisi"),
   // endKm must be > startKm (validated in service), but 0 is structurally valid.
   endKm: z.number().int().min(0).optional(),
   returnNotes: z.string().optional(),
@@ -458,43 +458,43 @@ export function getAvailableActions(status: BookingStatus): Array<{
 
   switch (status) {
     case "Pending":
-      actions.push({ action: "confirm", label: "Confirm", variant: "default" });
+      actions.push({ action: "confirm", label: "Konfirmasi", variant: "default" });
       actions.push({
         action: "cancel",
-        label: "Cancel",
+        label: "Batalkan",
         variant: "destructive",
       });
       break;
     case "pending_payment":
-      actions.push({ action: "confirm", label: "Confirm", variant: "default" });
+      actions.push({ action: "confirm", label: "Konfirmasi", variant: "default" });
       actions.push({
         action: "cancel",
-        label: "Cancel",
+        label: "Batalkan",
         variant: "destructive",
       });
       break;
     case "Confirmed":
       actions.push({
         action: "start",
-        label: "Start Rental",
+        label: "Mulai Rental",
         variant: "default",
       });
       actions.push({
         action: "cancel",
-        label: "Cancel",
+        label: "Batalkan",
         variant: "destructive",
       });
       break;
     case "Active":
       actions.push({
         action: "complete",
-        label: "Complete",
+        label: "Selesaikan",
         variant: "default",
       });
-      actions.push({ action: "extend", label: "Extend", variant: "outline" });
+      actions.push({ action: "extend", label: "Perpanjang", variant: "outline" });
       actions.push({
         action: "cancel",
-        label: "Cancel",
+        label: "Batalkan",
         variant: "destructive",
       });
       break;
@@ -506,7 +506,7 @@ export function getAvailableActions(status: BookingStatus): Array<{
     case "payment_failed":
       actions.push({
         action: "cancel",
-        label: "Cancel",
+        label: "Batalkan",
         variant: "destructive",
       });
       break;

@@ -24,10 +24,10 @@ export function EquipmentPage() {
 		try {
 			await createEquipment.mutateAsync(data);
 			setIsCreateOpen(false);
-			toast({ title: 'Equipment created' });
+			toast({ title: 'Perlengkapan berhasil dibuat' });
 		} catch (error) {
 			toast({
-				title: 'Failed to create equipment',
+				title: 'Gagal membuat perlengkapan',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -41,12 +41,12 @@ export function EquipmentPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Equipment"
-				description="Manage rental gear — helmets, jerseys, accessories"
+				title="Perlengkapan"
+				description="Kelola perlengkapan rental seperti helm, jersey, dan aksesori"
 				actions={
 					<Button onClick={() => setIsCreateOpen(true)}>
 						<Plus className="size-4 mr-2" />
-						Add Equipment
+						Tambah Perlengkapan
 					</Button>
 				}
 			/>
@@ -62,10 +62,10 @@ export function EquipmentPage() {
 					}
 				>
 					<SelectTrigger className="w-[180px]">
-						<SelectValue placeholder="All Categories" />
+						<SelectValue placeholder="Semua kategori" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="all">All Categories</SelectItem>
+						<SelectItem value="all">Semua kategori</SelectItem>
 						{(Object.keys(EQUIPMENT_CATEGORY_LABELS) as EquipmentCategory[]).map((cat) => (
 							<SelectItem key={cat} value={cat}>
 								{EQUIPMENT_CATEGORY_LABELS[cat]}
@@ -84,7 +84,7 @@ export function EquipmentPage() {
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Add Equipment</DialogTitle>
+						<DialogTitle>Tambah Perlengkapan</DialogTitle>
 					</DialogHeader>
 					<EquipmentForm
 						onSubmit={handleCreateEquipment}

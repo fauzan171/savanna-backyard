@@ -13,6 +13,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/react-app/components/ui/dropdown-menu';
 import type { Vehicle, VehicleStatus } from '../types/vehicle.types';
+import { vehicleStatusLabels, vehicleTypeLabels } from '@/react-app/lib/labels';
 
 interface VehicleTableProps {
 	data: Vehicle[];
@@ -24,19 +25,11 @@ interface VehicleTableProps {
 }
 
 const statusConfig: Record<VehicleStatus, { variant: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
-	Available: { variant: 'success', label: 'Available' },
-	Rented: { variant: 'info', label: 'Rented' },
-	Cleaning: { variant: 'default', label: 'Cleaning' },
-	Maintenance: { variant: 'warning', label: 'Maintenance' },
-	Inactive: { variant: 'default', label: 'Inactive' },
-};
-
-const typeLabels: Record<string, string> = {
-	TrailBike: 'Trail Bike',
-	StreetBike: 'Street Bike',
-	Car: 'Car',
-	Jeep: 'Jeep',
-	Other: 'Other',
+	Available: { variant: 'success', label: vehicleStatusLabels.available },
+	Rented: { variant: 'info', label: vehicleStatusLabels.rented },
+	Cleaning: { variant: 'default', label: vehicleStatusLabels.cleaning },
+	Maintenance: { variant: 'warning', label: vehicleStatusLabels.maintenance },
+	Inactive: { variant: 'default', label: vehicleStatusLabels.inactive },
 };
 
 export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQrClick, onDelete }: VehicleTableProps) {
@@ -44,7 +37,7 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 		() => [
 			{
 				accessorKey: 'name',
-				header: 'Name',
+				header: 'Nama',
 				cell: ({ row }) => (
 					<Link
 						to={`/vehicles/${row.original.id}`}
@@ -56,23 +49,23 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 			},
 			{
 				accessorKey: 'plateNumber',
-				header: 'Plate',
+				header: 'Plat Nomor',
 				cell: ({ row }) => (
 					<span className="font-mono text-muted-foreground">{row.original.plateNumber}</span>
 				),
 			},
 			{
 				accessorKey: 'type',
-				header: 'Type',
+				header: 'Jenis',
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">
-						{typeLabels[row.original.type] || row.original.type}
+						{vehicleTypeLabels[row.original.type] || row.original.type}
 					</span>
 				),
 			},
 			{
 				accessorKey: 'dailyRateIdr',
-				header: 'Daily Rate',
+				header: 'Tarif Harian',
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">
 						{new Intl.NumberFormat('id-ID', {
@@ -114,20 +107,20 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 							<DropdownMenuItem asChild>
 								<Link to={`/vehicles/${row.original.id}`}>
 									<Eye className="mr-2 size-4" />
-									View Details
+									Lihat Detail
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => onStatusChange?.(row.original)}>
 								<Wrench className="mr-2 size-4" />
-								Change Status
+								Ubah Status
 							</DropdownMenuItem>
 							{onQrClick && (
 								<>
 									<DropdownMenuSeparator />
 									<DropdownMenuItem onClick={() => onQrClick(row.original)}>
 										<QrCode className="mr-2 size-4" />
-										Generate QR
+										Buat QR
 									</DropdownMenuItem>
 								</>
 							)}
@@ -139,7 +132,7 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 										onClick={() => onDelete(row.original)}
 									>
 										<Trash2 className="mr-2 size-4" />
-										Delete
+										Hapus
 									</DropdownMenuItem>
 								</>
 							)}
@@ -160,7 +153,7 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 				</Badge>
 			</div>
 			<div className="text-sm text-muted-foreground font-mono">{vehicle.plateNumber}</div>
-			<div className="text-sm text-muted-foreground">{typeLabels[vehicle.type] || vehicle.type}</div>
+			<div className="text-sm text-muted-foreground">{vehicleTypeLabels[vehicle.type] || vehicle.type}</div>
 		</div>
 	);
 
@@ -169,9 +162,9 @@ export function VehicleTable({ data, isLoading, onStatusChange, onRowClick, onQr
 			columns={columns}
 			data={data}
 			isLoading={isLoading}
-			searchPlaceholder="Search vehicles..."
-			noDataMessage="No vehicles found"
-			noDataDescription="Add your first vehicle to get started"
+			searchPlaceholder="Cari kendaraan..."
+			noDataMessage="Belum ada kendaraan"
+			noDataDescription="Tambah kendaraan pertama untuk mulai menerima booking"
 			onRowClick={onRowClick}
 			renderCard={renderCard}
 		/>

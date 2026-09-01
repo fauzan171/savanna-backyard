@@ -250,12 +250,12 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 								)}
 							</div>
 							<p className="text-sm font-medium text-foreground">
-								{error ? 'Upload failed' : 'Drop files here or click to upload'}
+								{error ? 'Upload gagal' : 'Tarik file ke sini atau klik untuk upload'}
 							</p>
 							<p className="text-xs text-muted-foreground mt-1">
-								{accept && `Accepted: ${accept}`}
-								{maxSize && ` • Max: ${formatMaxSize()}`}
-								{multiple && maxFiles > 1 && ` • Up to ${maxFiles} files`}
+								{accept && `Format: ${accept}`}
+								{maxSize && ` • Maks: ${formatMaxSize()}`}
+								{multiple && maxFiles > 1 && ` • Maks ${maxFiles} file`}
 							</p>
 						</div>
 					)}

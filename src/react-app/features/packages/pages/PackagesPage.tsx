@@ -21,11 +21,11 @@ export default function PackagesPage() {
 		try {
 			const result = await createMutation.mutateAsync(formData);
 			setIsCreateDialogOpen(false);
-			toast({ title: 'Package created' });
+			toast({ title: 'Paket berhasil dibuat' });
 			if (result.data?.id) navigate(`/packages/${result.data.id}`);
 		} catch (error) {
 			toast({
-				title: 'Failed to create package',
+				title: 'Gagal membuat paket',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -38,9 +38,9 @@ export default function PackagesPage() {
 
 	return (
 		<div className="space-y-6">
-			<PageHeader title="Packages" description="Manage tour packages" actions={
+			<PageHeader title="Paket" description="Kelola paket wisata dan paket rental yang tampil di website" actions={
 				<Button onClick={() => setIsCreateDialogOpen(true)}>
-					<Plus className="size-4 mr-2" /> Add Package
+					<Plus className="size-4 mr-2" /> Tambah Paket
 				</Button>
 			} />
 
@@ -51,11 +51,11 @@ export default function PackagesPage() {
 					<table className="w-full">
 						<thead className="bg-muted/50">
 							<tr>
-								<th className="text-left p-3 text-sm font-medium">Name</th>
-								<th className="text-left p-3 text-sm font-medium">Duration</th>
-								<th className="text-left p-3 text-sm font-medium">Price</th>
+								<th className="text-left p-3 text-sm font-medium">Nama</th>
+								<th className="text-left p-3 text-sm font-medium">Durasi</th>
+								<th className="text-left p-3 text-sm font-medium">Harga</th>
 								<th className="text-left p-3 text-sm font-medium">Status</th>
-								<th className="text-left p-3 text-sm font-medium">Actions</th>
+								<th className="text-left p-3 text-sm font-medium">Aksi</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y">
@@ -66,8 +66,8 @@ export default function PackagesPage() {
 										{pkg.tagline && <div className="text-sm text-muted-foreground">{pkg.tagline}</div>}
 									</td>
 									<td className="p-3 text-sm">{pkg.duration ?? '-'}</td>
-									<td className="p-3 text-sm">{pkg.price === 0 ? 'Contact' : `Rp ${pkg.price.toLocaleString()}`}</td>
-									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${pkg.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{pkg.isActive ? 'Active' : 'Inactive'}</span></td>
+									<td className="p-3 text-sm">{pkg.price === 0 ? 'Hubungi admin' : `Rp ${pkg.price.toLocaleString()}`}</td>
+									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${pkg.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{pkg.isActive ? 'Aktif' : 'Nonaktif'}</span></td>
 									<td className="p-3">
 										<Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleToggle(pkg); }}>
 											{pkg.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}
@@ -77,13 +77,13 @@ export default function PackagesPage() {
 							))}
 						</tbody>
 					</table>
-					{(!packages || packages.length === 0) && <div className="text-center py-8 text-muted-foreground">No packages found</div>}
+					{(!packages || packages.length === 0) && <div className="text-center py-8 text-muted-foreground">Belum ada paket</div>}
 				</div>
 			)}
 
 			<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
 				<DialogContent className="max-w-2xl">
-					<DialogHeader><DialogTitle>Add New Package</DialogTitle></DialogHeader>
+					<DialogHeader><DialogTitle>Tambah Paket Baru</DialogTitle></DialogHeader>
 					<PackageForm onSubmit={handleCreate} onCancel={() => setIsCreateDialogOpen(false)} isLoading={createMutation.isPending} />
 				</DialogContent>
 			</Dialog>

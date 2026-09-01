@@ -10,20 +10,20 @@ import type { Setting } from '../api/settings';
 
 const SETTING_GROUPS = [
 	{
-		title: 'Contact Information',
+		title: 'Informasi Kontak',
 		keys: ['contact_email', 'contact_phone', 'whatsapp_number', 'location', 'instagram_url'],
-		labels: { contact_email: 'Contact Email', contact_phone: 'Contact Phone', whatsapp_number: 'WhatsApp Number', location: 'Location', instagram_url: 'Instagram URL' },
+		labels: { contact_email: 'Email Kontak', contact_phone: 'Telepon Kontak', whatsapp_number: 'Nomor WhatsApp', location: 'Lokasi', instagram_url: 'URL Instagram' },
 		types: { contact_email: 'email', contact_phone: 'tel', whatsapp_number: 'tel', instagram_url: 'url' },
 	},
 	{
-		title: 'Bank Account (Manual Transfer)',
+		title: 'Rekening Bank (Transfer Manual)',
 		keys: ['bank_name', 'bank_account_number', 'bank_account_holder'],
-		labels: { bank_name: 'Bank Name', bank_account_number: 'Account Number', bank_account_holder: 'Account Holder' },
+		labels: { bank_name: 'Nama Bank', bank_account_number: 'Nomor Rekening', bank_account_holder: 'Nama Pemilik Rekening' },
 	},
 	{
 		title: 'Deposit',
 		keys: ['deposit_amount', 'deposit_description'],
-		labels: { deposit_amount: 'Deposit Amount (IDR)', deposit_description: 'Deposit Description' },
+		labels: { deposit_amount: 'Nominal Deposit (IDR)', deposit_description: 'Deskripsi Deposit' },
 	},
 ];
 
@@ -54,14 +54,14 @@ export default function SettingsPage() {
 		}
 	};
 
-	if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+	if (isLoading) return <div className="text-center py-8 text-muted-foreground">Memuat pengaturan...</div>;
 
 	return (
 		<div className="space-y-6">
-			<PageHeader title="Settings" description="Manage website configuration" actions={
+			<PageHeader title="Pengaturan" description="Kelola informasi website, kontak, rekening, dan deposit" actions={
 				<Button onClick={handleSave} disabled={bulkUpdate.isPending}>
 					{bulkUpdate.isPending ? <Loader2 className="size-4 mr-2 animate-spin" /> : <Save className="size-4 mr-2" />}
-					Save All
+					Simpan Semua
 				</Button>
 			} />
 

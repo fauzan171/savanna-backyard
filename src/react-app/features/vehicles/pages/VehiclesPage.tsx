@@ -67,12 +67,12 @@ export default function VehiclesPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Vehicles"
-				description="Manage your fleet inventory and availability"
+				title="Kendaraan"
+				description="Kelola data kendaraan, status armada, dan ketersediaannya"
 				actions={
 					<Button onClick={() => setIsCreateDialogOpen(true)}>
 						<Plus className="size-4 mr-2" />
-						Add Vehicle
+						Tambah Kendaraan
 					</Button>
 				}
 			/>
@@ -89,7 +89,7 @@ export default function VehiclesPage() {
 			<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
 				<DialogContent className="max-w-2xl">
 					<DialogHeader>
-						<DialogTitle>Add New Vehicle</DialogTitle>
+						<DialogTitle>Tambah Kendaraan Baru</DialogTitle>
 					</DialogHeader>
 					<VehicleForm
 						onSubmit={handleCreate}
@@ -104,16 +104,16 @@ export default function VehiclesPage() {
 				<div className="rounded-lg border p-5 flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-gray-900">
 					<div>
 						<h3 className="text-base font-semibold">
-							QR Code — {qrVehicle.name}
+							QR Kendaraan - {qrVehicle.name}
 						</h3>
 						<p className="text-sm text-gray-500 dark:text-gray-400">
-							Print and attach this QR to the motor. Scan to see vehicle identity.
+							Cetak dan tempel QR ini pada kendaraan. Scan QR untuk melihat identitas kendaraan.
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
 						<VehicleQrCard vehicleId={qrVehicle.id} vehicleName={qrVehicle.name} />
 						<Button variant="ghost" size="sm" onClick={() => setQrVehicle(null)}>
-							Close
+							Tutup
 						</Button>
 					</div>
 				</div>

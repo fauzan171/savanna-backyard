@@ -8,8 +8,8 @@ import { Input } from '@/react-app/components/ui/input';
 import { Label } from '@/react-app/components/ui/label';
 
 const loginSchema = z.object({
-	email: z.string().email('Invalid email address'),
-	password: z.string().min(6, 'Password must be at least 6 characters'),
+	email: z.string().email('Format email tidak valid'),
+	password: z.string().min(6, 'Password minimal 6 karakter'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -37,7 +37,7 @@ export default function LoginPage() {
 		try {
 			await login(data.email, data.password);
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Login failed');
+			setError(err instanceof Error ? err.message : 'Login gagal. Periksa email dan password.');
 		} finally {
 			setIsLoading(false);
 		}
@@ -48,7 +48,7 @@ export default function LoginPage() {
 			<div className="text-center">
 				<h1 className="text-2xl font-bold text-gray-900 dark:text-white">Savanna Backyard</h1>
 				<p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-					Vehicle Rental Admin Panel
+					Sistem Admin Rental Kendaraan
 				</p>
 			</div>
 
@@ -74,7 +74,7 @@ export default function LoginPage() {
 				</div>
 
 				<div className="space-y-2">
-					<Label htmlFor="password">Password</Label>
+					<Label htmlFor="password">Kata Sandi</Label>
 					<Input
 						id="password"
 						type="password"
@@ -88,7 +88,7 @@ export default function LoginPage() {
 				</div>
 
 				<Button type="submit" className="w-full" disabled={isLoading}>
-					{isLoading ? 'Signing in...' : 'Sign in'}
+					{isLoading ? 'Masuk...' : 'Masuk'}
 				</Button>
 			</form>
 		</div>

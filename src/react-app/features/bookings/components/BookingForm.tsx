@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
+import { id } from "date-fns/locale";
 import { Button } from "@/react-app/components/ui/button";
 import { Input } from "@/react-app/components/ui/input";
 import { Textarea } from "@/react-app/components/ui/textarea";
@@ -49,11 +50,11 @@ interface BookingFormProps {
 
 const addonTypes: Array<{ value: CreateAddonRequest["type"]; label: string }> =
   [
-    { value: "TourGuide", label: "Tour Guide" },
-    { value: "SafetyGear", label: "Safety Gear" },
-    { value: "PickupDropoff", label: "Pickup/Dropoff" },
-    { value: "Package", label: "Package" },
-    { value: "Other", label: "Other" },
+    { value: "TourGuide", label: "Pemandu tur" },
+    { value: "SafetyGear", label: "Perlengkapan keselamatan" },
+    { value: "PickupDropoff", label: "Antar/jemput" },
+    { value: "Package", label: "Paket" },
+    { value: "Other", label: "Lainnya" },
   ];
 
 const formatCurrency = (amount: number, currency: "IDR" | "USD" = "IDR") => {
@@ -122,7 +123,7 @@ export function BookingForm({
       .map((v) => ({
         value: v.name.toLowerCase().trim(),
         label: v.name,
-        sublabel: `${all.filter((u) => u.name.toLowerCase().trim() === v.name.toLowerCase().trim()).length} unit(s)`,
+        sublabel: `${all.filter((u) => u.name.toLowerCase().trim() === v.name.toLowerCase().trim()).length} unit`,
       }));
   }, [vehiclesData]);
 
@@ -201,7 +202,7 @@ export function BookingForm({
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
       {/* Customer */}
-      <FormField label="Customer" required error={errors.customerId?.message}>
+      <FormField label="Pelanggan" required error={errors.customerId?.message}>
         <Combobox
           options={customerOptions}
           value={selectedCustomer}
@@ -209,15 +210,15 @@ export function BookingForm({
             setSelectedCustomer(value);
             if (value) setValue("customerId", value);
           }}
-          placeholder="Select customer..."
-          searchPlaceholder="Search customers..."
+          placeholder="Pilih pelanggan..."
+          searchPlaceholder="Cari pelanggan..."
         />
       </FormField>
 
       {/* Dates first — needed for availability check */}
       <div className="grid gap-4 md:grid-cols-2">
         <FormField
-          label="Start Date"
+          label="Tanggal Mulai"
           required
           error={errors.startDate?.message}
         >
@@ -233,7 +234,7 @@ export function BookingForm({
                 disabled={isLoading || isSubmitting}
               >
                 <CalendarIcon className="mr-2 size-4" />
-                {startDate ? format(startDate, "dd MMM yyyy") : "Pick a date"}
+                {startDate ? format(startDate, "dd MMM yyyy", { locale: id }) : "Pilih tanggal"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -249,7 +250,7 @@ export function BookingForm({
           </Popover>
         </FormField>
 
-        <FormField label="End Date" required error={errors.endDate?.message}>
+        <FormField label="Tanggal Selesai" required error={errors.endDate?.message}>
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -262,7 +263,7 @@ export function BookingForm({
                 disabled={isLoading || isSubmitting}
               >
                 <CalendarIcon className="mr-2 size-4" />
-                {endDate ? format(endDate, "dd MMM yyyy") : "Pick a date"}
+                {endDate ? format(endDate, "dd MMM yyyy", { locale: id }) : "Pilih tanggal"}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -281,7 +282,7 @@ export function BookingForm({
 
       {/* Vehicle Model */}
       <FormField
-        label="Vehicle Model"
+        label="Model Kendaraan"
         required
         error={errors.vehicleId?.message}
       >
@@ -289,8 +290,8 @@ export function BookingForm({
           options={vehicleModels}
           value={selectedModel}
           onChange={(value) => setSelectedModel(value)}
-          placeholder="Select vehicle model..."
-          searchPlaceholder="Search models..."
+          placeholder="Pilih model kendaraan..."
+          searchPlaceholder="Cari model..."
         />
       </FormField>
 
@@ -300,14 +301,14 @@ export function BookingForm({
           {availabilityLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner size="sm" />
-              <span>Checking availability...</span>
+              <span>Mengecek ketersediaan...</span>
             </div>
           ) : availableUnits.length > 0 ? (
             <>
               <div className="flex items-center gap-2 text-sm font-medium text-[hsl(var(--forest-green))]">
                 <CheckCircle className="size-4" />
                 <span>
-                  {availableUnits.length} unit available — tap to select
+                  {availableUnits.length} unit tersedia. Klik salah satu untuk memilih
                 </span>
               </div>
               {availableUnits.map((unit) => (
@@ -331,14 +332,13 @@ export function BookingForm({
                     </span>
                   </div>
                   <span className="text-muted-foreground text-xs">
-                    {formatCurrency(unit.dailyRateIdr)}/day
+                    {formatCurrency(unit.dailyRateIdr)}/hari
                   </span>
                 </div>
               ))}
               {unavailableUnits.length > 0 && (
                 <p className="text-xs text-muted-foreground pt-1">
-                  {unavailableUnits.length} unit(s) unavailable on selected
-                  dates
+                  {unavailableUnits.length} unit tidak tersedia pada tanggal yang dipilih
                 </p>
               )}
             </>
@@ -346,10 +346,9 @@ export function BookingForm({
             <div className="flex items-center gap-2 text-sm text-destructive">
               <AlertCircle className="size-4" />
               <span>
-                No <strong>{selectedModel}</strong> units available on selected
-                dates.
+                Tidak ada unit <strong>{selectedModel}</strong> yang tersedia pada tanggal yang dipilih.
                 {unavailableUnits.length > 0 &&
-                  ` All ${unavailableUnits.length} unit(s) are booked.`}
+                  ` Semua ${unavailableUnits.length} unit sudah dibooking.`}
               </span>
             </div>
           )}
@@ -359,7 +358,7 @@ export function BookingForm({
       {/* Payment Terms & Currency */}
       <div className="grid gap-4 md:grid-cols-2">
         <FormField
-          label="Payment Terms"
+          label="Skema Pembayaran"
           required
           error={errors.paymentTerms?.message}
         >
@@ -371,18 +370,18 @@ export function BookingForm({
             disabled={isLoading || isSubmitting}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select payment terms" />
+              <SelectValue placeholder="Pilih skema pembayaran" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="DP_Pickup">DP + Pickup</SelectItem>
-              <SelectItem value="Full_Upfront">Full Upfront</SelectItem>
-              <SelectItem value="DP_After">DP + After Return</SelectItem>
-              <SelectItem value="Flexible">Flexible</SelectItem>
+              <SelectItem value="DP_Pickup">DP + saat pickup</SelectItem>
+              <SelectItem value="Full_Upfront">Lunas di awal</SelectItem>
+              <SelectItem value="DP_After">DP + setelah kembali</SelectItem>
+              <SelectItem value="Flexible">Fleksibel</SelectItem>
             </SelectContent>
           </Select>
         </FormField>
 
-        <FormField label="Currency" error={errors.currency?.message}>
+        <FormField label="Mata Uang" error={errors.currency?.message}>
           <Select
             value={watch("currency")}
             onValueChange={(value) =>
@@ -391,11 +390,11 @@ export function BookingForm({
             disabled={isLoading || isSubmitting}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select currency" />
+              <SelectValue placeholder="Pilih mata uang" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="IDR">IDR - Indonesian Rupiah</SelectItem>
-              <SelectItem value="USD">USD - US Dollar</SelectItem>
+              <SelectItem value="IDR">IDR - Rupiah Indonesia</SelectItem>
+              <SelectItem value="USD">USD - Dolar AS</SelectItem>
             </SelectContent>
           </Select>
         </FormField>
@@ -404,7 +403,7 @@ export function BookingForm({
       {/* Add-ons */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">Add-ons</h3>
+          <h3 className="text-sm font-medium">Tambahan Biaya</h3>
           <Button
             type="button"
             variant="outline"
@@ -413,7 +412,7 @@ export function BookingForm({
             disabled={isLoading || isSubmitting}
           >
             <Plus className="size-4 mr-2" />
-            Add Add-on
+            Tambah Biaya
           </Button>
         </div>
 
@@ -431,7 +430,7 @@ export function BookingForm({
                     {formatCurrency(addon.amount, currency as "IDR" | "USD")}
                     {addon.isMandatory && (
                       <Badge variant="outline" size="sm" className="ml-2">
-                        Mandatory
+                        Wajib
                       </Badge>
                     )}
                   </div>
@@ -452,7 +451,7 @@ export function BookingForm({
 
         {showAddonForm && (
           <div className="p-4 border rounded-lg space-y-4 bg-muted/50">
-            <FormField label="Type">
+            <FormField label="Tipe">
               <Select
                 value={newAddon.type}
                 onValueChange={(value) =>
@@ -474,16 +473,16 @@ export function BookingForm({
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Description" required>
+            <FormField label="Deskripsi" required>
               <Input
                 value={newAddon.description}
                 onChange={(e) =>
                   setNewAddon({ ...newAddon, description: e.target.value })
                 }
-                placeholder="e.g., Helmet and riding jacket"
+                placeholder="Contoh: Helm dan jaket riding"
               />
             </FormField>
-            <FormField label="Amount" required>
+            <FormField label="Nominal" required>
               <Input
                 type="number"
                 value={newAddon.amount || ""}
@@ -504,7 +503,7 @@ export function BookingForm({
                 className="rounded border-input"
               />
               <label htmlFor="isMandatory" className="text-sm">
-                Mandatory add-on
+                Tambahan biaya wajib
               </label>
             </div>
             <div className="flex justify-end gap-2">
@@ -514,7 +513,7 @@ export function BookingForm({
                 size="sm"
                 onClick={() => setShowAddonForm(false)}
               >
-                Cancel
+                Batal
               </Button>
               <Button
                 type="button"
@@ -522,7 +521,7 @@ export function BookingForm({
                 onClick={handleAddAddon}
                 disabled={!newAddon.description || newAddon.amount <= 0}
               >
-                Add
+                Tambah
               </Button>
             </div>
           </div>
@@ -530,10 +529,10 @@ export function BookingForm({
       </div>
 
       {/* Notes */}
-      <FormField label="Notes" error={errors.notes?.message}>
+      <FormField label="Catatan" error={errors.notes?.message}>
         <Textarea
           {...register("notes")}
-          placeholder="Any special requests or notes..."
+          placeholder="Tulis permintaan khusus atau catatan operasional..."
           rows={3}
           disabled={isLoading || isSubmitting}
         />
@@ -548,7 +547,7 @@ export function BookingForm({
             onClick={onCancel}
             disabled={isLoading || isSubmitting}
           >
-            Cancel
+            Batal
           </Button>
         )}
         <Button
@@ -558,10 +557,10 @@ export function BookingForm({
           {isSubmitting ? (
             <>
               <Spinner size="sm" className="mr-2" />
-              Creating...
+              Membuat booking...
             </>
           ) : (
-            "Create Booking"
+            "Buat Booking"
           )}
         </Button>
       </div>

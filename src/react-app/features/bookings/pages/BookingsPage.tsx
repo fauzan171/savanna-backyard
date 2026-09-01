@@ -21,6 +21,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/react-app/components/ui/select';
+import { bookingStatusLabels } from '@/react-app/lib/labels';
 
 export function BookingsPage() {
 	const navigate = useNavigate();
@@ -53,8 +54,8 @@ export function BookingsPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Bookings"
-				description="Manage vehicle rental bookings"
+				title="Booking"
+				description="Kelola jadwal rental, customer, kendaraan, dan status booking"
 				actions={
 					<div className="flex gap-2">
 						<Button variant="outline" onClick={() => setIsScanOpen(true)}>
@@ -63,7 +64,7 @@ export function BookingsPage() {
 						</Button>
 						<Button onClick={() => setIsCreateOpen(true)}>
 							<Plus className="size-4 mr-2" />
-							New Booking
+							Booking Baru
 						</Button>
 					</div>
 				}
@@ -81,17 +82,17 @@ export function BookingsPage() {
 					}
 				>
 					<SelectTrigger className="w-[180px]">
-						<SelectValue placeholder="All Statuses" />
+						<SelectValue placeholder="Semua status" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="all">All Statuses</SelectItem>
-						<SelectItem value="Pending">Pending</SelectItem>
-						<SelectItem value="pending_payment">Pending Payment</SelectItem>
-						<SelectItem value="Confirmed">Confirmed</SelectItem>
-						<SelectItem value="Active">Active</SelectItem>
-						<SelectItem value="Completed">Completed</SelectItem>
-						<SelectItem value="Cancelled">Cancelled</SelectItem>
-						<SelectItem value="payment_failed">Payment Failed</SelectItem>
+						<SelectItem value="all">Semua status</SelectItem>
+						<SelectItem value="Pending">{bookingStatusLabels.pending}</SelectItem>
+						<SelectItem value="pending_payment">{bookingStatusLabels.pending_payment}</SelectItem>
+						<SelectItem value="Confirmed">{bookingStatusLabels.confirmed}</SelectItem>
+						<SelectItem value="Active">{bookingStatusLabels.active}</SelectItem>
+						<SelectItem value="Completed">{bookingStatusLabels.completed}</SelectItem>
+						<SelectItem value="Cancelled">{bookingStatusLabels.cancelled}</SelectItem>
+						<SelectItem value="payment_failed">{bookingStatusLabels.payment_failed}</SelectItem>
 					</SelectContent>
 				</Select>
 			</div>
@@ -107,7 +108,7 @@ export function BookingsPage() {
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
 					<DialogHeader>
-						<DialogTitle>Create New Booking</DialogTitle>
+						<DialogTitle>Buat Booking Baru</DialogTitle>
 					</DialogHeader>
 					<BookingForm
 						onSubmit={handleCreateBooking}

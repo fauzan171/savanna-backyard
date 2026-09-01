@@ -12,6 +12,7 @@ import { Badge } from '@/react-app/components/ui/badge';
 import { Skeleton } from '@/react-app/components/ui/skeleton';
 import { Link } from 'react-router';
 import type { Activity, ActivitiesResult } from '../types/dashboard.types';
+import { id } from 'date-fns/locale';
 
 interface ActivityFeedProps {
 	data: ActivitiesResult | undefined;
@@ -73,7 +74,7 @@ function ActivityItem({ activity }: { activity: Activity }) {
 					<span>•</span>
 					<span>{activity.performedBy.name}</span>
 					<span>•</span>
-					<span>{formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}</span>
+					<span>{formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true, locale: id })}</span>
 				</div>
 			</div>
 		</div>
@@ -85,7 +86,7 @@ export function ActivityFeed({ data, isLoading }: ActivityFeedProps) {
 		return (
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+					<CardTitle className="text-base font-semibold">Aktivitas Terbaru</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="space-y-4">
@@ -108,11 +109,11 @@ export function ActivityFeed({ data, isLoading }: ActivityFeedProps) {
 		return (
 			<Card>
 				<CardHeader>
-					<CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+					<CardTitle className="text-base font-semibold">Aktivitas Terbaru</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-						No recent activity
+						Belum ada aktivitas terbaru
 					</div>
 				</CardContent>
 			</Card>
@@ -122,7 +123,7 @@ export function ActivityFeed({ data, isLoading }: ActivityFeedProps) {
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+				<CardTitle className="text-base font-semibold">Aktivitas Terbaru</CardTitle>
 			</CardHeader>
 			<CardContent>
 				<div className="divide-y divide-border">

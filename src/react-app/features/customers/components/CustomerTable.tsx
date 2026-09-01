@@ -26,7 +26,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 		() => [
 			{
 				accessorKey: 'name',
-				header: 'Name',
+				header: 'Nama',
 				cell: ({ row }) => (
 					<Link
 						to={`/customers/${row.original.id}`}
@@ -38,7 +38,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 			},
 			{
 				accessorKey: 'phone',
-				header: 'Phone',
+				header: 'No. HP',
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">{row.original.phone}</span>
 				),
@@ -54,7 +54,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 			},
 			{
 				accessorKey: 'identityType',
-				header: 'ID Type',
+				header: 'Tipe ID',
 				cell: ({ row }) => (
 					<span className="text-muted-foreground">
 						{row.original.identityType || '-'}
@@ -68,12 +68,12 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 					row.original.isBlacklisted ? (
 						<Badge variant="error" size="sm">Blacklisted</Badge>
 					) : (
-						<Badge variant="outline" size="sm">Active</Badge>
+						<Badge variant="outline" size="sm">Aktif</Badge>
 					),
 			},
 			{
 				accessorKey: 'createdAt',
-				header: 'Created',
+				header: 'Dibuat',
 				cell: ({ row }) => {
 					const date = new Date(row.original.createdAt);
 					return (
@@ -101,7 +101,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 							<DropdownMenuItem asChild>
 								<Link to={`/customers/${row.original.id}`}>
 									<Eye className="mr-2 size-4" />
-									View Details
+									Lihat Detail
 								</Link>
 							</DropdownMenuItem>
 							<DropdownMenuSeparator />
@@ -110,7 +110,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 								className={row.original.isBlacklisted ? 'text-green-600' : 'text-error'}
 							>
 								<Ban className="mr-2 size-4" />
-								{row.original.isBlacklisted ? 'Remove from Blacklist' : 'Add to Blacklist'}
+								{row.original.isBlacklisted ? 'Cabut Blacklist' : 'Tambah ke Blacklist'}
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
@@ -127,7 +127,7 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 				{customer.isBlacklisted ? (
 					<Badge variant="error" size="sm">Blacklisted</Badge>
 				) : (
-					<Badge variant="outline" size="sm">Active</Badge>
+					<Badge variant="outline" size="sm">Aktif</Badge>
 				)}
 			</div>
 			<div className="text-sm text-muted-foreground">{customer.phone}</div>
@@ -142,9 +142,9 @@ export function CustomerTable({ data, isLoading, onBlacklist, onRowClick }: Cust
 			columns={columns}
 			data={data}
 			isLoading={isLoading}
-			searchPlaceholder="Search customers..."
-			noDataMessage="No customers found"
-			noDataDescription="Add your first customer to get started"
+			searchPlaceholder="Cari pelanggan..."
+			noDataMessage="Belum ada pelanggan"
+			noDataDescription="Tambah pelanggan pertama untuk mulai mencatat booking"
 			onRowClick={onRowClick}
 			renderCard={renderCard}
 		/>

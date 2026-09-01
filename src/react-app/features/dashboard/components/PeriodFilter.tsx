@@ -7,17 +7,17 @@ interface PeriodFilterProps {
 }
 
 const periodOptions: { value: PeriodFilter; label: string }[] = [
-	{ value: 'today', label: 'Today' },
-	{ value: 'week', label: 'This Week' },
-	{ value: 'month', label: 'This Month' },
-	{ value: 'year', label: 'This Year' },
+	{ value: 'today', label: periodLabels.today },
+	{ value: 'week', label: periodLabels.week },
+	{ value: 'month', label: periodLabels.month },
+	{ value: 'year', label: periodLabels.year },
 ];
 
 export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
 	return (
 		<Select value={value} onValueChange={(v) => onChange(v as PeriodFilter)}>
 			<SelectTrigger className="w-[150px]">
-				<SelectValue placeholder="Select period" />
+				<SelectValue placeholder="Pilih periode" />
 			</SelectTrigger>
 			<SelectContent>
 				{periodOptions.map((option) => (
@@ -29,3 +29,4 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
 		</Select>
 	);
 }
+import { periodLabels } from '@/react-app/lib/labels';

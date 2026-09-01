@@ -38,11 +38,11 @@ export function EquipmentForm({ onSubmit, onCancel, isLoading, defaultValues }: 
 	return (
 		<form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
 			<div className="grid gap-4 md:grid-cols-2">
-				<FormField label="Name" required error={errors.name?.message}>
-					<Input {...register('name')} placeholder="e.g. Helmet NHK" />
+				<FormField label="Nama" required error={errors.name?.message}>
+					<Input {...register('name')} placeholder="Contoh: Helm NHK" />
 				</FormField>
 
-				<FormField label="Category" required error={errors.category?.message}>
+				<FormField label="Kategori" required error={errors.category?.message}>
 					<Select
 						defaultValue={defaultValues?.category ?? 'Safety'}
 						onValueChange={(val) => {
@@ -51,7 +51,7 @@ export function EquipmentForm({ onSubmit, onCancel, isLoading, defaultValues }: 
 						}}
 					>
 						<SelectTrigger>
-							<SelectValue placeholder="Select category" />
+								<SelectValue placeholder="Pilih kategori" />
 						</SelectTrigger>
 						<SelectContent>
 							{(Object.keys(EQUIPMENT_CATEGORY_LABELS) as EquipmentCategory[]).map((cat) => (
@@ -65,46 +65,46 @@ export function EquipmentForm({ onSubmit, onCancel, isLoading, defaultValues }: 
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-2">
-				<FormField label="Daily Rate (IDR)" required error={errors.dailyRateIdr?.message}>
+				<FormField label="Tarif Harian (IDR)" required error={errors.dailyRateIdr?.message}>
 					<Input type="number" {...register('dailyRateIdr', { valueAsNumber: true })} placeholder="50000" />
 				</FormField>
 
-				<FormField label="Stock" required error={errors.stock?.message}>
+				<FormField label="Stok" required error={errors.stock?.message}>
 					<Input type="number" {...register('stock', { valueAsNumber: true })} placeholder="10" />
 				</FormField>
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-2">
-				<FormField label="Min Rental Days" error={errors.minRentalDays?.message}>
+				<FormField label="Minimal Hari Rental" error={errors.minRentalDays?.message}>
 					<Input type="number" {...register('minRentalDays', { valueAsNumber: true })} placeholder="1" />
 				</FormField>
 
-				<FormField label="Sort Order" error={errors.sortOrder?.message}>
+				<FormField label="Urutan Tampil" error={errors.sortOrder?.message}>
 					<Input type="number" {...register('sortOrder', { valueAsNumber: true })} placeholder="0" />
 				</FormField>
 			</div>
 
-			<FormField label="Description" error={errors.description?.message}>
+			<FormField label="Deskripsi" error={errors.description?.message}>
 				<textarea
 					{...register('description')}
 					className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-					placeholder="Equipment description..."
+					placeholder="Deskripsi perlengkapan..."
 				/>
 			</FormField>
 
-			<FormField label="Image URL" error={errors.image?.message}>
+			<FormField label="URL Gambar" error={errors.image?.message}>
 				<Input {...register('image')} placeholder="https://..." />
 			</FormField>
 
 			<div className="flex justify-end gap-3 pt-4">
 				{onCancel && (
 					<Button type="button" variant="outline" onClick={onCancel}>
-						Cancel
+						Batal
 					</Button>
 				)}
 				<Button type="submit" disabled={isLoading || isSubmitting}>
 					{(isLoading || isSubmitting) && <Spinner size="sm" className="mr-2" />}
-					{defaultValues ? 'Update Equipment' : 'Add Equipment'}
+					{defaultValues ? 'Update Perlengkapan' : 'Tambah Perlengkapan'}
 				</Button>
 			</div>
 		</form>

@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/react-app/components/ui/select";
 import type { ComboboxOption } from "@/react-app/components/ui/combobox";
+import { paymentMethodLabels, paymentStatusLabels } from "@/react-app/lib/labels";
 
 export function PaymentsPage() {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export function PaymentsPage() {
     bookingsData?.items?.map((b) => ({
       value: b.id,
       label: b.bookingNumber,
-      sublabel: `${b.customer?.name ?? "Unknown"} • ${b.vehicle?.name ?? "Unknown"}`,
+      sublabel: `${b.customer?.name ?? "Tanpa nama"} - ${b.vehicle?.name ?? "Tanpa kendaraan"}`,
     })) ?? [];
 
   const handleCreatePayment = async (data: PaymentFormData) => {
@@ -65,12 +66,12 @@ export function PaymentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Payments"
-        description="Manage payment records and verification"
+        title="Pembayaran"
+        description="Catat, cek, dan verifikasi pembayaran customer"
         actions={
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="size-4 mr-2" />
-            Record Payment
+            Catat Pembayaran
           </Button>
         }
       />
@@ -90,13 +91,13 @@ export function PaymentsPage() {
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Statuses" />
+            <SelectValue placeholder="Semua status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="Pending">Pending</SelectItem>
-            <SelectItem value="Verified">Verified</SelectItem>
-            <SelectItem value="Failed">Failed</SelectItem>
+            <SelectItem value="all">Semua status</SelectItem>
+            <SelectItem value="Pending">{paymentStatusLabels.pending}</SelectItem>
+            <SelectItem value="Verified">{paymentStatusLabels.verified}</SelectItem>
+            <SelectItem value="Failed">{paymentStatusLabels.failed}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -113,14 +114,14 @@ export function PaymentsPage() {
           }
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All Methods" />
+            <SelectValue placeholder="Semua metode" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Methods</SelectItem>
+            <SelectItem value="all">Semua metode</SelectItem>
             <SelectItem value="QRIS">QRIS</SelectItem>
-            <SelectItem value="Gateway">Payment Gateway</SelectItem>
-            <SelectItem value="Bank_Transfer">Bank Transfer</SelectItem>
-            <SelectItem value="Cash">Cash</SelectItem>
+            <SelectItem value="Gateway">{paymentMethodLabels.Gateway}</SelectItem>
+            <SelectItem value="Bank_Transfer">{paymentMethodLabels.Bank_Transfer}</SelectItem>
+            <SelectItem value="Cash">{paymentMethodLabels.Cash}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -136,7 +137,7 @@ export function PaymentsPage() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>Catat Pembayaran</DialogTitle>
           </DialogHeader>
           <PaymentForm
             onSubmit={handleCreatePayment}

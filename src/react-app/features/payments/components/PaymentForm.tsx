@@ -19,6 +19,7 @@ import {
 	type PaymentFormData,
 	type PaymentMethod,
 } from '../types/payment.types';
+import { paymentMethodLabels } from '@/react-app/lib/labels';
 
 interface PaymentFormProps {
 	onSubmit: (data: PaymentFormData) => Promise<void>;
@@ -30,9 +31,9 @@ interface PaymentFormProps {
 
 const paymentMethods: Array<{ value: PaymentMethod; label: string }> = [
 	{ value: 'QRIS', label: 'QRIS' },
-	{ value: 'Gateway', label: 'Payment Gateway' },
-	{ value: 'Bank_Transfer', label: 'Bank Transfer' },
-	{ value: 'Cash', label: 'Cash' },
+	{ value: 'Gateway', label: paymentMethodLabels.Gateway },
+	{ value: 'Bank_Transfer', label: paymentMethodLabels.Bank_Transfer },
+	{ value: 'Cash', label: paymentMethodLabels.Cash },
 ];
 
 const formatCurrency = (amount: number, currency: 'IDR' | 'USD' = 'IDR') => {
@@ -101,15 +102,15 @@ export function PaymentForm({
 						options={bookingOptions}
 						value={selectedBooking}
 						onChange={handleBookingChange}
-						placeholder="Select booking..."
-						searchPlaceholder="Search bookings..."
+						placeholder="Pilih booking..."
+						searchPlaceholder="Cari booking..."
 					/>
 				</FormField>
 			)}
 
 			{/* Amount & Currency */}
 			<div className="grid gap-4 md:grid-cols-2">
-				<FormField label="Amount" required error={errors.amount?.message}>
+				<FormField label="Nominal" required error={errors.amount?.message}>
 					<Input
 						type="number"
 						{...register('amount', { valueAsNumber: true })}
@@ -118,7 +119,7 @@ export function PaymentForm({
 					/>
 				</FormField>
 
-				<FormField label="Currency" error={errors.currency?.message}>
+				<FormField label="Mata Uang" error={errors.currency?.message}>
 					<Controller
 						name="currency"
 						control={control}
@@ -129,11 +130,11 @@ export function PaymentForm({
 								disabled={isLoading || isSubmitting}
 							>
 								<SelectTrigger>
-									<SelectValue placeholder="Select currency" />
+									<SelectValue placeholder="Pilih mata uang" />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="IDR">IDR - Indonesian Rupiah</SelectItem>
-									<SelectItem value="USD">USD - US Dollar</SelectItem>
+									<SelectItem value="IDR">IDR - Rupiah Indonesia</SelectItem>
+									<SelectItem value="USD">USD - Dolar AS</SelectItem>
 								</SelectContent>
 							</Select>
 						)}
@@ -144,7 +145,7 @@ export function PaymentForm({
 			{/* Amount Preview */}
 			{amount > 0 && (
 				<div className="p-3 bg-muted/50 rounded-lg">
-					<div className="text-sm text-muted-foreground">Payment Amount</div>
+					<div className="text-sm text-muted-foreground">Nominal Pembayaran</div>
 					<div className="text-xl font-semibold">
 						{formatCurrency(amount, currency as 'IDR' | 'USD')}
 					</div>
@@ -152,7 +153,7 @@ export function PaymentForm({
 			)}
 
 			{/* Payment Method */}
-			<FormField label="Payment Method" required error={errors.method?.message}>
+			<FormField label="Metode Pembayaran" required error={errors.method?.message}>
 				<Controller
 					name="method"
 					control={control}
@@ -163,7 +164,7 @@ export function PaymentForm({
 							disabled={isLoading || isSubmitting}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select payment method" />
+								<SelectValue placeholder="Pilih metode pembayaran" />
 							</SelectTrigger>
 							<SelectContent>
 								{paymentMethods.map((method) => (
@@ -178,16 +179,16 @@ export function PaymentForm({
 			</FormField>
 
 			{/* Transaction Reference */}
-			<FormField label="Transaction Reference" error={errors.transactionReference?.message}>
+			<FormField label="Referensi Transaksi" error={errors.transactionReference?.message}>
 				<Input
 					{...register('transactionReference')}
-					placeholder="e.g., TXN123456789"
+					placeholder="Contoh: TXN123456789"
 					disabled={isLoading || isSubmitting}
 				/>
 			</FormField>
 
 			{/* Proof URL */}
-			<FormField label="Proof URL" error={errors.proofUrl?.message}>
+			<FormField label="Link Bukti Pembayaran" error={errors.proofUrl?.message}>
 				<Input
 					{...register('proofUrl')}
 					type="url"
@@ -197,10 +198,10 @@ export function PaymentForm({
 			</FormField>
 
 			{/* Notes */}
-			<FormField label="Notes" error={errors.notes?.message}>
+			<FormField label="Catatan" error={errors.notes?.message}>
 				<Textarea
 					{...register('notes')}
-					placeholder="Additional notes..."
+					placeholder="Catatan tambahan..."
 					rows={3}
 					disabled={isLoading || isSubmitting}
 				/>
@@ -215,17 +216,17 @@ export function PaymentForm({
 						onClick={onCancel}
 						disabled={isLoading || isSubmitting}
 					>
-						Cancel
+						Batal
 					</Button>
 				)}
 				<Button type="submit" disabled={isLoading || isSubmitting}>
 					{isSubmitting ? (
 						<>
 							<Spinner size="sm" className="mr-2" />
-							Recording...
+							Menyimpan...
 						</>
 					) : (
-						'Record Payment'
+						'Catat Pembayaran'
 					)}
 				</Button>
 			</div>

@@ -17,15 +17,16 @@ import { FileUpload } from '@/react-app/components/ui/file-upload';
 import { Textarea } from '@/react-app/components/ui/textarea';
 import { api } from '@/react-app/lib/api-client';
 import type { Vehicle, VehicleFormData, VehicleType } from '../types/vehicle.types';
+import { vehicleTypeLabels } from '@/react-app/lib/labels';
 
 const vehicleFormSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
-	plateNumber: z.string().min(3, 'Plate number is required'),
+	name: z.string().min(2, 'Nama minimal 2 karakter').max(100),
+	plateNumber: z.string().min(3, 'Plat nomor wajib diisi'),
 	type: z.enum(['TrailBike', 'StreetBike', 'Car', 'Jeep', 'Other']),
 	brand: z.string().optional(),
 	model: z.string().optional(),
 	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),
-	dailyRateIdr: z.coerce.number().min(0, 'Rate must be positive'),
+	dailyRateIdr: z.coerce.number().min(0, 'Tarif tidak boleh negatif'),
 	dailyRateUsd: z.coerce.number().min(0).optional().or(z.literal('')),
 	description: z.string().max(1000).optional().or(z.literal('')),
 	photoUrl: z.string().optional().or(z.literal('')),
@@ -39,11 +40,11 @@ interface VehicleFormProps {
 }
 
 const vehicleTypes: { value: VehicleType; label: string }[] = [
-	{ value: 'TrailBike', label: 'Trail Bike' },
-	{ value: 'StreetBike', label: 'Street Bike' },
-	{ value: 'Car', label: 'Car' },
-	{ value: 'Jeep', label: 'Jeep' },
-	{ value: 'Other', label: 'Other' },
+	{ value: 'TrailBike', label: vehicleTypeLabels.TrailBike },
+	{ value: 'StreetBike', label: vehicleTypeLabels.StreetBike },
+	{ value: 'Car', label: vehicleTypeLabels.Car },
+	{ value: 'Jeep', label: vehicleTypeLabels.Jeep },
+	{ value: 'Other', label: vehicleTypeLabels.Other },
 ];
 
 export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleFormProps) {
@@ -103,7 +104,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				const result = await api.upload('/v1/uploads', uploadFile[0]);
 				data.photoUrl = result.data.url;
 			} catch (err) {
-				setUploadError(err instanceof Error ? err.message : 'Upload failed');
+				setUploadError(err instanceof Error ? err.message : 'Upload gagal');
 				setUploading(false);
 				return;
 			}
@@ -126,7 +127,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 	return (
 		<form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
 			<div className="grid gap-4 md:grid-cols-2">
-				<FormField label="Name" required error={errors.name?.message}>
+				<FormField label="Nama Kendaraan" required error={errors.name?.message}>
 					<Input
 						{...register('name')}
 						placeholder="Honda CRF 250L"
@@ -134,7 +135,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 					/>
 				</FormField>
 
-				<FormField label="Plate Number" required error={errors.plateNumber?.message}>
+				<FormField label="Plat Nomor" required error={errors.plateNumber?.message}>
 					<Input
 						{...register('plateNumber')}
 						placeholder="B 1234 ABC"
@@ -144,14 +145,14 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-3">
-				<FormField label="Type" required error={errors.type?.message}>
+				<FormField label="Jenis Kendaraan" required error={errors.type?.message}>
 					<Select
 						value={vehicleType}
 						onValueChange={(value) => setValue('type', value as VehicleType)}
 						disabled={isLoading || isSubmitting}
 					>
 						<SelectTrigger>
-							<SelectValue placeholder="Select type" />
+							<SelectValue placeholder="Pilih jenis" />
 						</SelectTrigger>
 						<SelectContent>
 							{vehicleTypes.map((type) => (
@@ -163,7 +164,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 					</Select>
 				</FormField>
 
-				<FormField label="Brand" error={errors.brand?.message}>
+				<FormField label="Merek" error={errors.brand?.message}>
 					<Input
 						{...register('brand')}
 						placeholder="Honda"
@@ -181,7 +182,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 			</div>
 
 			<div className="grid gap-4 md:grid-cols-3">
-				<FormField label="Year" error={errors.year?.message}>
+				<FormField label="Tahun" error={errors.year?.message}>
 					<Input
 						{...register('year')}
 						type="number"
@@ -190,7 +191,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 					/>
 				</FormField>
 
-				<FormField label="Daily Rate (IDR)" required error={errors.dailyRateIdr?.message}>
+				<FormField label="Tarif Harian (IDR)" required error={errors.dailyRateIdr?.message}>
 					<Input
 						{...register('dailyRateIdr')}
 						type="number"
@@ -199,7 +200,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 					/>
 				</FormField>
 
-				<FormField label="Daily Rate (USD)" error={errors.dailyRateUsd?.message}>
+				<FormField label="Tarif Harian (USD)" error={errors.dailyRateUsd?.message}>
 					<Input
 						{...register('dailyRateUsd')}
 						type="number"
@@ -209,7 +210,7 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				</FormField>
 			</div>
 
-			<FormField label="Photo">
+			<FormField label="Foto">
 				<FileUpload
 					accept="image/jpeg,image/png,image/webp,image/gif"
 					maxSize={5 * 1024 * 1024}
@@ -224,21 +225,21 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				/>
 				{watch('photoUrl') && !uploadFile.length && (
 					<div className="mt-2 flex items-center gap-2">
-						<img src={watch('photoUrl')!} alt="Current" className="size-12 rounded object-cover border" />
-						<span className="text-xs text-muted-foreground">Current photo</span>
+						<img src={watch('photoUrl')!} alt="Foto saat ini" className="size-12 rounded object-cover border" />
+						<span className="text-xs text-muted-foreground">Foto saat ini</span>
 					</div>
 				)}
 			</FormField>
 
-			<FormField label="Description" error={errors.description?.message}>
+			<FormField label="Deskripsi" error={errors.description?.message}>
 				<Textarea
 					{...register('description')}
-					placeholder="Describe this vehicle - condition, features, best use, etc. This will be shown on the landing page."
+					placeholder="Tulis kondisi, fitur, dan penggunaan terbaik kendaraan. Deskripsi ini tampil di landing page."
 					rows={4}
 					disabled={isLoading || isSubmitting}
 				/>
 				<p className="text-xs text-muted-foreground mt-1">
-					Optional. Max 1000 characters. Shown on the public landing page vehicle detail.
+					Opsional. Maksimal 1000 karakter. Tampil di detail kendaraan pada landing page.
 				</p>
 			</FormField>
 
@@ -250,12 +251,12 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 						onClick={onCancel}
 						disabled={isLoading || isSubmitting}
 					>
-						Cancel
+						Batal
 					</Button>
 				)}
 				<Button type="submit" disabled={isLoading || isSubmitting || uploading}>
-					{uploading ? <><Loader2 className="size-4 mr-2 animate-spin" />Uploading...</> :
-					 isSubmitting ? 'Saving...' : vehicle ? 'Update Vehicle' : 'Create Vehicle'}
+					{uploading ? <><Loader2 className="size-4 mr-2 animate-spin" />Mengupload...</> :
+					 isSubmitting ? 'Menyimpan...' : vehicle ? 'Update Kendaraan' : 'Buat Kendaraan'}
 				</Button>
 			</div>
 		</form>

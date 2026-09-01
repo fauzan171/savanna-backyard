@@ -21,10 +21,10 @@ export default function ReviewsPage() {
 		try {
 			await createMutation.mutateAsync(data);
 			setIsCreateOpen(false);
-			toast({ title: 'Review created' });
+			toast({ title: 'Ulasan berhasil dibuat' });
 		} catch (error) {
 			toast({
-				title: 'Failed to create review',
+				title: 'Gagal membuat ulasan',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -33,20 +33,20 @@ export default function ReviewsPage() {
 
 	return (
 		<div className="space-y-6">
-			<PageHeader title="Reviews" description="Manage customer reviews and testimonials" actions={
-				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Add Review</Button>
+			<PageHeader title="Ulasan" description="Kelola testimoni customer yang tampil di website" actions={
+				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Tambah Ulasan</Button>
 			} />
 			{isLoading ? <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full size-8 border-b-2 border-primary" /></div> : (
 				<div className="border rounded-lg overflow-x-auto">
 					<table className="w-full">
 						<thead className="bg-muted/50">
 							<tr>
-								<th className="text-left p-3 text-sm font-medium">Name</th>
+								<th className="text-left p-3 text-sm font-medium">Nama</th>
 								<th className="text-left p-3 text-sm font-medium">Rating</th>
-								<th className="text-left p-3 text-sm font-medium">Location</th>
-								<th className="text-left p-3 text-sm font-medium">Review</th>
+								<th className="text-left p-3 text-sm font-medium">Lokasi</th>
+								<th className="text-left p-3 text-sm font-medium">Ulasan</th>
 								<th className="text-left p-3 text-sm font-medium">Status</th>
-								<th className="text-left p-3 text-sm font-medium">Actions</th>
+								<th className="text-left p-3 text-sm font-medium">Aksi</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y">
@@ -56,18 +56,18 @@ export default function ReviewsPage() {
 									<td className="p-3">{Array.from({ length: r.rating }).map((_, i) => <Star key={i} className="size-3 fill-yellow-400 text-yellow-400 inline" />)}</td>
 									<td className="p-3 text-sm">{r.location ?? '-'}</td>
 									<td className="p-3 text-sm max-w-xs truncate">{r.text}</td>
-									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${r.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{r.isPublished ? 'Published' : 'Draft'}</span></td>
+									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${r.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{r.isPublished ? 'Tayang' : 'Draft'}</span></td>
 									<td className="p-3"><Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleMutation.mutate(r.id); }}>{r.isPublished ? <Eye className="size-4" /> : <EyeOff className="size-4 text-gray-400" />}</Button></td>
 								</tr>
 							))}
 						</tbody>
 					</table>
-					{(!reviews || reviews.length === 0) && <div className="text-center py-8 text-muted-foreground">No reviews found</div>}
+					{(!reviews || reviews.length === 0) && <div className="text-center py-8 text-muted-foreground">Belum ada ulasan</div>}
 				</div>
 			)}
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<DialogContent className="max-w-2xl">
-					<DialogHeader><DialogTitle>Add New Review</DialogTitle></DialogHeader>
+					<DialogHeader><DialogTitle>Tambah Ulasan Baru</DialogTitle></DialogHeader>
 					<ReviewForm onSubmit={handleCreate} onCancel={() => setIsCreateOpen(false)} isLoading={createMutation.isPending} />
 				</DialogContent>
 			</Dialog>

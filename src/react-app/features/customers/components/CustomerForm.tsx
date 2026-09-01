@@ -16,16 +16,16 @@ import { FormField } from '@/react-app/components/ui/form-field';
 import type { Customer, CustomerFormData } from '../types/customer.types';
 
 const customerFormSchema = z.object({
-	name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+	name: z.string().min(2, 'Nama minimal 2 karakter').max(100),
 	phone: z
 		.string()
-		.min(5, 'Phone number is required')
-		.regex(/^[0-9+\-\s]+$/, 'Phone must contain only digits, +, spaces or dashes'),
-	email: z.string().email('Invalid email address').optional().or(z.literal('')),
+		.min(5, 'Nomor HP wajib diisi')
+		.regex(/^[0-9+\-\s]+$/, 'Nomor HP hanya boleh berisi angka, +, spasi, atau strip'),
+	email: z.string().email('Format email tidak valid').optional().or(z.literal('')),
 	address: z.string().optional(),
 	identityType: z.enum(['KTP', 'SIM', 'Passport']).optional().or(z.literal('')),
 	identityNumber: z.string().optional(),
-	identityPhotoUrl: z.string().url('Invalid URL').optional().or(z.literal('')),
+	identityPhotoUrl: z.string().url('URL tidak valid').optional().or(z.literal('')),
 	notes: z.string().optional(),
 });
 
@@ -94,19 +94,19 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 		<form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
 			<div className="grid gap-4 md:grid-cols-2">
 				<FormField
-					label="Name"
+					label="Nama"
 					required
 					error={errors.name?.message}
 				>
 					<Input
 						{...register('name')}
-						placeholder="John Doe"
+						placeholder="Nama lengkap pelanggan"
 						disabled={isLoading || isSubmitting}
 					/>
 				</FormField>
 
 				<FormField
-					label="Phone"
+					label="No. HP"
 					required
 					error={errors.phone?.message}
 				>
@@ -131,7 +131,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 					/>
 				</FormField>
 
-				<FormField label="Address" error={errors.address?.message}>
+				<FormField label="Alamat" error={errors.address?.message}>
 					<Input
 						{...register('address')}
 						placeholder="Jl. Sudirman No. 123, Jakarta"
@@ -141,26 +141,26 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 			</div>
 
 			<div className="border-t pt-4">
-				<h3 className="mb-4 text-sm font-medium text-muted-foreground">Identity Document (Optional)</h3>
+				<h3 className="mb-4 text-sm font-medium text-muted-foreground">Dokumen Identitas (Opsional)</h3>
 				<div className="grid gap-4 md:grid-cols-2">
-					<FormField label="Document Type" error={errors.identityType?.message}>
+					<FormField label="Tipe Dokumen" error={errors.identityType?.message}>
 						<Select
 							value={identityType || ''}
 							onValueChange={(value) => setValue('identityType', value as 'KTP' | 'SIM' | 'Passport' || undefined)}
 							disabled={isLoading || isSubmitting}
 						>
 							<SelectTrigger>
-								<SelectValue placeholder="Select type" />
+								<SelectValue placeholder="Pilih tipe" />
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="KTP">KTP</SelectItem>
 								<SelectItem value="SIM">SIM</SelectItem>
-								<SelectItem value="Passport">Passport</SelectItem>
+								<SelectItem value="Passport">Paspor</SelectItem>
 							</SelectContent>
 						</Select>
 					</FormField>
 
-					<FormField label="Document Number" error={errors.identityNumber?.message}>
+					<FormField label="Nomor Dokumen" error={errors.identityNumber?.message}>
 						<Input
 							{...register('identityNumber')}
 							placeholder="3171234567890001"
@@ -170,7 +170,7 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 				</div>
 
 				<FormField
-					label="Document Photo URL"
+					label="Link Foto Dokumen"
 					error={errors.identityPhotoUrl?.message}
 					className="mt-4"
 				>
@@ -182,10 +182,10 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 				</FormField>
 			</div>
 
-			<FormField label="Notes" error={errors.notes?.message}>
+			<FormField label="Catatan" error={errors.notes?.message}>
 				<Textarea
 					{...register('notes')}
-					placeholder="Additional notes about this customer..."
+					placeholder="Catatan tambahan tentang pelanggan..."
 					rows={3}
 					disabled={isLoading || isSubmitting}
 				/>
@@ -199,11 +199,11 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 						onClick={onCancel}
 						disabled={isLoading || isSubmitting}
 					>
-						Cancel
+						Batal
 					</Button>
 				)}
 				<Button type="submit" disabled={isLoading || isSubmitting}>
-					{isSubmitting ? 'Saving...' : customer ? 'Update Customer' : 'Create Customer'}
+					{isSubmitting ? 'Menyimpan...' : customer ? 'Update Pelanggan' : 'Buat Pelanggan'}
 				</Button>
 			</div>
 		</form>

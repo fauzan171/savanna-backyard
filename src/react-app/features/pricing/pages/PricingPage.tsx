@@ -24,7 +24,7 @@ export default function PricingPage() {
 			if (result.data?.id) navigate(`/pricing/${result.data.id}`);
 		} catch (error) {
 			toast({
-				title: 'Failed to create pricing tier',
+				title: 'Gagal membuat tier harga',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -33,10 +33,10 @@ export default function PricingPage() {
 
 	return (
 		<div className="space-y-6">
-			<PageHeader title="Pricing Tiers" description="Manage rental pricing tiers" actions={
-				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Add Tier</Button>
+			<PageHeader title="Harga" description="Kelola tier harga rental yang tampil di website" actions={
+				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Tambah Tier</Button>
 			} />
-			{isLoading ? <div className="text-center py-8 text-muted-foreground">Loading...</div> : (
+			{isLoading ? <div className="text-center py-8 text-muted-foreground">Memuat data...</div> : (
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 					{(tiers ?? []).map((tier) => (
 						<div key={tier.id} className={`bg-card border rounded-lg p-6 cursor-pointer hover:shadow-md transition ${tier.highlighted ? 'ring-2 ring-primary' : ''}`} onClick={() => navigate(`/pricing/${tier.id}`)}>
@@ -46,11 +46,11 @@ export default function PricingPage() {
 							</div>
 							{tier.description && <p className="text-sm text-muted-foreground mb-3">{tier.description}</p>}
 							<div className="space-y-1">
-								<div className="text-2xl font-bold">Rp {tier.dailyPrice.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/day</span></div>
-								<div className="text-sm text-muted-foreground">Rp {tier.multiDayPrice.toLocaleString()}/multi-day</div>
+								<div className="text-2xl font-bold">Rp {tier.dailyPrice.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hari</span></div>
+								<div className="text-sm text-muted-foreground">Rp {tier.multiDayPrice.toLocaleString()}/multi-hari</div>
 							</div>
 							<div className="flex items-center justify-between mt-4">
-								<span className={`text-xs px-2 py-1 rounded-full ${tier.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{tier.isActive ? 'Active' : 'Inactive'}</span>
+								<span className={`text-xs px-2 py-1 rounded-full ${tier.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{tier.isActive ? 'Aktif' : 'Nonaktif'}</span>
 								<Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleMutation.mutate(tier.id); }}>
 									{tier.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}
 								</Button>
@@ -61,7 +61,7 @@ export default function PricingPage() {
 			)}
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<DialogContent className="max-w-2xl">
-					<DialogHeader><DialogTitle>Add Pricing Tier</DialogTitle></DialogHeader>
+					<DialogHeader><DialogTitle>Tambah Tier Harga</DialogTitle></DialogHeader>
 					<PricingForm onSubmit={handleCreate} onCancel={() => setIsCreateOpen(false)} isLoading={createMutation.isPending} />
 				</DialogContent>
 			</Dialog>

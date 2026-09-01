@@ -22,7 +22,7 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 	const columns: ColumnDef<Equipment>[] = [
 		{
 			accessorKey: 'name',
-			header: 'Name',
+			header: 'Nama',
 			cell: ({ row }) => (
 				<Link
 					to={`/equipment/${row.original.id}`}
@@ -35,7 +35,7 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 		},
 		{
 			accessorKey: 'category',
-			header: 'Category',
+			header: 'Kategori',
 			cell: ({ row }) => (
 				<Badge variant="outline" className={CATEGORY_COLORS[row.original.category]}>
 					{EQUIPMENT_CATEGORY_LABELS[row.original.category]}
@@ -44,12 +44,12 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 		},
 		{
 			accessorKey: 'dailyRateIdr',
-			header: 'Daily Rate',
+			header: 'Tarif Harian',
 			cell: ({ row }) => <div>{formatCurrency(row.original.dailyRateIdr)}</div>,
 		},
 		{
 			accessorKey: 'stock',
-			header: 'Stock',
+			header: 'Stok',
 			cell: ({ row }) => (
 				<div className={row.original.stock === 0 ? 'text-destructive font-medium' : ''}>
 					{row.original.stock}
@@ -61,7 +61,7 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 			header: 'Status',
 			cell: ({ row }) => (
 				<Badge variant="outline" className={row.original.isActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
-					{row.original.isActive ? 'Active' : 'Inactive'}
+					{row.original.isActive ? 'Aktif' : 'Nonaktif'}
 				</Badge>
 			),
 		},
@@ -76,7 +76,7 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 				</Badge>
 			</div>
 			<div className="mt-2 text-sm text-muted-foreground">
-				{formatCurrency(equipment.dailyRateIdr)}/day · Stock: {equipment.stock}
+				{formatCurrency(equipment.dailyRateIdr)}/hari · Stok: {equipment.stock}
 			</div>
 		</div>
 	);
@@ -86,11 +86,11 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 			columns={columns}
 			data={data}
 			isLoading={isLoading}
-			searchPlaceholder="Search equipment..."
+			searchPlaceholder="Cari perlengkapan..."
 			onRowClick={onRowClick}
 			renderCard={renderCard}
-			noDataMessage="No equipment found"
-			noDataDescription="Add equipment to start tracking inventory"
+			noDataMessage="Belum ada perlengkapan"
+			noDataDescription="Tambahkan perlengkapan untuk mulai mengelola stok"
 		/>
 	);
 }

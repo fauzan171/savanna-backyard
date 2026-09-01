@@ -71,76 +71,76 @@ export interface SidebarProps {
 
 const defaultNavItems: NavItem[] = [
 	{
-		label: 'Dashboard',
+		label: 'Beranda',
 		href: '/',
 		icon: <LayoutDashboard className="size-5" />,
 	},
 	{
-		label: 'Bookings',
+		label: 'Booking',
 		href: '/bookings',
 		icon: <FileText className="size-5" />,
 	},
 	{
-		label: 'Payments',
+		label: 'Pembayaran',
 		href: '/payments',
 		icon: <CreditCard className="size-5" />,
 		children: [
-			{ label: 'All Payments', href: '/payments' },
-			{ label: 'Dashboard', href: '/payments/dashboard' },
+			{ label: 'Semua Pembayaran', href: '/payments' },
+			{ label: 'Ringkasan', href: '/payments/dashboard' },
 		],
 	},
 	{
-		label: 'Vehicles',
+		label: 'Kendaraan',
 		href: '/vehicles',
 		icon: <Bike className="size-5" />,
 	},
 	{
-		label: 'Availability',
+		label: 'Ketersediaan',
 		href: '/vehicles/availability',
 		icon: <Car className="size-5" />,
 	},
 	{
-		label: 'Calendar',
+		label: 'Kalender',
 		href: '/calendar',
 		icon: <CalendarDays className="size-5" />,
 	},
 	{
-		label: 'Customers',
+		label: 'Pelanggan',
 		href: '/customers',
 		icon: <UserCircle className="size-5" />,
 	},
 	{
-		label: 'Equipment',
+		label: 'Perlengkapan',
 		href: '/equipment',
 		icon: <Shirt className="size-5" />,
 	},
 	{
-		label: 'Maintenance',
+		label: 'Perawatan',
 		href: '/maintenance',
 		icon: <Wrench className="size-5" />,
 	},
 	{
-		label: 'Packages',
+		label: 'Paket',
 		href: '/packages',
 		icon: <Package className="size-5" />,
 	},
 	{
-		label: 'Pricing',
+		label: 'Harga',
 		href: '/pricing',
 		icon: <Tag className="size-5" />,
 	},
 	{
-		label: 'Reviews',
+		label: 'Ulasan',
 		href: '/reviews',
 		icon: <Star className="size-5" />,
 	},
 	{
-		label: 'Trails',
+		label: 'Rute',
 		href: '/trails',
 		icon: <Map className="size-5" />,
 	},
 	{
-		label: 'Reports',
+		label: 'Laporan',
 		href: '/reports',
 		icon: <BarChart3 className="size-5" />,
 	},
@@ -148,12 +148,12 @@ const defaultNavItems: NavItem[] = [
 
 const defaultFooterItems: NavItem[] = [
 	{
-		label: 'Settings',
+		label: 'Pengaturan',
 		href: '/settings',
 		icon: <Settings className="size-5" />,
 	},
 	{
-		label: 'Users',
+		label: 'Pengguna',
 		href: '/users',
 		icon: <UserCog className="size-5" />,
 	},

@@ -11,6 +11,7 @@ import {
 import { Spinner } from '@/react-app/components/ui/spinner';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { useCalendarMatrix } from '../hooks/useCalendarMatrix';
+import { labelFromMap, vehicleStatusLabels, vehicleTypeLabels } from '@/react-app/lib/labels';
 
 function currentMonth(): string {
 	const d = new Date();
@@ -43,7 +44,7 @@ export default function CalendarPage() {
 				{/* Logo / title */}
 				<div className="flex items-center gap-2 mr-2">
 					<Calendar className="size-5 text-primary" />
-					<span className="text-lg font-semibold tracking-tight">Fleet Calendar</span>
+					<span className="text-lg font-semibold tracking-tight">Kalender Kendaraan</span>
 				</div>
 
 				{/* Today button */}
@@ -54,7 +55,7 @@ export default function CalendarPage() {
 					disabled={isCurrentMonth}
 					className="shrink-0"
 				>
-					Today
+					Hari ini
 				</Button>
 
 				{/* Month navigation */}
@@ -88,38 +89,38 @@ export default function CalendarPage() {
 				{/* Filters */}
 				<Select value={type ?? 'all'} onValueChange={(v) => setType(v === 'all' ? undefined : v)}>
 					<SelectTrigger className="h-8 w-[140px] text-xs">
-						<SelectValue placeholder="All types" />
+						<SelectValue placeholder="Semua jenis" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="all">All types</SelectItem>
-						<SelectItem value="TrailBike">Trail Bike</SelectItem>
-						<SelectItem value="StreetBike">Street Bike</SelectItem>
-						<SelectItem value="Car">Car</SelectItem>
-						<SelectItem value="Jeep">Jeep</SelectItem>
-						<SelectItem value="Other">Other</SelectItem>
+						<SelectItem value="all">Semua jenis</SelectItem>
+						<SelectItem value="TrailBike">{vehicleTypeLabels.TrailBike}</SelectItem>
+						<SelectItem value="StreetBike">{vehicleTypeLabels.StreetBike}</SelectItem>
+						<SelectItem value="Car">{vehicleTypeLabels.Car}</SelectItem>
+						<SelectItem value="Jeep">{vehicleTypeLabels.Jeep}</SelectItem>
+						<SelectItem value="Other">{vehicleTypeLabels.Other}</SelectItem>
 					</SelectContent>
 				</Select>
 
 				<Select value={status ?? 'all'} onValueChange={(v) => setStatus(v === 'all' ? undefined : v)}>
 					<SelectTrigger className="h-8 w-[150px] text-xs">
-						<SelectValue placeholder="All statuses" />
+						<SelectValue placeholder="Semua status" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="all">All statuses</SelectItem>
-						<SelectItem value="Available">Available</SelectItem>
-						<SelectItem value="Rented">Rented</SelectItem>
-						<SelectItem value="Maintenance">Maintenance</SelectItem>
-						<SelectItem value="Inactive">Inactive</SelectItem>
+						<SelectItem value="all">Semua status</SelectItem>
+						<SelectItem value="Available">{labelFromMap(vehicleStatusLabels, 'Available')}</SelectItem>
+						<SelectItem value="Rented">{labelFromMap(vehicleStatusLabels, 'Rented')}</SelectItem>
+						<SelectItem value="Maintenance">{labelFromMap(vehicleStatusLabels, 'Maintenance')}</SelectItem>
+						<SelectItem value="Inactive">{labelFromMap(vehicleStatusLabels, 'Inactive')}</SelectItem>
 					</SelectContent>
 				</Select>
 
 				{/* Legend */}
 				<div className="hidden lg:flex items-center gap-3 border-l pl-3 text-xs">
-					<LegendDot color="bg-blue-600" label="Trail Bike" />
-					<LegendDot color="bg-emerald-600" label="Street Bike" />
-					<LegendDot color="bg-violet-600" label="Car" />
+					<LegendDot color="bg-blue-600" label={vehicleTypeLabels.TrailBike} />
+					<LegendDot color="bg-emerald-600" label={vehicleTypeLabels.StreetBike} />
+					<LegendDot color="bg-violet-600" label={vehicleTypeLabels.Car} />
 					<LegendDot color="bg-orange-500" label="Jeep" />
-					<LegendDot color="bg-amber-100 border border-amber-300 dark:bg-amber-500/20" label="Maint." textClass="text-amber-700 dark:text-amber-400" />
+					<LegendDot color="bg-amber-100 border border-amber-300 dark:bg-amber-500/20" label="Perawatan" textClass="text-amber-700 dark:text-amber-400" />
 				</div>
 			</div>
 
@@ -129,14 +130,14 @@ export default function CalendarPage() {
 					<div className="flex h-full items-center justify-center">
 						<div className="flex flex-col items-center gap-3 text-muted-foreground">
 							<Spinner size="lg" />
-							<span className="text-sm">Loading calendar…</span>
+							<span className="text-sm">Memuat kalender...</span>
 						</div>
 					</div>
 				) : error ? (
 					<div className="flex h-full items-center justify-center">
 						<div className="rounded-lg border border-destructive/50 bg-destructive/10 p-8 text-center text-destructive">
-							<p className="font-medium">Failed to load calendar</p>
-							<p className="mt-1 text-sm opacity-80">Please refresh the page or try again.</p>
+							<p className="font-medium">Kalender gagal dimuat</p>
+							<p className="mt-1 text-sm opacity-80">Muat ulang halaman atau coba beberapa saat lagi.</p>
 						</div>
 					</div>
 				) : data ? (

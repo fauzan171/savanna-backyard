@@ -1,5 +1,12 @@
 import { Badge } from '@/react-app/components/ui/badge';
 import { cn } from '@/react-app/lib/utils';
+import {
+	bookingStatusLabels,
+	leadStatusLabels,
+	paymentStatusLabels,
+	priorityLabels,
+	vehicleStatusLabels,
+} from '@/react-app/lib/labels';
 
 // ============================================
 // BOOKING STATUS BADGE
@@ -9,39 +16,39 @@ type BookingStatus = string;
 
 const bookingStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
-		label: 'Pending',
+		label: bookingStatusLabels.pending,
 		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	pending_payment: {
-		label: 'Pending Payment',
+		label: bookingStatusLabels.pending_payment,
 		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	confirmed: {
-		label: 'Confirmed',
+		label: bookingStatusLabels.confirmed,
 		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	active: {
-		label: 'Active',
+		label: bookingStatusLabels.active,
 		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	completed: {
-		label: 'Completed',
+		label: bookingStatusLabels.completed,
 		className: 'bg-gray-100 text-gray-800 border-gray-300',
 	},
 	cancelled: {
-		label: 'Cancelled',
+		label: bookingStatusLabels.cancelled,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 	payment_failed: {
-		label: 'Payment Failed',
+		label: bookingStatusLabels.payment_failed,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 	expired: {
-		label: 'Expired',
+		label: bookingStatusLabels.expired,
 		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	refunded: {
-		label: 'Refunded',
+		label: bookingStatusLabels.refunded,
 		className: 'bg-purple-100 text-purple-800 border-purple-300',
 	},
 };
@@ -78,23 +85,23 @@ type LeadStatus = string;
 
 const leadStatusConfig: Record<string, { label: string; className: string }> = {
 	new: {
-		label: 'New',
+		label: leadStatusLabels.new,
 		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	contacted: {
-		label: 'Contacted',
+		label: leadStatusLabels.contacted,
 		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	negotiating: {
-		label: 'Negotiating',
+		label: leadStatusLabels.negotiating,
 		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	converted: {
-		label: 'Converted',
+		label: leadStatusLabels.converted,
 		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	lost: {
-		label: 'Lost',
+		label: leadStatusLabels.lost,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 };
@@ -131,17 +138,17 @@ type LeadPriority = string;
 
 const priorityConfig: Record<string, { label: string; className: string; dot: string }> = {
 	hot: {
-		label: 'Hot',
+		label: priorityLabels.hot,
 		className: 'bg-red-100 text-red-800 border-red-300',
 		dot: 'bg-red-500',
 	},
 	warm: {
-		label: 'Warm',
+		label: priorityLabels.warm,
 		className: 'bg-orange-100 text-orange-800 border-orange-300',
 		dot: 'bg-orange-500',
 	},
 	cold: {
-		label: 'Cold',
+		label: priorityLabels.cold,
 		className: 'bg-blue-100 text-blue-800 border-blue-300',
 		dot: 'bg-blue-500',
 	},
@@ -182,35 +189,35 @@ type PaymentStatus = string;
 
 const paymentStatusConfig: Record<string, { label: string; className: string }> = {
 	pending: {
-		label: 'Pending',
+		label: paymentStatusLabels.pending,
 		className: 'bg-yellow-100 text-yellow-800 border-yellow-300',
 	},
 	verified: {
-		label: 'Verified',
+		label: paymentStatusLabels.verified,
 		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	settlement: {
-		label: 'Settled',
+		label: paymentStatusLabels.settlement,
 		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	failed: {
-		label: 'Failed',
+		label: paymentStatusLabels.failed,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 	deny: {
-		label: 'Denied',
+		label: paymentStatusLabels.deny,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 	expire: {
-		label: 'Expired',
+		label: paymentStatusLabels.expire,
 		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	cancel: {
-		label: 'Cancelled',
+		label: paymentStatusLabels.cancel,
 		className: 'bg-red-100 text-red-800 border-red-300',
 	},
 	refund: {
-		label: 'Refunded',
+		label: paymentStatusLabels.refund,
 		className: 'bg-purple-100 text-purple-800 border-purple-300',
 	},
 };
@@ -247,19 +254,19 @@ type VehicleStatus = string;
 
 const vehicleStatusConfig: Record<string, { label: string; className: string }> = {
 	available: {
-		label: 'Available',
+		label: vehicleStatusLabels.available,
 		className: 'bg-green-100 text-green-800 border-green-300',
 	},
 	rented: {
-		label: 'Rented',
+		label: vehicleStatusLabels.rented,
 		className: 'bg-blue-100 text-blue-800 border-blue-300',
 	},
 	maintenance: {
-		label: 'Maintenance',
+		label: vehicleStatusLabels.maintenance,
 		className: 'bg-orange-100 text-orange-800 border-orange-300',
 	},
 	inactive: {
-		label: 'Inactive',
+		label: vehicleStatusLabels.inactive,
 		className: 'bg-gray-100 text-gray-800 border-gray-300',
 	},
 };

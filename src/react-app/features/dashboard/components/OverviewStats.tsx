@@ -25,22 +25,22 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 
 	const stats = [
 		{
-			title: 'Active Bookings',
+			title: 'Booking Aktif',
 			value: data?.activeBookings ?? 0,
 			icon: <Car className="h-4 w-4" />,
-			description: `${data?.upcomingPickups ?? 0} pickups today`,
+			description: `${data?.upcomingPickups ?? 0} pengambilan hari ini`,
 		},
 		{
-			title: 'Available Vehicles',
+			title: 'Kendaraan Tersedia',
 			value: data?.fleet?.available ?? 0,
 			icon: <TrendingUp className="h-4 w-4" />,
-			description: `${data?.fleet?.total ?? 0} total fleet`,
+			description: `${data?.fleet?.total ?? 0} total kendaraan`,
 		},
 		{
-			title: 'Payments Pending',
+			title: 'Pembayaran Menunggu',
 			value: data?.payments?.pending ?? 0,
 			icon: <Users className="h-4 w-4" />,
-			description: `${data?.payments?.overdue ?? 0} overdue`,
+			description: `${data?.payments?.overdue ?? 0} lewat jatuh tempo`,
 		},
 	];
 
@@ -57,7 +57,7 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 				/>
 			))}
 			<StatCard
-				title="Revenue"
+				title="Pendapatan"
 				value={data ? formatCurrency(data.revenue.total, data.revenue.currency) : '-'}
 				icon={<DollarSign className="h-4 w-4" />}
 				trend={
@@ -65,7 +65,7 @@ export function OverviewStats({ data, isLoading }: OverviewStatsProps) {
 						? {
 								value: Math.abs(data.revenue.change.value ?? 0),
 								direction: data.revenue.change.direction === 'neutral' ? 'up' : data.revenue.change.direction,
-								label: data.revenue.change.direction === 'up' ? 'increase' : 'decrease',
+								label: data.revenue.change.direction === 'up' ? 'naik' : 'turun',
 							}
 						: undefined
 				}

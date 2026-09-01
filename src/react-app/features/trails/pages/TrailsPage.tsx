@@ -35,20 +35,20 @@ export default function TrailsPage() {
 
 	return (
 		<div className="space-y-6">
-			<PageHeader title="Trails" description="Manage trail routes and blog content" actions={
-				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Add Trail</Button>
+			<PageHeader title="Rute" description="Kelola rute perjalanan dan konten blog untuk website" actions={
+				<Button onClick={() => setIsCreateOpen(true)}><Plus className="size-4 mr-2" />Tambah Rute</Button>
 			} />
 			{isLoading ? <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full size-8 border-b-2 border-primary" /></div> : (
 				<div className="border rounded-lg overflow-x-auto">
 					<table className="w-full">
 						<thead className="bg-muted/50">
 							<tr>
-								<th className="text-left p-3 text-sm font-medium">Trail</th>
-								<th className="text-left p-3 text-sm font-medium">Difficulty</th>
-								<th className="text-left p-3 text-sm font-medium">Duration</th>
-								<th className="text-left p-3 text-sm font-medium">Distance</th>
+								<th className="text-left p-3 text-sm font-medium">Rute</th>
+								<th className="text-left p-3 text-sm font-medium">Tingkat Kesulitan</th>
+								<th className="text-left p-3 text-sm font-medium">Durasi</th>
+								<th className="text-left p-3 text-sm font-medium">Jarak</th>
 								<th className="text-left p-3 text-sm font-medium">Status</th>
-								<th className="text-left p-3 text-sm font-medium">Actions</th>
+								<th className="text-left p-3 text-sm font-medium">Aksi</th>
 							</tr>
 						</thead>
 						<tbody className="divide-y">
@@ -58,18 +58,18 @@ export default function TrailsPage() {
 									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${difficultyColor[trail.difficulty ?? ''] ?? 'bg-gray-100 text-gray-500'}`}>{trail.difficulty ?? '-'}</span></td>
 									<td className="p-3 text-sm">{trail.estimatedDuration ?? '-'}</td>
 									<td className="p-3 text-sm">{trail.distance ?? '-'}</td>
-									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${trail.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{trail.isActive ? 'Active' : 'Inactive'}</span></td>
+									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${trail.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{trail.isActive ? 'Aktif' : 'Nonaktif'}</span></td>
 									<td className="p-3"><Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleMutation.mutate(trail.id); }}>{trail.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button></td>
 								</tr>
 							))}
 						</tbody>
 					</table>
-					{(!trails || trails.length === 0) && <div className="text-center py-8 text-muted-foreground">No trails found</div>}
+					{(!trails || trails.length === 0) && <div className="text-center py-8 text-muted-foreground">Belum ada rute</div>}
 				</div>
 			)}
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
 				<DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-					<DialogHeader><DialogTitle>Add New Trail</DialogTitle></DialogHeader>
+					<DialogHeader><DialogTitle>Tambah Rute Baru</DialogTitle></DialogHeader>
 					<TrailForm isNew onSubmit={handleCreate} onCancel={() => setIsCreateOpen(false)} isLoading={createMutation.isPending} />
 				</DialogContent>
 			</Dialog>

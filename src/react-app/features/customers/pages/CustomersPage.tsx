@@ -27,14 +27,14 @@ export default function CustomersPage() {
 		try {
 			const result = await createMutation.mutateAsync(formData);
 			setIsCreateDialogOpen(false);
-			toast({ title: 'Customer created' });
+			toast({ title: 'Pelanggan berhasil dibuat' });
 			// Navigate to the new customer's detail page
 			if (result.data?.id) {
 				navigate(`/customers/${result.data.id}`);
 			}
 		} catch (error) {
 			toast({
-				title: 'Failed to create customer',
+				title: 'Gagal membuat pelanggan',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -55,7 +55,7 @@ export default function CustomersPage() {
 			setBlacklistReason('');
 		} catch (error) {
 			toast({
-				title: 'Failed to update blacklist',
+				title: 'Gagal memperbarui blacklist',
 				description: extractApiError(error),
 				variant: 'destructive',
 			});
@@ -69,12 +69,12 @@ export default function CustomersPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Customers"
-				description="Manage customer profiles and rental history"
+				title="Pelanggan"
+				description="Kelola data pelanggan, dokumen identitas, dan riwayat rental"
 				actions={
 					<Button onClick={() => setIsCreateDialogOpen(true)}>
 						<Plus className="size-4 mr-2" />
-						Add Customer
+						Tambah Pelanggan
 					</Button>
 				}
 			/>
@@ -95,7 +95,7 @@ export default function CustomersPage() {
 			<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
 				<DialogContent className="max-w-2xl">
 					<DialogHeader>
-						<DialogTitle>Add New Customer</DialogTitle>
+						<DialogTitle>Tambah Pelanggan Baru</DialogTitle>
 					</DialogHeader>
 					<CustomerForm
 						onSubmit={handleCreate}
@@ -114,24 +114,24 @@ export default function CustomersPage() {
 						setBlacklistReason('');
 					}
 				}}
-				title={blacklistCustomer?.isBlacklisted ? 'Remove from Blacklist' : 'Add to Blacklist'}
+				title={blacklistCustomer?.isBlacklisted ? 'Cabut Blacklist' : 'Tambah ke Blacklist'}
 				description={
 					blacklistCustomer?.isBlacklisted
-						? `Are you sure you want to remove ${blacklistCustomer.name} from the blacklist?`
-						: `Are you sure you want to blacklist ${blacklistCustomer?.name}? They will not be able to make new bookings.`
+						? `Cabut status blacklist untuk ${blacklistCustomer.name}? Setelah dicabut, pelanggan bisa membuat booking lagi.`
+						: `Blacklist ${blacklistCustomer?.name}? Pelanggan ini tidak bisa membuat booking baru.`
 				}
-				confirmLabel={blacklistCustomer?.isBlacklisted ? 'Remove' : 'Blacklist'}
+				confirmLabel={blacklistCustomer?.isBlacklisted ? 'Cabut Blacklist' : 'Blacklist'}
 				variant={blacklistCustomer?.isBlacklisted ? 'default' : 'danger'}
 				onConfirm={handleBlacklist}
 				isLoading={blacklistMutation.isPending}
 			>
 				{!blacklistCustomer?.isBlacklisted && (
 					<div className="mt-4">
-						<label className="text-sm font-medium">Reason (required)</label>
+						<label className="text-sm font-medium">Alasan (wajib)</label>
 						<textarea
 							value={blacklistReason}
 							onChange={(e) => setBlacklistReason(e.target.value)}
-							placeholder="Enter reason for blacklisting..."
+							placeholder="Tulis alasan blacklist..."
 							className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 							rows={3}
 						/>

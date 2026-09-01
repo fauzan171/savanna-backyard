@@ -4,26 +4,26 @@ import { ReportCard } from '../components/ReportCard';
 export default function ReportsPage() {
 	const reports = [
 		{
-			title: 'Revenue Report',
-			description: 'Track revenue trends and payment breakdown',
+			title: 'Laporan Pendapatan',
+			description: 'Pantau tren omzet dan rincian pembayaran',
 			icon: <DollarSign className="h-5 w-5" />,
 			href: '/reports/revenue',
 		},
 		{
-			title: 'Fleet Utilization',
-			description: 'Analyze vehicle usage and availability',
+			title: 'Utilisasi Kendaraan',
+			description: 'Lihat pemakaian kendaraan dan ketersediaannya',
 			icon: <Car className="h-5 w-5" />,
 			href: '/reports/fleet',
 		},
 		{
-			title: 'Payment Report',
-			description: 'Payment status and method breakdown',
+			title: 'Laporan Pembayaran',
+			description: 'Ringkasan status dan metode pembayaran',
 			icon: <CreditCard className="h-5 w-5" />,
 			href: '/reports/payments',
 		},
 		{
-			title: 'Customer Report',
-			description: 'Customer retention and top customers',
+			title: 'Laporan Pelanggan',
+			description: 'Retensi pelanggan dan pelanggan terbaik',
 			icon: <BarChart3 className="h-5 w-5" />,
 			href: '/reports/customers',
 		},
@@ -32,9 +32,9 @@ export default function ReportsPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h1>
+				<h1 className="text-2xl font-bold text-gray-900 dark:text-white">Laporan</h1>
 				<p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-					Analyze your business performance and generate reports
+					Analisa performa bisnis dan buka laporan yang dibutuhkan
 				</p>
 			</div>
 
