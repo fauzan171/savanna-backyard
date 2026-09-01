@@ -35,14 +35,28 @@ export const createBookingSchema = z.object({
 );
 
 // Update booking schema (limited fields)
-export const updateBookingSchema = z.object({
-	notes: z
-		.string()
-		.max(2000)
-		.optional()
-		.nullable()
-		.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
-});
+export const updateBookingSchema = z
+	.object({
+		notes: z
+			.string()
+			.max(2000)
+			.optional()
+			.nullable()
+			.transform((v) => (v == null ? v : (sanitizeText(v) as string))),
+		startDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional(),
+		endDate: z
+			.string()
+			.regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)')
+			.optional(),
+		vehicleId: z.string().uuid().optional(),
+	})
+	.refine((data) => {
+		if (data.startDate && data.endDate) return data.startDate <= data.endDate;
+		return true;
+	}, { message: 'End date must be after start date' });
 
 // Start rental schema
 export const startRentalSchema = z.object({

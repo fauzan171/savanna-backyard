@@ -9,6 +9,7 @@ import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '@
 import {
 	generateBookingNumber,
 	calculateDays,
+	calculateTwelveHourBlocks,
 	calculateLateFee,
 	getHourlyRate,
 	LATE_FEE_MULTIPLIER,
@@ -461,8 +462,38 @@ export class BookingsService {
 
 		this.assertNotTerminal(booking, 'update');
 
-		const updated = await this.bookingRepo.update(id, {
-			notes: data.notes,
+		// Build update payload
+		const updateData: Record<string, unknown> = {};
+
+		if (data.notes !== undefined) updateData.notes = data.notes;
+
+		// Handle vehicle change
+		if (data.vehicleId && data.vehicleId !== booking.vehicleId) {
+			const newVehicle = await this.vehicleRepo.findById(data.vehicleId);
+			if (!newVehicle) throw new ValidationError('Vehicle not found');
+			if (newVehicle.status !== 'Available') throw new ValidationError('Target vehicle is not available');
+			updateData.vehicleId = data.vehicleId;
+			updateData.baseAmount = Math.round(newVehicle.dailyRateIdr * calculateTwelveHourBlocks(booking.startDate, booking.endDate));
+		}
+
+		// Handle date change — re-check availability + re-price
+		const newStart = data.startDate ?? booking.startDate;
+		const newEnd = data.endDate ?? booking.endDate;
+		if (data.startDate || data.endDate) {
+			if (newStart > newEnd) throw new ValidationError('End date must be after start date');
+			const isAvail = await this.bookingRepo.isVehicleAvailableForDates(
+				updateData.vehicleId as string ?? booking.vehicleId,
+				newStart,
+				newEnd,
+			);
+			if (!isAvail) throw new ConflictError('Vehicle is not available for the selected dates');
+			updateData.startDate = newStart;
+			updateData.endDate = newEnd;
+			const vehicle = await this.vehicleRepo.findById(updateData.vehicleId as string ?? booking.vehicleId);
+			updateData.baseAmount = Math.round(vehicle!.dailyRateIdr * calculateTwelveHourBlocks(newStart, newEnd));
+		}
+
+		const updated = await this.bookingRepo.update(id, updateData as any);
 		});
 
 		if (!updated) {
