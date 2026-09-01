@@ -78,7 +78,7 @@ export class BookingsRepository {
 			.innerJoin(customers, eq(customers.id, bookings.customerId))
 			.where(
 				and(
-					inArray(bookings.status, ['Confirmed', 'Active']),
+					inArray(bookings.status, ['Confirmed', 'Active', 'pending_payment']),
 					lt(bookings.startDate, endDateExclusive),
 					gt(bookings.endDate, startDate),
 				),
