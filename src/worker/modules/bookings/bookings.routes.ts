@@ -19,6 +19,7 @@ import {
 	cancelBookingSchema,
 	addAddonSchema,
 	scanReturnSchema,
+	scanQrSchema,
 	submitChecklistSchema,
 	listBookingsQuerySchema,
 	availabilityQuerySchema,
@@ -254,7 +255,7 @@ export function createBookingsRouter(): Hono<BookingsEnv> {
 	router.post('/scan-return', validateBody(scanReturnSchema), scanReturnHandler);
 
 	// Scan vehicle QR to determine pickup checklist vs motor condition check
-	router.post('/scan-qr', scanQrHandler);
+	router.post('/scan-qr', validateBody(scanQrSchema), scanQrHandler);
 
 	// Submit QR scan checklist results (pickup or motor condition)
 	router.post('/submit-checklist', validateBody(submitChecklistSchema), submitChecklistHandler);

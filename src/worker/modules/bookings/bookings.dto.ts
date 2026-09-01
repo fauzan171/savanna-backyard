@@ -105,6 +105,12 @@ export const scanReturnSchema = z.object({
 	qrCode: z.string().min(1, 'QR code is required'),
 });
 
+// Scan-qr schema: resolve vehicle from QR/plate scan for pickup condition check
+export const scanQrSchema = z.object({
+	qrCode: z.string().min(1, 'QR code or plate number is required'),
+	scanTime: z.string().optional(),
+});
+
 // Add addon schema
 export const addAddonSchema = z.object({
 	type: z.enum(['TourGuide', 'SafetyGear', 'PickupDropoff', 'Package', 'Other']),
