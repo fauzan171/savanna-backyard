@@ -19,6 +19,45 @@ import {
 	type NewPublicUserNotification,
 } from '@/worker/core/database/schema';
 
+type RawVerificationCodeRow = {
+	id: string;
+	public_user_id: string | null;
+	phone: string;
+	ref_code: string;
+	otp_code?: string | null;
+	otp_hash: string | null;
+	delivery_channel?: 'web' | 'whatsapp' | null;
+	status?: 'otp_sent' | 'verified' | 'expired' | null;
+	type: 'phone_otp';
+	consumed: number | boolean;
+	attempts: number;
+	expires_at: string;
+	created_at: string;
+};
+
+function isMissingSchemaError(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : String(error);
+	return /no column named|no such column|no such table/i.test(message);
+}
+
+function toVerificationCode(row: RawVerificationCodeRow): VerificationCode {
+	return {
+		id: row.id,
+		publicUserId: row.public_user_id,
+		phone: row.phone,
+		refCode: row.ref_code,
+		otpCode: row.otp_code ?? null,
+		otpHash: row.otp_hash,
+		deliveryChannel: row.delivery_channel ?? 'web',
+		status: row.status ?? (row.consumed ? 'verified' : 'otp_sent'),
+		type: row.type,
+		consumed: Boolean(row.consumed),
+		attempts: row.attempts,
+		expiresAt: row.expires_at,
+		createdAt: row.created_at,
+	};
+}
+
 export class PublicUsersRepository {
 	constructor(private db: Database) {}
 
@@ -62,20 +101,90 @@ export class PublicUsersRepository {
 	// ---------------- verification_codes ----------------
 	async createVerificationCode(data: Omit<NewVerificationCode, 'id' | 'createdAt'>): Promise<VerificationCode> {
 		const id = crypto.randomUUID();
-		await this.db.insert(verificationCodes).values({ id, ...data, createdAt: new Date().toISOString() });
-		const [v] = await this.db.select().from(verificationCodes).where(eq(verificationCodes.id, id)).limit(1);
-		return v!;
+		const createdAt = new Date().toISOString();
+		try {
+			await this.db.insert(verificationCodes).values({ id, ...data, createdAt });
+			const [v] = await this.db.select().from(verificationCodes).where(eq(verificationCodes.id, id)).limit(1);
+			return v!;
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			await this.db.run(sql`
+				insert into verification_codes (
+					id,
+					public_user_id,
+					phone,
+					ref_code,
+					otp_hash,
+					type,
+					consumed,
+					attempts,
+					expires_at,
+					created_at
+				)
+				values (
+					${id},
+					${data.publicUserId ?? null},
+					${data.phone},
+					${data.refCode},
+					${data.otpHash ?? null},
+					${data.type ?? 'phone_otp'},
+					${data.consumed ? 1 : 0},
+					${data.attempts ?? 0},
+					${data.expiresAt},
+					${createdAt}
+				)
+			`);
+			return {
+				id,
+				publicUserId: data.publicUserId ?? null,
+				phone: data.phone,
+				refCode: data.refCode,
+				otpCode: null,
+				otpHash: data.otpHash ?? null,
+				deliveryChannel: data.deliveryChannel ?? 'web',
+				status: data.status ?? 'otp_sent',
+				type: data.type ?? 'phone_otp',
+				consumed: data.consumed ?? false,
+				attempts: data.attempts ?? 0,
+				expiresAt: data.expiresAt,
+				createdAt,
+			};
+		}
 	}
 
 	async findActiveVerificationByRef(refCode: string): Promise<VerificationCode | null> {
 		const now = new Date().toISOString();
-		const [v] = await this.db
-			.select()
-			.from(verificationCodes)
-			.where(and(eq(verificationCodes.refCode, refCode), eq(verificationCodes.consumed, false), gte(verificationCodes.expiresAt, now)))
-			.orderBy(desc(verificationCodes.createdAt))
-			.limit(1);
-		return v ?? null;
+		try {
+			const [v] = await this.db
+				.select()
+				.from(verificationCodes)
+				.where(and(eq(verificationCodes.refCode, refCode), eq(verificationCodes.consumed, false), gte(verificationCodes.expiresAt, now)))
+				.orderBy(desc(verificationCodes.createdAt))
+				.limit(1);
+			return v ?? null;
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			const rows = await this.db.all<RawVerificationCodeRow>(sql`
+				select
+					id,
+					public_user_id,
+					phone,
+					ref_code,
+					otp_hash,
+					type,
+					consumed,
+					attempts,
+					expires_at,
+					created_at
+				from verification_codes
+				where ref_code = ${refCode}
+					and consumed = 0
+					and expires_at >= ${now}
+				order by created_at desc
+				limit 1
+			`);
+			return rows[0] ? toVerificationCode(rows[0]) : null;
+		}
 	}
 
 	async findLatestVerificationByPhone(phone: string, publicUserId?: string): Promise<VerificationCode | null> {
@@ -91,13 +200,58 @@ export class PublicUsersRepository {
 		if (publicUserId) {
 			conds.push(eq(verificationCodes.publicUserId, publicUserId));
 		}
-		const [v] = await this.db
-			.select()
-			.from(verificationCodes)
-			.where(and(...conds))
-			.orderBy(desc(verificationCodes.createdAt))
-			.limit(1);
-		return v ?? null;
+		try {
+			const [v] = await this.db
+				.select()
+				.from(verificationCodes)
+				.where(and(...conds))
+				.orderBy(desc(verificationCodes.createdAt))
+				.limit(1);
+			return v ?? null;
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			const rows = publicUserId
+				? await this.db.all<RawVerificationCodeRow>(sql`
+					select
+						id,
+						public_user_id,
+						phone,
+						ref_code,
+						otp_hash,
+						type,
+						consumed,
+						attempts,
+						expires_at,
+						created_at
+					from verification_codes
+					where phone = ${phone}
+						and consumed = 0
+						and expires_at >= ${now}
+						and public_user_id = ${publicUserId}
+					order by created_at desc
+					limit 1
+				`)
+				: await this.db.all<RawVerificationCodeRow>(sql`
+					select
+						id,
+						public_user_id,
+						phone,
+						ref_code,
+						otp_hash,
+						type,
+						consumed,
+						attempts,
+						expires_at,
+						created_at
+					from verification_codes
+					where phone = ${phone}
+						and consumed = 0
+						and expires_at >= ${now}
+					order by created_at desc
+					limit 1
+				`);
+			return rows[0] ? toVerificationCode(rows[0]) : null;
+		}
 	}
 
 	async countRecentVerificationByPhone(phone: string, sinceIso: string): Promise<number> {
@@ -123,58 +277,123 @@ export class PublicUsersRepository {
 	}
 
 	async updateVerification(id: string, data: Partial<NewVerificationCode>): Promise<void> {
-		await this.db.update(verificationCodes).set(data).where(eq(verificationCodes.id, id));
+		try {
+			await this.db.update(verificationCodes).set(data).where(eq(verificationCodes.id, id));
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			await this.db.update(verificationCodes).set({
+				...(data.publicUserId !== undefined ? { publicUserId: data.publicUserId } : {}),
+				...(data.phone !== undefined ? { phone: data.phone } : {}),
+				...(data.refCode !== undefined ? { refCode: data.refCode } : {}),
+				...(data.otpHash !== undefined ? { otpHash: data.otpHash } : {}),
+				...(data.type !== undefined ? { type: data.type } : {}),
+				...(data.consumed !== undefined ? { consumed: data.consumed } : {}),
+				...(data.attempts !== undefined ? { attempts: data.attempts } : {}),
+				...(data.expiresAt !== undefined ? { expiresAt: data.expiresAt } : {}),
+			}).where(eq(verificationCodes.id, id));
+		}
 	}
 
 	async listVerificationCodes(limit = 100): Promise<VerificationCode[]> {
-		return this.db
-			.select()
-			.from(verificationCodes)
-			.orderBy(desc(verificationCodes.createdAt))
-			.limit(limit);
+		try {
+			return await this.db
+				.select()
+				.from(verificationCodes)
+				.orderBy(desc(verificationCodes.createdAt))
+				.limit(limit);
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			const rows = await this.db.all<RawVerificationCodeRow>(sql`
+				select
+					id,
+					public_user_id,
+					phone,
+					ref_code,
+					otp_hash,
+					type,
+					consumed,
+					attempts,
+					expires_at,
+					created_at
+				from verification_codes
+				order by created_at desc
+				limit ${limit}
+			`);
+			return rows.map(toVerificationCode);
+		}
 	}
 
 	// ---------------- public_user_notifications ----------------
 	async createNotification(data: Omit<NewPublicUserNotification, 'id' | 'createdAt'>): Promise<PublicUserNotification> {
 		const id = crypto.randomUUID();
-		await this.db.insert(publicUserNotifications).values({ id, ...data, createdAt: new Date().toISOString() });
-		const [created] = await this.db.select().from(publicUserNotifications).where(eq(publicUserNotifications.id, id)).limit(1);
-		return created!;
+		const createdAt = new Date().toISOString();
+		try {
+			await this.db.insert(publicUserNotifications).values({ id, ...data, createdAt });
+			const [created] = await this.db.select().from(publicUserNotifications).where(eq(publicUserNotifications.id, id)).limit(1);
+			return created!;
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			return {
+				id,
+				publicUserId: data.publicUserId ?? null,
+				phone: data.phone ?? null,
+				type: data.type,
+				title: data.title,
+				message: data.message,
+				metadata: data.metadata ?? null,
+				readAt: data.readAt ?? null,
+				createdAt,
+			};
+		}
 	}
 
 	async listNotifications(publicUserId: string, phone: string, limit = 50): Promise<PublicUserNotification[]> {
-		return this.db
-			.select()
-			.from(publicUserNotifications)
-			.where(or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)))
-			.orderBy(desc(publicUserNotifications.createdAt))
-			.limit(limit);
+		try {
+			return await this.db
+				.select()
+				.from(publicUserNotifications)
+				.where(or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)))
+				.orderBy(desc(publicUserNotifications.createdAt))
+				.limit(limit);
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			return [];
+		}
 	}
 
 	async markNotificationRead(id: string, publicUserId: string, phone: string): Promise<PublicUserNotification | null> {
-		await this.db
-			.update(publicUserNotifications)
-			.set({ readAt: new Date().toISOString() })
-			.where(and(
-				eq(publicUserNotifications.id, id),
-				or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
-			));
-		const [updated] = await this.db
-			.select()
-			.from(publicUserNotifications)
-			.where(and(
-				eq(publicUserNotifications.id, id),
-				or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
-			))
-			.limit(1);
-		return updated ?? null;
+		try {
+			await this.db
+				.update(publicUserNotifications)
+				.set({ readAt: new Date().toISOString() })
+				.where(and(
+					eq(publicUserNotifications.id, id),
+					or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
+				));
+			const [updated] = await this.db
+				.select()
+				.from(publicUserNotifications)
+				.where(and(
+					eq(publicUserNotifications.id, id),
+					or(eq(publicUserNotifications.publicUserId, publicUserId), eq(publicUserNotifications.phone, phone)),
+				))
+				.limit(1);
+			return updated ?? null;
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+			return null;
+		}
 	}
 
 	async attachNotificationsToPublicUser(phone: string, publicUserId: string): Promise<void> {
-		await this.db
-			.update(publicUserNotifications)
-			.set({ publicUserId })
-			.where(and(eq(publicUserNotifications.phone, phone), isNull(publicUserNotifications.publicUserId)));
+		try {
+			await this.db
+				.update(publicUserNotifications)
+				.set({ publicUserId })
+				.where(and(eq(publicUserNotifications.phone, phone), isNull(publicUserNotifications.publicUserId)));
+		} catch (error) {
+			if (!isMissingSchemaError(error)) throw error;
+		}
 	}
 
 	// ---------------- bookings (account-scoped) ----------------
