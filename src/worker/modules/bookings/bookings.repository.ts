@@ -468,22 +468,33 @@ export class BookingsRepository {
 		changedBy?: string,
 		note?: string,
 	): Promise<void> {
-		await this.db.insert(bookingStatusLogs).values({
-			id: crypto.randomUUID(),
-			bookingId,
-			fromStatus,
-			toStatus,
-			changedBy: changedBy ?? null,
-			note: note ?? null,
-		});
+		try {
+			await this.db.insert(bookingStatusLogs).values({
+				id: crypto.randomUUID(),
+				bookingId,
+				fromStatus,
+				toStatus,
+				changedBy: changedBy ?? null,
+				note: note ?? null,
+			});
+		} catch (e) {
+			// Hotfix 0012: ignore if table not yet migrated in PROD
+			if (String(e).includes('no such table')) return;
+			throw e;
+		}
 	}
 
 	/** Fetch status history for a booking, newest first. */
 	async getBookingHistory(bookingId: string): Promise<BookingStatusLog[]> {
-		return this.db
-			.select()
-			.from(bookingStatusLogs)
-			.where(eq(bookingStatusLogs.bookingId, bookingId))
-			.orderBy(desc(bookingStatusLogs.createdAt));
+		try {
+			return await this.db
+				.select()
+				.from(bookingStatusLogs)
+				.where(eq(bookingStatusLogs.bookingId, bookingId))
+				.orderBy(desc(bookingStatusLogs.createdAt));
+		} catch (e) {
+			if (String(e).includes('no such table')) return [];
+			throw e;
+		}
 	}
 }

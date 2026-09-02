@@ -183,8 +183,13 @@ export class BookingsService {
 			dailyRateIdr: details.vehicle.dailyRateIdr,
 		};
 
-		// Fetch status change history
-		const statusHistory = await this.bookingRepo.getBookingHistory(booking.id);
+		// Fetch status change history (hotfix 0012: tolerate missing table)
+		let statusHistory: BookingStatusLog[] = [];
+		try {
+			statusHistory = await this.bookingRepo.getBookingHistory(booking.id);
+		} catch (e) {
+			if (!String(e).includes('no such table')) throw e;
+		}
 
 		return {
 			id: booking.id,
@@ -456,8 +461,12 @@ export class BookingsService {
 			createdBy: userId,
 		});
 
-		// Log initial status
-		await this.bookingRepo.logStatusChange(booking.id, null, 'Pending', userId, 'Booking created');
+		// Log initial status (hotfix 0012: tolerate missing table)
+		try {
+			await this.bookingRepo.logStatusChange(booking.id, null, 'Pending', userId, 'Booking created');
+		} catch (e) {
+			if (!String(e).includes('no such table')) throw e;
+		}
 
 		// Create addons
 		for (const addon of data.addons ?? []) {
