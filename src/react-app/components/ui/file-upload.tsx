@@ -131,11 +131,16 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 		ref
 	) => {
 		const [isDragging, setIsDragging] = React.useState(false);
+		// TC-VEH-003: when selected files are rejected by accept/maxSize,
+		// surface WHY to the user instead of silently dropping them.
+		const [rejectError, setRejectError] = React.useState('');
 		const inputRef = React.useRef<HTMLInputElement>(null);
+
+		const displayError = error || rejectError;
 
 		const variant = disabled
 			? 'disabled'
-			: error
+			: displayError
 				? 'error'
 				: isDragging
 					? 'active'
@@ -151,23 +156,44 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 			setIsDragging(false);
 		};
 
-		const validateFiles = (files: File[]): File[] => {
+		const validateFiles = (files: File[]): { valid: File[]; rejected: string } => {
 			let validFiles = [...files];
+			let rejected = '';
 
 			// Filter by accepted types
 			if (accept) {
 				const acceptTypes = accept.split(',').map(t => t.trim());
+				// TC-BK-006: some valid PNGs arrive with file.type = '' (OS/browser
+				// cannot map the MIME) — infer a candidate MIME from the extension
+				// so the accept check does not reject them.
+				const EXT_MIME: Record<string, string> = {
+					'.png': 'image/png',
+					'.jpg': 'image/jpeg',
+					'.jpeg': 'image/jpeg',
+					'.webp': 'image/webp',
+					'.gif': 'image/gif',
+				};
+				const before = validFiles.length;
 				validFiles = validFiles.filter(file => {
-					const fileType = file.type;
-					const fileExtension = `.${file.name.split('.').pop()}`;
-					return acceptTypes.some(
-						type => type === fileType || type === fileExtension || fileType.startsWith(type.replace('/*', ''))
+					const fileExtension = `.${(file.name.split('.').pop() ?? '').toLowerCase()}`;
+					const candidates = [file.type, EXT_MIME[fileExtension]].filter(Boolean) as string[];
+					return acceptTypes.some(type =>
+						candidates.some(c =>
+							type === c || type === fileExtension || c.startsWith(type.replace('/*', '/'))
+						)
 					);
 				});
+				if (validFiles.length < before) {
+					rejected = `Format file tidak didukung. Hanya menerima: ${accept}`;
+				}
 			}
 
 			// Filter by max size
+			const beforeSize = validFiles.length;
 			validFiles = validFiles.filter(file => file.size <= maxSize);
+			if (validFiles.length < beforeSize) {
+				rejected = rejected || `Ukuran file melebihi batas ${formatMaxSize(maxSize)}`;
+			}
 
 			// Limit to maxFiles
 			if (!multiple) {
@@ -176,49 +202,42 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 				validFiles = validFiles.slice(0, maxFiles - value.length);
 			}
 
-			return validFiles;
+			return { valid: validFiles, rejected };
+		};
+
+		const processFiles = (incoming: File[]) => {
+			const { valid, rejected } = validateFiles(incoming);
+			setRejectError(rejected);
+			if (valid.length === 0) return;
+			if (multiple) {
+				onChange?.([...value, ...valid]);
+			} else {
+				onChange?.(valid);
+			}
 		};
 
 		const handleDrop = (e: React.DragEvent) => {
 			e.preventDefault();
 			setIsDragging(false);
 			if (disabled) return;
-
-			const droppedFiles = Array.from(e.dataTransfer.files);
-			const validFiles = validateFiles(droppedFiles);
-
-			if (validFiles.length > 0) {
-				if (multiple) {
-					onChange?.([...value, ...validFiles]);
-				} else {
-					onChange?.(validFiles);
-				}
-			}
+			processFiles(Array.from(e.dataTransfer.files));
 		};
 
 		const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-			const selectedFiles = Array.from(e.target.files || []);
-			const validFiles = validateFiles(selectedFiles);
-
-			if (validFiles.length > 0) {
-				if (multiple) {
-					onChange?.([...value, ...validFiles]);
-				} else {
-					onChange?.(validFiles);
-				}
-			}
+			processFiles(Array.from(e.target.files || []));
 			// Reset input
 			if (inputRef.current) inputRef.current.value = '';
 		};
 
 		const handleRemove = (fileToRemove: File) => {
 			const newFiles = value.filter(f => f !== fileToRemove);
+			if (newFiles.length === 0) setRejectError('');
 			onChange?.(newFiles);
 		};
 
-		const formatMaxSize = () => {
-			if (maxSize < 1024 * 1024) return `${(maxSize / 1024).toFixed(0)} KB`;
-			return `${(maxSize / (1024 * 1024)).toFixed(0)} MB`;
+		const formatMaxSize = (bytes: number = maxSize) => {
+			if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+			return `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
 		};
 
 		return (
@@ -243,14 +262,14 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 					{children || (
 						<div className="text-center">
 							<div className="mx-auto mb-3 text-muted-foreground">
-								{error ? (
+								{displayError ? (
 									<AlertCircle className="size-8" />
 								) : (
 									<Upload className="size-8" />
 								)}
 							</div>
 							<p className="text-sm font-medium text-foreground">
-								{error ? 'Upload gagal' : 'Tarik file ke sini atau klik untuk upload'}
+								{displayError ? 'Upload gagal' : 'Tarik file ke sini atau klik untuk upload'}
 							</p>
 							<p className="text-xs text-muted-foreground mt-1">
 								{accept && `Format: ${accept}`}
@@ -261,10 +280,10 @@ const FileUpload = React.forwardRef<HTMLDivElement, FileUploadProps>(
 					)}
 				</div>
 
-				{error && (
+				{displayError && (
 					<p className="text-sm text-destructive flex items-center gap-1">
 						<AlertCircle className="size-4" />
-						{error}
+						{displayError}
 					</p>
 				)}
 

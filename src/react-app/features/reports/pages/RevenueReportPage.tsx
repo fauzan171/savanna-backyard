@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, DollarSign, FileText, TrendingUp } from 'lucide-react';
 import { Button } from '@/react-app/components/ui/button';
 import { StatCard } from '@/react-app/components/ui/stat-card';
 import { formatCurrency } from '@/react-app/lib/utils';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { DateRangeFilter } from '../components/DateRangeFilter';
 import { ExportButton } from '../components/ExportButton';
 import { LineChart } from '../components/charts/LineChart';
@@ -21,7 +23,31 @@ export default function RevenueReportPage() {
 		endDate: endDate?.toISOString().split('T')[0],
 	};
 
-	const { data: report, isLoading } = useRevenueReport(params);
+	// TC-RPT-002: start > end is always a server 400. Detect locally, skip the
+	// wasted request, and tell the user.
+	const rangeInvalid = !!(startDate && endDate && startDate > endDate);
+
+	const { data: report, isLoading, error } = useRevenueReport(params, { enabled: !rangeInvalid });
+
+	useEffect(() => {
+		if (rangeInvalid) {
+			toast({
+				variant: 'destructive',
+				title: 'Rentang tanggal tidak valid',
+				description: 'Tanggal mulai harus sebelum atau sama dengan tanggal selesai.',
+			});
+		}
+	}, [rangeInvalid]);
+
+	useEffect(() => {
+		if (error) {
+			toast({
+				variant: 'destructive',
+				title: 'Gagal memuat laporan revenue',
+				description: extractApiError(error, 'Terjadi kesalahan saat memuat laporan'),
+			});
+		}
+	}, [error]);
 
 	const chartData = (report?.byPeriod ?? []).map((item) => ({
 		period: item.period,

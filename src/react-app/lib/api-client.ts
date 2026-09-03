@@ -6,6 +6,23 @@ interface ApiOptions {
 	params?: Record<string, string>;
 }
 
+/**
+ * Error thrown by ApiClient. Extends Error so existing `instanceof Error` /
+ * extractApiError() call sites keep working, while exposing `status` and the
+ * server error `code` so callers can react to specific HTTP codes (e.g. 409
+ * duplicate plate → "Nomor plat sudah terdaftar" toast).
+ */
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		public status: number,
+		public code?: string
+	) {
+		super(message);
+		this.name = 'ApiError';
+	}
+}
+
 class ApiClient {
 	private baseUrl = '/api';
 
@@ -35,12 +52,16 @@ class ApiClient {
 			// Clear only local auth state. Calling the logout endpoint from a 401 handler
 			// creates a request loop when the session is already invalid/missing.
 			this.clearAuthState();
-			throw new Error('Unauthorized');
+			throw new ApiError('Unauthorized', 401, 'UNAUTHORIZED');
 		}
 
 		if (!response.ok) {
 			const error = await response.json().catch(() => ({ error: { message: 'Request failed' } }));
-			throw new Error(error.error?.message || 'Request failed');
+			throw new ApiError(
+				error.error?.message || 'Request failed',
+				response.status,
+				error.error?.code
+			);
 		}
 
 		return response.json();
@@ -79,12 +100,16 @@ class ApiClient {
 
 		if (response.status === 401) {
 			this.clearAuthState();
-			throw new Error('Unauthorized');
+			throw new ApiError('Unauthorized', 401, 'UNAUTHORIZED');
 		}
 
 		if (!response.ok) {
 			const error = await response.json().catch(() => ({ error: { message: 'Upload failed' } }));
-			throw new Error(error.error?.message || 'Upload failed');
+			throw new ApiError(
+				error.error?.message || 'Upload failed',
+				response.status,
+				error.error?.code
+			);
 		}
 
 		return response.json();

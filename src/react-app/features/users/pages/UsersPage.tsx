@@ -4,10 +4,11 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
+import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { useUsers, useCreateUser, useToggleUser, useUpdateUser } from '../hooks/useUsers';
 import { toast } from '@/react-app/hooks/useToast';
-import type { CreateUserRequest } from '../api/users';
+import type { CreateUserRequest, User } from '../api/users';
 
 function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
 	const createMutation = useCreateUser();
@@ -80,9 +81,27 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 export default function UsersPage() {
 	const [isCreateOpen, setIsCreateOpen] = useState(false);
 	const [editingUser, setEditingUser] = useState<any>(null);
+	// USER-08: trash icon targets a user; ConfirmationDialog gates the action
+	const [toggleTarget, setToggleTarget] = useState<User | null>(null);
 	const { data: users, isLoading } = useUsers();
 	const toggleMutation = useToggleUser();
 	const updateMutation = useUpdateUser();
+
+	const handleToggle = async (user: User) => {
+		try {
+			await toggleMutation.mutateAsync(user.id);
+			toast({
+				title: user.isActive ? 'Pengguna dinonaktifkan' : 'Pengguna diaktifkan kembali',
+				description: user.name,
+			});
+		} catch (error) {
+			toast({
+				variant: 'destructive',
+				title: 'Gagal mengubah status pengguna',
+				description: (error as Error).message,
+			});
+		}
+	};
 
 	return (
 		<div className="space-y-6">
@@ -111,8 +130,8 @@ export default function UsersPage() {
 									<td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{user.isActive ? 'Aktif' : 'Nonaktif'}</span></td>
 									<td className="p-3 flex gap-1">
 									<Button variant="ghost" size="sm" onClick={() => setEditingUser(user)}><Pencil className="size-4" /></Button>
-									<Button variant="ghost" size="sm" onClick={() => { if (window.confirm(`Nonaktifkan ${user.name}? Pengguna ini tidak bisa login setelah dinonaktifkan.`)) toggleMutation.mutate(user.id); }}><Trash2 className="size-4 text-destructive" /></Button>
-									<Button variant="ghost" size="sm" onClick={() => toggleMutation.mutate(user.id)}>{user.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button>
+									<Button variant="ghost" size="sm" onClick={() => setToggleTarget(user)} aria-label={`Nonaktifkan ${user.name}`}><Trash2 className="size-4 text-destructive" /></Button>
+									<Button variant="ghost" size="sm" onClick={() => handleToggle(user)} aria-label={`Ubah status ${user.name}`}>{user.isActive ? <ToggleRight className="size-4 text-green-600" /> : <ToggleLeft className="size-4 text-gray-400" />}</Button>
 								</td>
 								</tr>
 							))}
@@ -163,6 +182,22 @@ export default function UsersPage() {
 				</Dialog>
 			)}
 			<CreateUserDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+
+			{/* USER-08: confirm before disabling an account via trash icon */}
+			<ConfirmationDialog
+				open={!!toggleTarget}
+				onOpenChange={(open) => !open && setToggleTarget(null)}
+				title={toggleTarget?.isActive ? 'Nonaktifkan Pengguna' : 'Aktifkan Pengguna'}
+				description={
+					toggleTarget?.isActive
+						? `Yakin ingin menonaktifkan ${toggleTarget.name} (${toggleTarget.email})? Pengguna ini tidak bisa login setelah dinonaktifkan.`
+						: `Aktifkan kembali ${toggleTarget?.name} (${toggleTarget?.email})? Pengguna bisa login kembali.`
+				}
+				confirmLabel={toggleTarget?.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+				variant={toggleTarget?.isActive ? 'danger' : 'default'}
+				onConfirm={async () => { if (toggleTarget) await handleToggle(toggleTarget); }}
+				isLoading={toggleMutation.isPending}
+			/>
 		</div>
 	);
 }

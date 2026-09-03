@@ -28,6 +28,8 @@ export interface BookingSummaryWithDetails extends BookingSummary {
 
 export interface PaymentResponse {
 	id: string;
+	// TC-PAY-004: top-level bookingId so admin booking links resolve
+	bookingId: string;
 	booking: BookingSummary;
 	amount: number;
 	currency: PaymentCurrency;

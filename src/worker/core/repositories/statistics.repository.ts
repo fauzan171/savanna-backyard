@@ -18,16 +18,20 @@ export class StatisticsRepository {
 	// ============ Revenue Queries ============
 
 	/**
-	 * Get total revenue from completed bookings within date range
+	 * TC-RPT-004: revenue = SUM of Verified payments in range, not booking
+	 * totals. The old booking-based query required the whole rental window
+	 * (endDate <= range end), so verified payments on still-running/future
+	 * bookings were filtered out and the report showed Rp 0.
 	 */
 	async getTotalRevenue(startDate?: string, endDate?: string): Promise<number> {
-		const conditions = [inArray(bookings.status, ['Confirmed', 'Active', 'Completed'])];
-		if (startDate) conditions.push(gte(bookings.startDate, startDate));
-		if (endDate) conditions.push(lte(bookings.endDate, endDate));
+		const conditions = [eq(payments.status, 'Verified')];
+		const paidAt = sql`COALESCE(${payments.verifiedAt}, ${payments.createdAt})`;
+		if (startDate) conditions.push(gte(paidAt, startDate));
+		if (endDate) conditions.push(lte(paidAt, `${endDate}T23:59:59`));
 
 		const result = await this.db
-			.select({ total: sum(bookings.totalAmount) })
-			.from(bookings)
+			.select({ total: sum(payments.amount) })
+			.from(payments)
 			.where(and(...conditions));
 
 		return Number(result[0]?.total ?? 0);
@@ -47,22 +51,27 @@ export class StatisticsRepository {
 			month: '%Y-%m',
 		}[groupBy];
 
+		// TC-RPT-004: group Verified payments by paid date (same source as
+		// getTotalRevenue) so chart and headline stay consistent.
+		const paidAt = sql`COALESCE(${payments.verifiedAt}, ${payments.createdAt})`;
+		const period = sql<string>`strftime('${sql.raw(dateFormat)}', ${paidAt})`;
+
 		const result = await this.db
 			.select({
-				date: sql<string>`strftime('${sql.raw(dateFormat)}', ${bookings.startDate})`,
-				revenue: sum(bookings.totalAmount),
-				bookings: count(),
+				date: period,
+				revenue: sum(payments.amount),
+				bookings: sql<number>`COUNT(DISTINCT ${payments.bookingId})`,
 			})
-			.from(bookings)
+			.from(payments)
 			.where(
 				and(
-					inArray(bookings.status, ['Confirmed', 'Active', 'Completed']),
-					gte(bookings.startDate, startDate),
-					lte(bookings.endDate, endDate)
+					eq(payments.status, 'Verified'),
+					gte(paidAt, startDate),
+					lte(paidAt, `${endDate}T23:59:59`)
 				)
 			)
-			.groupBy(sql`strftime('${sql.raw(dateFormat)}', ${bookings.startDate})`)
-			.orderBy(asc(sql`strftime('${sql.raw(dateFormat)}', ${bookings.startDate})`));
+			.groupBy(period)
+			.orderBy(asc(period));
 
 		return result.map((r) => ({
 			date: r.date,
@@ -78,21 +87,24 @@ export class StatisticsRepository {
 		startDate?: string,
 		endDate?: string
 	): Promise<Array<{ type: string; revenue: number; bookings: number; percentage: number }>> {
-		const conditions = [inArray(bookings.status, ['Confirmed', 'Active', 'Completed'])];
-		if (startDate) conditions.push(gte(bookings.startDate, startDate));
-		if (endDate) conditions.push(lte(bookings.endDate, endDate));
+		// TC-RPT-004: revenue per vehicle type = Verified payments joined to the booking's vehicle
+		const conditions = [eq(payments.status, 'Verified')];
+		const paidAt = sql`COALESCE(${payments.verifiedAt}, ${payments.createdAt})`;
+		if (startDate) conditions.push(gte(paidAt, startDate));
+		if (endDate) conditions.push(lte(paidAt, `${endDate}T23:59:59`));
 
 		const result = await this.db
 			.select({
 				type: vehicles.type,
-				revenue: sum(bookings.totalAmount),
-				bookings: count(),
+				revenue: sum(payments.amount),
+				bookings: sql<number>`COUNT(DISTINCT ${payments.bookingId})`,
 			})
-			.from(bookings)
+			.from(payments)
+			.innerJoin(bookings, eq(payments.bookingId, bookings.id))
 			.innerJoin(vehicles, eq(bookings.vehicleId, vehicles.id))
 			.where(and(...conditions))
 			.groupBy(vehicles.type)
-			.orderBy(desc(sum(bookings.totalAmount)));
+			.orderBy(desc(sum(payments.amount)));
 
 		const totalRevenue = result.reduce((acc, r) => acc + Number(r.revenue ?? 0), 0);
 

@@ -7,7 +7,7 @@ import { toast } from '@/react-app/hooks/useToast';
 import { extractApiError } from '@/react-app/lib/extract-error';
 import { EquipmentTable } from '../components/EquipmentTable';
 import { EquipmentForm } from '../components/EquipmentForm';
-import { useEquipmentList, useCreateEquipment } from '../hooks/useEquipment';
+import { useEquipmentList, useCreateEquipment, useUpdateEquipment } from '../hooks/useEquipment';
 import type { Equipment, EquipmentFilters, CreateEquipmentRequest } from '../types/equipment.types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/react-app/components/ui/select';
@@ -22,6 +22,24 @@ export function EquipmentPage() {
 	const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 	const { data: equipment, isLoading } = useEquipmentList(filters);
 	const createEquipment = useCreateEquipment();
+	const updateEquipment = useUpdateEquipment();
+
+	// TC-EQUIP-002: activate/deactivate straight from the list
+	const handleToggle = async (item: Equipment) => {
+		try {
+			await updateEquipment.mutateAsync({
+				id: item.id,
+				data: { isActive: !item.isActive },
+			});
+			toast({ title: item.isActive ? 'Perlengkapan dinonaktifkan' : 'Perlengkapan diaktifkan' });
+		} catch (error) {
+			toast({
+				title: 'Gagal mengubah status',
+				description: extractApiError(error),
+				variant: 'destructive',
+			});
+		}
+	};
 
 	const handleCreateEquipment = async (data: CreateEquipmentRequest) => {
 		try {
@@ -82,6 +100,7 @@ export function EquipmentPage() {
 				data={equipment ?? []}
 				isLoading={isLoading}
 				onRowClick={handleRowClick}
+				onToggle={handleToggle}
 			/>
 
 			<Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

@@ -4,8 +4,11 @@ import { X } from 'lucide-react';
 export function Toaster() {
 	const { toasts, dismiss } = useToast();
 
+	// z-[100]: Radix Dialog portals render at z-50 after this element in DOM order.
+	// Same z-index => toasts fired while a dialog is open (vehicle/customer create)
+	// render hidden behind the modal overlay. Keep toasts above all dialogs.
 	return (
-		<div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+		<div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
 			{toasts.map((toast) => (
 				<div
 					key={toast.id}

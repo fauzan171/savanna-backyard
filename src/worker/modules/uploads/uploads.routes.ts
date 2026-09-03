@@ -3,19 +3,26 @@ import { authMiddleware, requireRole } from '@/worker/core/middleware/auth';
 
 type UploadEnv = { Bindings: Env };
 
-// Magic bytes for image type validation
-const MAGIC_BYTES: Record<string, number[]> = {
-  'image/jpeg': [0xFF, 0xD8, 0xFF],
-  'image/png': [0x89, 0x50, 0x4E, 0x47],
-  'image/gif': [0x47, 0x49, 0x46],
-  'image/webp': [0x52, 0x49, 0x46, 0x46], // RIFF header (first 4 bytes of WebP)
-};
-
-function validateMagicBytes(buffer: ArrayBuffer, declaredType: string): boolean {
-  const bytes = new Uint8Array(buffer.slice(0, 4));
-  const expected = MAGIC_BYTES[declaredType];
-  if (!expected) return false;
-  return expected.every((byte, i) => bytes[i] === byte);
+// TC-BK-006: detect the image type from file CONTENT (magic bytes) instead of
+// trusting the client-declared MIME. Browsers send file.type = '' (or a wrong
+// generic type) for some valid PNGs, so the old declared-type check rejected
+// real images. The sniffed type is the single source of truth.
+function sniffImageType(buffer: ArrayBuffer): string | null {
+  const b = new Uint8Array(buffer.byteLength < 12 ? buffer : buffer.slice(0, 12));
+  if (b.length < 4) return null;
+  // PNG: 89 50 4E 47
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  // JPEG: FF D8 FF
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  // GIF: "GIF8"
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif';
+  // WebP: "RIFF"...."WEBP"
+  if (
+    b.length >= 12 &&
+    b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+    b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50
+  ) return 'image/webp';
+  return null;
 }
 
 function getExtensionFromMimeType(mimeType: string): string {
@@ -25,7 +32,7 @@ function getExtensionFromMimeType(mimeType: string): string {
     'image/webp': 'webp',
     'image/gif': 'gif',
   };
-  return map[mimeType] || 'jpg';
+  return map[mimeType] || 'bin';
 }
 
 export function createUploadRouter(): Hono<UploadEnv> {
@@ -74,29 +81,25 @@ export function createUploadRouter(): Hono<UploadEnv> {
 			return c.json({ success: false, error: { code: 'NO_FILE', message: 'No file provided' } }, 400);
 		}
 
-		// Validate file type by MIME type
-		const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-		if (!allowedTypes.includes(file.type)) {
-			return c.json({ success: false, error: { code: 'INVALID_TYPE', message: 'Only JPEG, PNG, WebP, and GIF images are allowed' } }, 400);
-		}
-
 		// Validate file size (max 5MB)
 		if (file.size > 5 * 1024 * 1024) {
 			return c.json({ success: false, error: { code: 'FILE_TOO_LARGE', message: 'File must be under 5MB' } }, 400);
 		}
 
-		// Validate magic bytes (actual file content matches declared type)
+		// TC-BK-006: validate by CONTENT (magic bytes), not the declared MIME —
+		// valid PNGs with an empty/mislabelled file.type were being rejected.
 		const buffer = await file.arrayBuffer();
-		if (!validateMagicBytes(buffer, file.type)) {
-			return c.json({ success: false, error: { code: 'INVALID_FILE', message: 'File content does not match declared type' } }, 400);
+		const detectedType = sniffImageType(buffer);
+		if (!detectedType) {
+			return c.json({ success: false, error: { code: 'INVALID_FILE', message: 'Only JPEG, PNG, WebP, and GIF images are allowed' } }, 400);
 		}
 
-		// Generate key with correct extension from validated MIME type
-		const ext = getExtensionFromMimeType(file.type);
+		// Generate key + stored contentType from the sniffed (authoritative) type
+		const ext = getExtensionFromMimeType(detectedType);
 		const key = `${new Date().toISOString().split('T')[0]}-${crypto.randomUUID()}.${ext}`;
 
 		await bucket.put(key, buffer, {
-			httpMetadata: { contentType: file.type },
+			httpMetadata: { contentType: detectedType },
 		});
 
 		// Return the public URL path

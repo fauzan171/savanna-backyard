@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
+import { ToggleLeft, ToggleRight } from 'lucide-react';
 import { Badge } from '@/react-app/components/ui/badge';
+import { Button } from '@/react-app/components/ui/button';
 import { DataTable } from '@/react-app/components/ui/table';
 import type { Equipment, EquipmentCategory } from '../types/equipment.types';
 import { EQUIPMENT_CATEGORY_LABELS, formatCurrency } from '../types/equipment.types';
@@ -9,6 +11,8 @@ interface EquipmentTableProps {
 	data: Equipment[];
 	isLoading?: boolean;
 	onRowClick?: (equipment: Equipment) => void;
+	/** TC-EQUIP-002: activate/deactivate from the list (same pattern as packages/trails) */
+	onToggle?: (equipment: Equipment) => void;
 }
 
 const CATEGORY_COLORS: Record<EquipmentCategory, string> = {
@@ -18,7 +22,7 @@ const CATEGORY_COLORS: Record<EquipmentCategory, string> = {
 	Electronics: 'bg-green-100 text-green-800 border-green-200',
 };
 
-export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTableProps) {
+export function EquipmentTable({ data, isLoading, onRowClick, onToggle }: EquipmentTableProps) {
 	const columns: ColumnDef<Equipment>[] = [
 		{
 			accessorKey: 'name',
@@ -65,6 +69,29 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 				</Badge>
 			),
 		},
+		...(onToggle
+			? [{
+					id: 'actions',
+					header: 'Aksi',
+					cell: ({ row }: { row: { original: Equipment } }) => (
+						<Button
+							variant="ghost"
+							size="sm"
+							title={row.original.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+							onClick={(e) => {
+								e.stopPropagation();
+								onToggle(row.original);
+							}}
+						>
+							{row.original.isActive ? (
+								<ToggleRight className="size-4 text-green-600" />
+							) : (
+								<ToggleLeft className="size-4 text-gray-400" />
+							)}
+						</Button>
+					),
+				}]
+			: []),
 	];
 
 	const renderCard = (equipment: Equipment) => (
@@ -78,6 +105,27 @@ export function EquipmentTable({ data, isLoading, onRowClick }: EquipmentTablePr
 			<div className="mt-2 text-sm text-muted-foreground">
 				{formatCurrency(equipment.dailyRateIdr)}/hari · Stok: {equipment.stock}
 			</div>
+			{onToggle && (
+				<div className="flex items-center justify-between pt-2 border-t">
+					<Badge variant="outline" className={equipment.isActive ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}>
+						{equipment.isActive ? 'Aktif' : 'Nonaktif'}
+					</Badge>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={(e) => {
+							e.stopPropagation();
+							onToggle(equipment);
+						}}
+					>
+						{equipment.isActive ? (
+							<ToggleRight className="size-4 text-green-600" />
+						) : (
+							<ToggleLeft className="size-4 text-gray-400" />
+						)}
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 

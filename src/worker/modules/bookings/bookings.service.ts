@@ -45,7 +45,7 @@ import type {
 	AddAddonRequest,
 	SubmitChecklistRequest,
 } from './bookings.dto';
-import type { Booking, Vehicle } from '@/worker/core/database/schema';
+import type { Booking, BookingStatusLog, Vehicle } from '@/worker/core/database/schema';
 
 export class BookingsService {
 	// ── History ──
@@ -975,6 +975,8 @@ export class BookingsService {
 			const latestBooking = await this.bookingRepo.findById(bookingId);
 			if (latestBooking && latestBooking.status === 'Pending') {
 				await this.bookingRepo.confirm(bookingId);
+				// TC-BK-003: record the transition so the History tab is not empty
+				await this.bookingRepo.logStatusChange(bookingId, 'Pending', 'Confirmed', undefined, 'Auto-confirmed: payment verified');
 			}
 		}
 	}

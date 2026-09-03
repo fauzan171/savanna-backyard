@@ -9,6 +9,7 @@ import { Spinner } from '@/react-app/components/ui/spinner';
 import { ConfirmationDialog } from '@/react-app/components/ui/confirmation-dialog';
 import { toast } from '@/react-app/hooks/useToast';
 import { extractApiError } from '@/react-app/lib/extract-error';
+import { ApiError } from '@/react-app/lib/api-client';
 import { useVehicle, useUpdateVehicle, useUpdateVehicleStatus, useDeleteVehicle, useVehicleCalendar } from '../hooks/useVehicles';
 import { useBookings } from '@/react-app/features/bookings/hooks/useBookings';
 import { VehicleDetail } from '../components/VehicleDetail';
@@ -84,9 +85,13 @@ export default function VehicleDetailPage() {
 			await updateMutation.mutateAsync({ id: id!, data: formData });
 			setIsEditDialogOpen(false);
 		} catch (error) {
+			// VEH-02: 409 from PATCH = new plate belongs to another vehicle.
+			const isPlateConflict = error instanceof ApiError && error.status === 409;
 			toast({
-					title: 'Gagal memperbarui kendaraan',
-				description: extractApiError(error),
+				title: 'Gagal memperbarui kendaraan',
+				description: isPlateConflict
+					? 'Nomor plat sudah terdaftar'
+					: extractApiError(error),
 				variant: 'destructive',
 			});
 		}

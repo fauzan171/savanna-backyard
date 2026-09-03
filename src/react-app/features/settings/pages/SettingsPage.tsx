@@ -31,6 +31,8 @@ export default function SettingsPage() {
 	const { data: settings, isLoading } = useSettings();
 	const bulkUpdate = useBulkUpdateSettings();
 	const [formValues, setFormValues] = useState<Record<string, string>>({});
+	// TC-SET-001: per-field client-side validation messages (url/email keys)
+	const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
 	useEffect(() => {
 		if (settings) {
@@ -40,7 +42,44 @@ export default function SettingsPage() {
 		}
 	}, [settings]);
 
+	const isValidUrl = (v: string) => {
+		if (!/^https?:\/\//i.test(v)) return false;
+		try { new URL(v); return true; } catch { return false; }
+	};
+
+	const validateForm = (): Record<string, string> => {
+		const errs: Record<string, string> = {};
+		for (const group of SETTING_GROUPS) {
+			for (const key of group.keys) {
+				const type = (group.types as Record<string, string> | undefined)?.[key];
+				const label = (group.labels as any)[key] ?? key;
+				const value = (formValues[key] ?? '').trim();
+				if (!value) continue; // optional — server accepts empty
+				if (type === 'url' && !isValidUrl(value)) {
+					errs[key] = `${label} tidak valid — harus URL lengkap (diawali http:// atau https://)`;
+				}
+				if (type === 'email' && !/^\S+@\S+\.\S+$/.test(value)) {
+					errs[key] = `${label} tidak valid — contoh: nama@domain.com`;
+				}
+				if (type === 'tel' && !/^[0-9+\-\s()]+$/.test(value)) {
+					errs[key] = `${label} hanya boleh berisi angka, +, -, atau spasi`;
+				}
+			}
+		}
+		return errs;
+	};
+
 	const handleSave = async () => {
+		const errs = validateForm();
+		setFieldErrors(errs);
+		if (Object.keys(errs).length > 0) {
+			toast({
+				variant: 'destructive',
+				title: 'Periksa kembali pengaturan',
+				description: Object.values(errs)[0],
+			});
+			return;
+		}
 		const updates = Object.entries(formValues).map(([key, value]) => ({ key, value }));
 		try {
 			await bulkUpdate.mutateAsync(updates);
@@ -76,8 +115,14 @@ export default function SettingsPage() {
 									<Input
 										type={(group.types as any)?.[key] ?? 'text'}
 										value={formValues[key] ?? ''}
-										onChange={(e) => setFormValues(prev => ({ ...prev, [key]: e.target.value }))}
+										onChange={(e) => {
+											setFormValues(prev => ({ ...prev, [key]: e.target.value }));
+											if (fieldErrors[key]) setFieldErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
+										}}
 									/>
+									{fieldErrors[key] && (
+										<p className="mt-1 text-xs text-destructive">{fieldErrors[key]}</p>
+									)}
 								</div>
 							))}
 						</div>

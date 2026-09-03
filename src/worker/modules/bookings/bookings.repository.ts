@@ -80,7 +80,8 @@ export class BookingsRepository {
 			.innerJoin(customers, eq(customers.id, bookings.customerId))
 			.where(
 				and(
-					inArray(bookings.status, ['Confirmed', 'Active', 'pending_payment']),
+					// TC-CAL-001: Pending bookings must show in the admin calendar too
+					inArray(bookings.status, ['Pending', 'Confirmed', 'Active', 'pending_payment']),
 					lt(bookings.startDate, endDateExclusive),
 					gt(bookings.endDate, startDate),
 				),
@@ -468,20 +469,43 @@ export class BookingsRepository {
 		changedBy?: string,
 		note?: string,
 	): Promise<void> {
+		const values = {
+			id: crypto.randomUUID(),
+			bookingId,
+			fromStatus,
+			toStatus,
+			changedBy: changedBy ?? null,
+			note: note ?? null,
+		};
 		try {
-			await this.db.insert(bookingStatusLogs).values({
-				id: crypto.randomUUID(),
-				bookingId,
-				fromStatus,
-				toStatus,
-				changedBy: changedBy ?? null,
-				note: note ?? null,
-			});
+			await this.db.insert(bookingStatusLogs).values(values);
 		} catch (e) {
-			// Hotfix 0012: ignore if table not yet migrated in PROD
-			if (String(e).includes('no such table')) return;
-			throw e;
+			// TC-BK-003: hotfix 0012 swallowed missing-table errors, so History stayed
+			// empty wherever migration 0012 had not applied. Self-heal instead: create
+			// the table (same DDL as 0012, IF NOT EXISTS) and retry the insert once.
+			if (!String(e).includes('no such table')) throw e;
+			try {
+				await this.ensureStatusLogTable();
+				await this.db.insert(bookingStatusLogs).values(values);
+			} catch {
+				// Still fail-soft: history logging must never break a status transition.
+			}
 		}
+	}
+
+	/** DDL mirrored from migrations/0012_booking_status_logs.sql (idempotent). */
+	private async ensureStatusLogTable(): Promise<void> {
+		await this.db.run(sql`CREATE TABLE IF NOT EXISTS booking_status_logs (
+			id text PRIMARY KEY NOT NULL,
+			booking_id text NOT NULL,
+			from_status text,
+			to_status text NOT NULL,
+			changed_by text,
+			note text,
+			created_at text NOT NULL
+		)`);
+		await this.db.run(sql`CREATE INDEX IF NOT EXISTS booking_status_logs_booking_idx ON booking_status_logs (booking_id)`);
+		await this.db.run(sql`CREATE INDEX IF NOT EXISTS booking_status_logs_created_idx ON booking_status_logs (created_at)`);
 	}
 
 	/** Fetch status history for a booking, newest first. */

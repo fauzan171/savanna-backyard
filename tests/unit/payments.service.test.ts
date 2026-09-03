@@ -77,6 +77,7 @@ describe('PaymentsService', () => {
 		mockBookingRepo = {
 			findById: vi.fn(),
 			confirm: vi.fn(),
+			logStatusChange: vi.fn(),
 		} as unknown as BookingsRepository;
 
 		paymentsService = new PaymentsService(mockPaymentRepo, mockBookingRepo);

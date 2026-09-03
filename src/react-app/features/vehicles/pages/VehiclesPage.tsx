@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/react-app/co
 import { PageHeader } from '@/react-app/components/layout/page-header';
 import { toast } from '@/react-app/hooks/useToast';
 import { extractApiError } from '@/react-app/lib/extract-error';
+import { ApiError } from '@/react-app/lib/api-client';
 import { useVehicles, useCreateVehicle, useDeleteVehicle } from '../hooks/useVehicles';
 import { VehicleTable } from '../components/VehicleTable';
 import { VehicleForm } from '../components/VehicleForm';
@@ -36,10 +37,14 @@ export default function VehiclesPage() {
 				setQrVehicle({ id: result.data.id, name: formData.name } as Vehicle);
 			}
 		} catch (error) {
+			// VEH-02: server 409 = duplicate plate number. Show clear ID message.
+			const isPlateConflict = error instanceof ApiError && error.status === 409;
 			toast({
 				variant: 'destructive',
 				title: 'Gagal menyimpan kendaraan',
-				description: extractApiError(error),
+				description: isPlateConflict
+					? 'Nomor plat sudah terdaftar'
+					: extractApiError(error),
 			});
 		}
 	};

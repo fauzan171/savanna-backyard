@@ -15,7 +15,8 @@ import {
 import { FormField } from '@/react-app/components/ui/form-field';
 import { FileUpload } from '@/react-app/components/ui/file-upload';
 import { Textarea } from '@/react-app/components/ui/textarea';
-import { api } from '@/react-app/lib/api-client';
+import { api, ApiError } from '@/react-app/lib/api-client';
+import { toast } from '@/react-app/hooks/useToast';
 import type { Vehicle, VehicleFormData, VehicleType } from '../types/vehicle.types';
 import { vehicleTypeLabels } from '@/react-app/lib/labels';
 
@@ -26,7 +27,8 @@ const vehicleFormSchema = z.object({
 	brand: z.string().optional(),
 	model: z.string().optional(),
 	year: z.coerce.number().min(1990).max(2030).optional().or(z.literal('')),
-	dailyRateIdr: z.coerce.number().min(0, 'Tarif tidak boleh negatif'),
+	// TC-VEH-002: mirror server cap (vehicles.dto VEH-04: max Rp 50.000.000)
+	dailyRateIdr: z.coerce.number().min(0, 'Tarif tidak boleh negatif').max(50_000_000, 'Tarif harian maksimal Rp 50.000.000'),
 	dailyRateUsd: z.coerce.number().min(0).optional().or(z.literal('')),
 	description: z.string().max(1000).optional().or(z.literal('')),
 	photoUrl: z.string().optional().or(z.literal('')),
@@ -104,7 +106,17 @@ export function VehicleForm({ vehicle, onSubmit, onCancel, isLoading }: VehicleF
 				const result = await api.upload('/v1/uploads', uploadFile[0]);
 				data.photoUrl = result.data.url;
 			} catch (err) {
-				setUploadError(err instanceof Error ? err.message : 'Upload gagal');
+				// TC-VEH-003: map server upload rejection codes to clear ID messages.
+				let msg = 'Upload gagal';
+				if (err instanceof ApiError && (err.code === 'INVALID_TYPE' || err.code === 'INVALID_FILE')) {
+					msg = 'Hanya file gambar (JPEG, PNG, WebP, GIF) yang diizinkan';
+				} else if (err instanceof ApiError && err.code === 'FILE_TOO_LARGE') {
+					msg = 'Ukuran file melebihi 5MB';
+				} else if (err instanceof Error) {
+					msg = err.message;
+				}
+				setUploadError(msg);
+				toast({ variant: 'destructive', title: 'Upload foto gagal', description: msg });
 				setUploading(false);
 				return;
 			}

@@ -13,6 +13,7 @@ import {
 	SelectValue,
 } from '@/react-app/components/ui/select';
 import { FormField } from '@/react-app/components/ui/form-field';
+import { toast } from '@/react-app/hooks/useToast';
 import type { Customer, CustomerFormData } from '../types/customer.types';
 
 const customerFormSchema = z.object({
@@ -90,8 +91,19 @@ export function CustomerForm({ customer, onSubmit, onCancel, isLoading }: Custom
 		await onSubmit(cleanData);
 	};
 
+	// TC-CUST-001: inline error alone was easy to miss (e.g. "Format email
+	// tidak valid"). Echo the first validation failure as a toast too.
+	const onFormInvalid = (errs: Partial<Record<keyof CustomerFormData, { message?: string }>>) => {
+		const first = Object.values(errs).find((e) => e?.message)?.message;
+		toast({
+			variant: 'destructive',
+			title: 'Periksa kembali isian',
+			description: first ?? 'Formulir belum valid',
+		});
+	};
+
 	return (
-		<form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+		<form onSubmit={handleSubmit(onFormSubmit, onFormInvalid)} className="space-y-6">
 			<div className="grid gap-4 md:grid-cols-2">
 				<FormField
 					label="Nama"

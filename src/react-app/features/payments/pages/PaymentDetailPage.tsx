@@ -137,7 +137,7 @@ export function PaymentDetailPage() {
 					<div className="space-y-3">
 						<div
 							className="font-mono text-primary cursor-pointer hover:underline"
-							onClick={() => navigate(`/bookings/${payment.bookingId}`)}
+							onClick={() => navigate(`/bookings/${payment.bookingId ?? payment.booking?.id}`)}
 						>
 							{payment.booking.bookingNumber}
 						</div>

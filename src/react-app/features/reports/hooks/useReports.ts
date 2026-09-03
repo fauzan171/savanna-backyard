@@ -22,7 +22,7 @@ export const reportsKeys = {
 /**
  * Hook for revenue report
  */
-export function useRevenueReport(params?: ReportQueryParams) {
+export function useRevenueReport(params?: ReportQueryParams, options?: { enabled?: boolean }) {
 	return useQuery({
 		queryKey: reportsKeys.revenue(params),
 		queryFn: () =>
@@ -30,6 +30,9 @@ export function useRevenueReport(params?: ReportQueryParams) {
 				'/v1/reports/revenue',
 				params as Record<string, string>
 			),
+		// TC-RPT-002: don't retry a deterministic 400 (invalid range) — surface it now.
+		retry: false,
+		...options,
 		select: (data) => {
 			const report = data.data;
 			if (!report) return report;

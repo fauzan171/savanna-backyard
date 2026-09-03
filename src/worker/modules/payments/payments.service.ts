@@ -32,6 +32,7 @@ export class PaymentsService {
 
 		return {
 			id: payment.id,
+			bookingId: payment.bookingId,
 			booking: {
 				id: details.booking.id,
 				bookingNumber: details.booking.bookingNumber,
@@ -194,6 +195,8 @@ export class PaymentsService {
 			if (verifiedPayments.length === 1) {
 				// This is the first verified payment, auto-confirm
 				await this.bookingRepo.confirm(booking.id);
+				// TC-BK-003: record the transition so the History tab is not empty
+				await this.bookingRepo.logStatusChange(booking.id, 'Pending', 'Confirmed', userId, 'Auto-confirmed: payment verified');
 				bookingStatus = 'Confirmed';
 			}
 		}
