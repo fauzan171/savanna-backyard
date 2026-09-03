@@ -42,6 +42,8 @@ export interface PaymentResponse {
 	} | null;
 	verifiedAt: string | null;
 	notes: string | null;
+	// TC-PAY-003: reason supplied at reject time (status === 'Failed')
+	rejectionReason: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

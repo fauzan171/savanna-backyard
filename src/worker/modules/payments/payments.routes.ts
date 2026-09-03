@@ -170,13 +170,15 @@ const handleWebhookHandler = async (c: Context<PaymentsEnv>) => {
         data.payment_type === "qris" ? "QRIS" : "BankTransfer";
 
       try {
+        // TC-PAY-001: gateway money already moved — record over-amount with a
+        // warning note instead of blocking the webhook.
         const created = await service.create({
           bookingId: booking.id,
           amount: webhookResult.amount,
           currency: "IDR",
           method,
           transactionReference: webhookResult.transactionId,
-        });
+        }, { allowOverpayment: true });
 
         if (webhookResult.status === "Verified") {
           await service.verify(created.id, "system", {

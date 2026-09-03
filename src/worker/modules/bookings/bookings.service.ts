@@ -573,7 +573,7 @@ export class BookingsService {
 
 		// Validate start km
 		if (data.startKm < 0) {
-			throw new ValidationError('Start KM must be a non-negative number');
+			throw new ValidationError('Odometer awal harus berupa angka non-negatif');
 		}
 
 		// Update booking with start km + mark pickup confirmed
@@ -597,7 +597,7 @@ export class BookingsService {
 
 		// Check if already completed
 		if (booking.status === 'Completed') {
-			throw new ValidationError('Rental is already completed');
+			throw new ValidationError('Rental sudah selesai');
 		}
 		if (!booking.pickupConfirmed) {
 			throw new ValidationError('Return hanya bisa diproses setelah pickup dikonfirmasi');
@@ -626,12 +626,12 @@ export class BookingsService {
 
 		// Validate start km exists
 		if (booking.startKm === null || booking.startKm === undefined) {
-			throw new ValidationError('Cannot complete rental - start KM not recorded. Please start the rental first.');
+			throw new ValidationError('Tidak bisa menyelesaikan rental - odometer awal belum tercatat. Mulai rental terlebih dahulu.');
 		}
 
 		// Validate end km is greater than start km
 		if (data.endKm <= booking.startKm) {
-			throw new ValidationError(`End KM (${data.endKm}) must be greater than start KM (${booking.startKm})`);
+			throw new ValidationError(`Odometer akhir (${data.endKm}) harus lebih besar dari odometer awal (${booking.startKm})`);
 		}
 
 		// Get vehicle for daily rate

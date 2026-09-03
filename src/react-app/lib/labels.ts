@@ -14,7 +14,8 @@ export const paymentStatusLabels: Record<string, string> = {
 	pending: 'Menunggu',
 	verified: 'Terverifikasi',
 	settlement: 'Lunas',
-	failed: 'Gagal',
+	// TC-PAY-003: only the reject flow produces Failed → label it "Ditolak"
+	failed: 'Ditolak',
 	deny: 'Ditolak',
 	expire: 'Kedaluwarsa',
 	cancel: 'Dibatalkan',

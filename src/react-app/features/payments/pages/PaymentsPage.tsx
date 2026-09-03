@@ -5,6 +5,8 @@ import { Button } from "@/react-app/components/ui/button";
 import { PageHeader } from "@/react-app/components/layout/page-header";
 import { PaymentTable } from "../components/PaymentTable";
 import { PaymentForm } from "../components/PaymentForm";
+import { toast } from "@/react-app/hooks/useToast";
+import { extractApiError } from "@/react-app/lib/extract-error";
 import { usePayments, useCreatePayment } from "../hooks/usePayments";
 import { useBookings } from "@/react-app/features/bookings/hooks/useBookings";
 import type {
@@ -47,16 +49,25 @@ export function PaymentsPage() {
     })) ?? [];
 
   const handleCreatePayment = async (data: PaymentFormData) => {
-    await createPayment.mutateAsync({
-      bookingId: data.bookingId,
-      amount: data.amount,
-      currency: data.currency,
-      method: data.method,
-      transactionReference: data.transactionReference,
-      proofUrl: data.proofUrl,
-      notes: data.notes,
-    });
-    setIsCreateOpen(false);
+    try {
+      await createPayment.mutateAsync({
+        bookingId: data.bookingId,
+        amount: data.amount,
+        currency: data.currency,
+        method: data.method,
+        transactionReference: data.transactionReference,
+        proofUrl: data.proofUrl,
+        notes: data.notes,
+      });
+      setIsCreateOpen(false);
+    } catch (error) {
+      // TC-PAY-001: backend now blocks over-amount — surface the reason.
+      toast({
+        title: "Gagal mencatat pembayaran",
+        description: extractApiError(error),
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRowClick = (payment: Payment) => {

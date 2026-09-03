@@ -10,6 +10,11 @@ import type { CreatePricingRequest } from '../api/pricing';
 
 // PRIC-02: prices must be positive (match backend DTO). The form collects
 // features/notIncluded as comma-separated text, transformed to arrays on submit.
+const optUsdPrice = z.preprocess(
+	(v) => (typeof v === 'number' && !Number.isFinite(v) ? undefined : v),
+	z.number().int('Harus angka bulat').min(1, 'Harga USD harus lebih dari 0').max(1_000_000, 'Harga USD terlalu besar').optional()
+);
+
 const pricingFormSchema = z.object({
 	name: z.string().trim().min(2, 'Nama minimal 2 karakter').max(200),
 	description: z.string().max(1000).optional().nullable(),
@@ -23,6 +28,10 @@ const pricingFormSchema = z.object({
 		.int('Harga multi-hari harus berupa angka bulat')
 		.min(1, 'Harga multi-hari harus lebih dari 0')
 		.max(1_000_000_000, 'Harga multi-hari terlalu besar'),
+	// LC-006: optional USD prices, mirroring the vehicle form's IDR+USD pair.
+	// Empty number input arrives as NaN via valueAsNumber → treat as "not set".
+	dailyPriceUsd: optUsdPrice,
+	multiDayPriceUsd: optUsdPrice,
 	featuresText: z.string().max(2000).optional().default(''),
 	notIncludedText: z.string().max(2000).optional().default(''),
 	highlighted: z.boolean().optional().default(false),
@@ -65,6 +74,8 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 			description: initialData?.description ?? '',
 			dailyPrice: initialData?.dailyPrice ?? 0,
 			multiDayPrice: initialData?.multiDayPrice ?? 0,
+			dailyPriceUsd: initialData?.dailyPriceUsd ?? undefined,
+			multiDayPriceUsd: initialData?.multiDayPriceUsd ?? undefined,
 			featuresText: toText(initialData?.features),
 			notIncludedText: toText(initialData?.notIncluded),
 			highlighted: initialData?.highlighted ?? false,
@@ -82,6 +93,8 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 				description: initialData.description ?? '',
 				dailyPrice: initialData.dailyPrice ?? 0,
 				multiDayPrice: initialData.multiDayPrice ?? 0,
+				dailyPriceUsd: initialData.dailyPriceUsd ?? undefined,
+				multiDayPriceUsd: initialData.multiDayPriceUsd ?? undefined,
 				featuresText: initialData.features
 					? typeof initialData.features === 'string'
 						? initialData.features
@@ -106,6 +119,8 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 			description: data.description ?? null,
 			dailyPrice: data.dailyPrice,
 			multiDayPrice: data.multiDayPrice,
+			dailyPriceUsd: data.dailyPriceUsd ?? null,
+			multiDayPriceUsd: data.multiDayPriceUsd ?? null,
 			features: data.featuresText
 				? data.featuresText.split(',').map((s) => s.trim()).filter(Boolean)
 				: [],
@@ -137,6 +152,13 @@ export function PricingForm({ initialData, onSubmit, onCancel, isLoading }: Pric
 				</FormField>
 				<FormField label="Harga Multi-hari (IDR)" required error={errors.multiDayPrice?.message}>
 					<Input type="number" min={1} {...register('multiDayPrice', { valueAsNumber: true })} />
+				</FormField>
+				{/* LC-006: optional USD prices for the EN storefront; empty = auto-convert from IDR */}
+				<FormField label="Harga Harian (USD)" hint="Opsional. Kosongkan = konversi otomatis dari IDR" error={errors.dailyPriceUsd?.message}>
+					<Input type="number" min={1} placeholder="mis. 13" {...register('dailyPriceUsd', { valueAsNumber: true })} />
+				</FormField>
+				<FormField label="Harga Multi-hari (USD)" hint="Opsional. Kosongkan = konversi otomatis dari IDR" error={errors.multiDayPriceUsd?.message}>
+					<Input type="number" min={1} placeholder="mis. 30" {...register('multiDayPriceUsd', { valueAsNumber: true })} />
 				</FormField>
 				<div className="col-span-2">
 					<FormField

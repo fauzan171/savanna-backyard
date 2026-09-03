@@ -16,6 +16,8 @@ import {
 } from '@/react-app/components/ui/dialog';
 import { Textarea } from '@/react-app/components/ui/textarea';
 import { FormField } from '@/react-app/components/ui/form-field';
+import { toast } from '@/react-app/hooks/useToast';
+import { extractApiError } from '@/react-app/lib/extract-error';
 import { useState } from 'react';
 
 const formatCurrency = (amount: number, currency: 'IDR' | 'USD' = 'IDR') => {
@@ -45,10 +47,10 @@ export function PaymentDetailPage() {
 			<div className="space-y-4">
 				<Button variant="outline" onClick={() => navigate('/payments')}>
 					<ArrowLeft className="size-4 mr-2" />
-					Back to Payments
+					Kembali ke Pembayaran
 				</Button>
 				<div className="text-center py-12">
-					<p className="text-muted-foreground">Payment not found</p>
+					<p className="text-muted-foreground">Pembayaran tidak ditemukan</p>
 				</div>
 			</div>
 		);
@@ -57,7 +59,7 @@ export function PaymentDetailPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title={`Payment ${format(new Date(payment.createdAt), 'PPP')}`}
+				title={`Pembayaran ${format(new Date(payment.createdAt), 'PPP')}`}
 				actions={
 					<div className="flex gap-2">
 						{payment.status === 'Pending' && (
@@ -68,7 +70,7 @@ export function PaymentDetailPage() {
 						)}
 						<Button variant="outline" onClick={() => navigate('/payments')}>
 							<ArrowLeft className="size-4 mr-2" />
-							Back
+							Kembali
 						</Button>
 					</div>
 				}
@@ -90,26 +92,26 @@ export function PaymentDetailPage() {
 				<div className="space-y-4 p-4 border rounded-lg">
 					<h3 className="font-semibold flex items-center gap-2">
 						<CreditCard className="size-4" />
-						Payment Details
+						Detail Pembayaran
 					</h3>
 					<div className="space-y-3">
 						<div className="flex justify-between">
-							<span className="text-muted-foreground">Amount</span>
+							<span className="text-muted-foreground">Nominal</span>
 							<span className="text-xl font-semibold">
 								{formatCurrency(payment.amount, payment.currency)}
 							</span>
 						</div>
 						<div className="flex justify-between">
-							<span className="text-muted-foreground">Method</span>
+							<span className="text-muted-foreground">Metode</span>
 							<span>{payment.method.replace(/_/g, ' ')}</span>
 						</div>
 						<div className="flex justify-between">
-							<span className="text-muted-foreground">Recorded</span>
+							<span className="text-muted-foreground">Dicatat</span>
 							<span>{format(new Date(payment.createdAt), 'PPP p')}</span>
 						</div>
 						{payment.transactionReference && (
 							<div className="flex justify-between">
-								<span className="text-muted-foreground">Reference</span>
+								<span className="text-muted-foreground">Referensi</span>
 								<span className="font-mono text-sm">{payment.transactionReference}</span>
 							</div>
 						)}
@@ -121,7 +123,7 @@ export function PaymentDetailPage() {
 									rel="noopener noreferrer"
 									className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
 								>
-									View Proof <ExternalLink className="size-3" />
+									Lihat Bukti <ExternalLink className="size-3" />
 								</a>
 							</div>
 						)}
@@ -142,7 +144,7 @@ export function PaymentDetailPage() {
 							{payment.booking.bookingNumber}
 						</div>
 						<div className="flex justify-between">
-							<span className="text-muted-foreground">Total Amount</span>
+							<span className="text-muted-foreground">Total Tagihan</span>
 							<span>{formatCurrency(payment.booking.totalAmount, payment.booking.currency)}</span>
 						</div>
 					</div>
@@ -152,7 +154,7 @@ export function PaymentDetailPage() {
 				<div className="space-y-4 p-4 border rounded-lg">
 					<h3 className="font-semibold flex items-center gap-2">
 						<User className="size-4" />
-						Customer
+						Pelanggan
 					</h3>
 					<div className="space-y-3">
 						<div className="font-medium">{payment.booking.customer.name}</div>
@@ -167,7 +169,7 @@ export function PaymentDetailPage() {
 				<div className="space-y-4 p-4 border rounded-lg">
 					<h3 className="font-semibold flex items-center gap-2">
 						<Car className="size-4" />
-						Vehicle
+						Kendaraan
 					</h3>
 					<div className="space-y-3">
 						<div className="font-medium">{payment.booking.vehicle.name}</div>
@@ -181,7 +183,7 @@ export function PaymentDetailPage() {
 			{/* Notes */}
 			{payment.notes && (
 				<div className="space-y-4 p-4 border rounded-lg">
-					<h3 className="font-semibold">Notes</h3>
+					<h3 className="font-semibold">Catatan</h3>
 					<p className="text-muted-foreground whitespace-pre-wrap">{payment.notes}</p>
 				</div>
 			)}
@@ -189,9 +191,9 @@ export function PaymentDetailPage() {
 			{/* Verification Info */}
 			{payment.verifiedBy && (
 				<div className="space-y-4 p-4 border rounded-lg bg-green-50 border-green-200">
-					<h3 className="font-semibold text-green-800">Verified</h3>
+					<h3 className="font-semibold text-green-800">Terverifikasi</h3>
 					<div className="text-sm text-green-700">
-						By {payment.verifiedBy.name} on {format(new Date(payment.verifiedAt!), 'PPP p')}
+						oleh {payment.verifiedBy.name} pada {format(new Date(payment.verifiedAt!), 'PPP p')}
 					</div>
 				</div>
 			)}
@@ -199,7 +201,7 @@ export function PaymentDetailPage() {
 			{/* Rejection Info */}
 			{payment.rejectionReason && (
 				<div className="space-y-4 p-4 border rounded-lg bg-red-50 border-red-200">
-					<h3 className="font-semibold text-red-800">Rejected</h3>
+					<h3 className="font-semibold text-red-800">Ditolak</h3>
 					<div className="text-sm text-red-700">{payment.rejectionReason}</div>
 				</div>
 			)}
@@ -215,39 +217,48 @@ function VerifyDialog({ paymentId }: { paymentId: string }) {
 	const rejectPayment = useRejectPayment();
 
 	const handleVerify = async () => {
-		if (isVerify) {
-			await verifyPayment.mutateAsync({ id: paymentId, verified: true });
-		} else {
-			await rejectPayment.mutateAsync({ id: paymentId, reason: rejectionReason });
+		try {
+			if (isVerify) {
+				await verifyPayment.mutateAsync({ id: paymentId, verified: true });
+			} else {
+				// TC-PAY-003: reject goes to /reject (status Failed + reason)
+				await rejectPayment.mutateAsync({ id: paymentId, reason: rejectionReason });
+			}
+			setOpen(false);
+		} catch (e: unknown) {
+			toast({
+				title: isVerify ? 'Gagal memverifikasi pembayaran' : 'Gagal menolak pembayaran',
+				description: extractApiError(e),
+				variant: 'destructive',
+			});
 		}
-		setOpen(false);
 	};
 
 	return (
 		<>
 			<Button onClick={() => { setIsVerify(true); setOpen(true); }}>
-				Verify
+				Verifikasi
 			</Button>
 			<Button variant="outline" onClick={() => { setIsVerify(false); setOpen(true); }}>
-				Reject
+				Tolak
 			</Button>
 			<Dialog open={open} onOpenChange={setOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>{isVerify ? 'Verify Payment' : 'Reject Payment'}</DialogTitle>
+						<DialogTitle>{isVerify ? 'Verifikasi Pembayaran' : 'Tolak Pembayaran'}</DialogTitle>
 						<DialogDescription>
 							{isVerify
-								? 'Are you sure you want to verify this payment?'
-								: 'Please provide a reason for rejecting this payment.'}
+								? 'Yakin ingin memverifikasi pembayaran ini?'
+								: 'Berikan alasan penolakan pembayaran ini.'}
 						</DialogDescription>
 					</DialogHeader>
 
 					{!isVerify && (
-						<FormField label="Rejection Reason" required>
+						<FormField label="Alasan Penolakan" required>
 							<Textarea
 								value={rejectionReason}
 								onChange={(e) => setRejectionReason(e.target.value)}
-								placeholder="Enter reason for rejection..."
+								placeholder="Masukkan alasan penolakan..."
 								rows={3}
 							/>
 						</FormField>
@@ -255,14 +266,14 @@ function VerifyDialog({ paymentId }: { paymentId: string }) {
 
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setOpen(false)} disabled={verifyPayment.isPending || rejectPayment.isPending}>
-							Cancel
+							Batal
 						</Button>
 						<Button
 							variant={isVerify ? 'default' : 'destructive'}
 							onClick={handleVerify}
 							disabled={verifyPayment.isPending || rejectPayment.isPending || (!isVerify && rejectionReason.length < 10)}
 						>
-							{verifyPayment.isPending || rejectPayment.isPending ? 'Processing...' : isVerify ? 'Verify' : 'Reject'}
+							{verifyPayment.isPending || rejectPayment.isPending ? 'Memproses...' : isVerify ? 'Verifikasi' : 'Tolak'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -276,33 +287,41 @@ function DeleteDialog({ paymentId }: { paymentId: string }) {
 	const deletePayment = useDeletePayment();
 
 	const handleDelete = async () => {
-		await deletePayment.mutateAsync(paymentId);
-		setOpen(false);
+		try {
+			await deletePayment.mutateAsync(paymentId);
+			setOpen(false);
+		} catch (e: unknown) {
+			toast({
+				title: 'Gagal menghapus pembayaran',
+				description: extractApiError(e),
+				variant: 'destructive',
+			});
+		}
 	};
 
 	return (
 		<>
 			<Button variant="destructive" onClick={() => setOpen(true)}>
-				Delete
+				Hapus
 			</Button>
 			<Dialog open={open} onOpenChange={setOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Delete Payment</DialogTitle>
+						<DialogTitle>Hapus Pembayaran</DialogTitle>
 						<DialogDescription>
-							Are you sure you want to delete this payment? This action cannot be undone.
+							Yakin ingin menghapus pembayaran ini? Tindakan ini tidak bisa dibatalkan.
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setOpen(false)} disabled={deletePayment.isPending}>
-							Cancel
+							Batal
 						</Button>
 						<Button
 							variant="destructive"
 							onClick={handleDelete}
 							disabled={deletePayment.isPending}
 						>
-							{deletePayment.isPending ? 'Deleting...' : 'Delete'}
+							{deletePayment.isPending ? 'Menghapus...' : 'Hapus'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

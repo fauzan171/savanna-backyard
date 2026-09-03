@@ -14,6 +14,11 @@ import type {
 
 const BASE_PATH = '/v1/payments';
 
+// Server method enum is 'BankTransfer'; the admin form uses 'Bank_Transfer'
+// (display convention). Normalize at the API boundary.
+const toServerMethod = (method: string): string =>
+	method === 'Bank_Transfer' ? 'BankTransfer' : method;
+
 // ============================================
 // QUERY KEYS
 // ============================================
@@ -36,7 +41,7 @@ export function usePayments(params?: PaymentFilters & { page?: number; limit?: n
 				...(params.page && { page: String(params.page) }),
 				...(params.limit && { limit: String(params.limit) }),
 				...(params.status && { status: params.status }),
-				...(params.method && { method: params.method }),
+				...(params.method && { method: toServerMethod(params.method) }),
 				...(params.bookingId && { bookingId: params.bookingId }),
 				...(params.dateFrom && { dateFrom: params.dateFrom }),
 				...(params.dateTo && { dateTo: params.dateTo }),
@@ -84,7 +89,10 @@ export function useCreatePayment() {
 
 	return useMutation({
 		mutationFn: (data: CreatePaymentRequest) =>
-			api.post<ApiSuccessResponse<Payment>>(BASE_PATH, data),
+			api.post<ApiSuccessResponse<Payment>>(BASE_PATH, {
+				...data,
+				method: toServerMethod(data.method) as CreatePaymentRequest['method'],
+			}),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: paymentKeys.all });
 		},

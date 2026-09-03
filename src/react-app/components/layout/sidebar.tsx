@@ -1,8 +1,5 @@
 import * as React from 'react';
-import {
-	Link,
-	NavLink as RouterNavLink,
-} from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
 	LayoutDashboard,
 	FileText,
@@ -186,51 +183,43 @@ const defaultFooterItems: NavItem[] = [
 
 interface SidebarItemProps {
 	item: NavItem;
+	/** Derived from longest-prefix match in <Sidebar>; NavLink's own isActive is prefix-only and double-highlights siblings like /vehicles vs /vehicles/availability */
+	active: boolean;
 	collapsed?: boolean;
 	onItemClick?: () => void;
 }
 
-function SidebarItem({ item, collapsed, onItemClick }: SidebarItemProps) {
+function SidebarItem({ item, active, collapsed, onItemClick }: SidebarItemProps) {
 	return (
-		<RouterNavLink
+		<Link
 			to={item.href}
 			onClick={onItemClick}
-			className={({ isActive }) =>
-				cn(
-					'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200',
-					'hover:bg-accent hover:text-accent-foreground',
-					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-					isActive
-						? 'bg-primary/15 text-primary font-semibold'
-						: 'text-muted-foreground',
-					collapsed && 'justify-center px-2'
-				)
-			}
+			aria-current={active ? 'page' : undefined}
+			className={cn(
+				'flex min-h-12 items-center gap-3 rounded-lg px-4 py-3 text-base font-semibold transition-all duration-200',
+				'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+				active
+					? 'bg-primary text-primary-foreground hover:bg-primary-hover hover:text-primary-foreground'
+					: 'text-muted-foreground hover:bg-secondary hover:text-secondary-foreground',
+				collapsed && 'justify-center px-2'
+			)}
 		>
-			{({ isActive }) => (
+			{item.icon && <span className="shrink-0">{item.icon}</span>}
+			{!collapsed && (
 				<>
-					{item.icon && (
-						<span className={cn('shrink-0', isActive && 'text-primary')}>
-							{item.icon}
-						</span>
-					)}
-					{!collapsed && (
-						<>
-							<span className="flex-1 truncate">{item.label}</span>
-							{item.badge && (
-								<Badge
-									variant={isActive ? 'primary' : 'default'}
-									size="sm"
-									className="ml-auto"
-								>
-									{item.badge}
-								</Badge>
-							)}
-						</>
+					<span className="flex-1 truncate">{item.label}</span>
+					{item.badge && (
+						<Badge
+							variant={active ? 'outline' : 'default'}
+							size="sm"
+							className="ml-auto"
+						>
+							{item.badge}
+						</Badge>
 					)}
 				</>
 			)}
-		</RouterNavLink>
+		</Link>
 	);
 }
 
@@ -259,6 +248,15 @@ function Sidebar({
 	const canSeeItem = (item: NavItem) => !item.allowedRoles || (user && item.allowedRoles.includes(user.role));
 	const visibleItems = items.filter(canSeeItem);
 	const visibleFooterItems = footerItems.filter(canSeeItem);
+
+	// Longest-prefix match wins so only ONE item is active:
+	// /vehicles/availability → Ketersediaan only (not Kendaraan); /vehicles/:id → Kendaraan still active.
+	const { pathname } = useLocation();
+	const isActiveHref = (href: string) =>
+		href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`);
+	const activeHref = [...visibleItems, ...visibleFooterItems]
+		.filter((i) => isActiveHref(i.href))
+		.sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
 	const handleCollapsedChange = (value: boolean) => {
 		setInternalCollapsed(value);
@@ -302,6 +300,7 @@ function Sidebar({
 					<SidebarItem
 						key={item.href}
 						item={item}
+						active={activeHref === item.href}
 						collapsed={collapsed}
 						onItemClick={() => handleMobileOpenChange(false)}
 					/>
@@ -315,6 +314,7 @@ function Sidebar({
 						<SidebarItem
 							key={item.href}
 							item={item}
+							active={activeHref === item.href}
 							collapsed={collapsed}
 							onItemClick={() => handleMobileOpenChange(false)}
 						/>

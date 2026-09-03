@@ -117,6 +117,7 @@ export class PublicApiService {
       name: string;
       type: string;
       dailyRateIdr: number;
+      dailyRateUsd: number | null;
       photoUrl: string | null;
     }>;
     unavailableVehicles: Array<{ id: string; name: string; reason: string }>;
@@ -153,6 +154,7 @@ export class PublicApiService {
         name: v.name,
         type: v.type,
         dailyRateIdr: v.dailyRateIdr,
+        dailyRateUsd: v.dailyRateUsd ?? null,
         photoUrl: resolveUrl(v.photoUrl, this.baseUrl),
       }));
 
@@ -228,6 +230,7 @@ export class PublicApiService {
     year: number | null;
     category: string | null;
     dailyRateIdr: number;
+    dailyRateUsd: number | null;
     image: string | null;
     specs: Record<string, string> | null;
     description: string | null;
@@ -251,6 +254,7 @@ export class PublicApiService {
       year: vehicle.year,
       category: vehicle.category,
       dailyRateIdr: vehicle.dailyRateIdr,
+      dailyRateUsd: vehicle.dailyRateUsd ?? null,
       image: resolveUrl(vehicle.photoUrl, this.baseUrl),
       specs: parsedSpecs,
       description: vehicle.description,
@@ -269,6 +273,7 @@ export class PublicApiService {
     category: string | null;
     plateNumber: string;
     dailyRateIdr: number;
+    dailyRateUsd: number | null;
     image: string | null;
     specs: Record<string, string> | null;
     description: string | null;
@@ -294,6 +299,7 @@ export class PublicApiService {
       category: vehicle.category,
       plateNumber: vehicle.plateNumber,
       dailyRateIdr: vehicle.dailyRateIdr,
+      dailyRateUsd: vehicle.dailyRateUsd ?? null,
       image: resolveUrl(vehicle.photoUrl, this.baseUrl),
       specs: parsedSpecs,
       description: vehicle.description,
@@ -577,7 +583,8 @@ export class PublicApiService {
   // 6. Get public vehicles
   async getPublicVehicles(): Promise<Array<{
     id: string; name: string; type: string; category: string | null;
-    image: string | null; dailyRateIdr: number; specs: Record<string, string> | null;
+    image: string | null; dailyRateIdr: number; dailyRateUsd: number | null;
+    specs: Record<string, string> | null;
     description: string | null; available: boolean;
   }>> {
     const vehicles = await this.repo.getPublicVehicles();
@@ -595,6 +602,7 @@ export class PublicApiService {
         category: v.category,
         image: resolveUrl(v.photoUrl, this.baseUrl),
         dailyRateIdr: v.dailyRateIdr,
+        dailyRateUsd: v.dailyRateUsd ?? null,
         specs: parsedSpecs,
         description: v.description,
         available: v.status === "Available",
@@ -630,6 +638,7 @@ export class PublicApiService {
   async getPublicPricing(): Promise<Array<{
     id: string; name: string; description: string | null;
     dailyPrice: number; multiDayPrice: number;
+    dailyPriceUsd: number | null; multiDayPriceUsd: number | null;
     features: string[]; notIncluded: string[];
     highlighted: boolean; icon: string | null;
   }>> {
@@ -640,6 +649,8 @@ export class PublicApiService {
       description: t.description,
       dailyPrice: t.dailyPrice,
       multiDayPrice: t.multiDayPrice,
+      dailyPriceUsd: t.dailyPriceUsd ?? null,
+      multiDayPriceUsd: t.multiDayPriceUsd ?? null,
       features: safeJsonParseStringArray(t.features),
       notIncluded: safeJsonParseStringArray(t.notIncluded),
       highlighted: t.highlighted,
@@ -753,6 +764,8 @@ export class PublicApiService {
     bankAccount: { bankName: string; accountNumber: string; accountHolder: string };
     deposit: { amount: number; description: string };
     depositPercent: number;
+    /** LC-003: IDR per 1 USD — public display conversion when language=en. */
+    usdRate: number;
   }> {
     const getValue = async (key: string, fallback: string = ''): Promise<string> => {
       const val = await this.configRepo.getValue(key);
@@ -776,6 +789,8 @@ export class PublicApiService {
       },
       // Single source of truth for the DP percentage (FE previously hardcoded 30%)
       depositPercent: await this.configRepo.getNumber('dp_percentage', 30),
+      // LC-003: currency conversion rate for the EN storefront display
+      usdRate: await this.configRepo.getNumber('usd_rate', 16300),
     };
   }
 

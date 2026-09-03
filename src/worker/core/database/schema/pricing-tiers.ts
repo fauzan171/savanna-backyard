@@ -7,6 +7,10 @@ export const pricingTiers = sqliteTable('pricing_tiers', {
 	description: text('description'),
 	dailyPrice: integer('daily_price').notNull(),
 	multiDayPrice: integer('multi_day_price').notNull(),
+	// LC-006: optional USD prices (mirrors vehicles.daily_rate_usd). When null,
+	// public EN display converts IDR via the `usd_rate` system config.
+	dailyPriceUsd: integer('daily_price_usd'),
+	multiDayPriceUsd: integer('multi_day_price_usd'),
 	features: text('features').notNull(),
 	notIncluded: text('not_included').notNull(),
 	highlighted: integer('highlighted', { mode: 'boolean' }).notNull().default(false),

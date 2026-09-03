@@ -46,6 +46,9 @@ export class PaymentsService {
 			verifiedBy: details.verifier,
 			verifiedAt: payment.verifiedAt,
 			notes: payment.notes,
+			// TC-PAY-003: reject stores the reason in notes; surface it as a
+			// dedicated field so the admin "Rejected" card renders.
+			rejectionReason: payment.status === 'Failed' ? payment.notes : null,
 			createdAt: payment.createdAt,
 			updatedAt: payment.updatedAt,
 		};
@@ -105,7 +108,11 @@ export class PaymentsService {
 		};
 	}
 
-	async create(data: CreatePaymentRequest): Promise<PaymentResponse> {
+	async create(
+		data: CreatePaymentRequest,
+		options?: { allowOverpayment?: boolean }
+	): Promise<PaymentResponse> {
+		let notes = data.notes ?? null;
 		// Validate booking exists
 		const booking = await this.bookingRepo.findById(data.bookingId);
 		if (!booking) {
@@ -115,7 +122,7 @@ export class PaymentsService {
 		// Validate currency matches booking
 		if (data.currency !== booking.currency) {
 			throw new ValidationError(
-				`Payment currency (${data.currency}) must match booking currency (${booking.currency})`
+				`Mata uang pembayaran (${data.currency}) harus sama dengan mata uang booking (${booking.currency})`
 			);
 		}
 
@@ -124,24 +131,29 @@ export class PaymentsService {
 			const existingPayment = await this.paymentRepo.findByTransactionReference(data.transactionReference);
 			if (existingPayment) {
 				throw new ConflictError(
-					`Payment with transaction reference '${data.transactionReference}' already exists`
+					`Pembayaran dengan referensi '${data.transactionReference}' sudah tercatat`
 				);
 			}
 		}
 
-		// Validate payment amount doesn't exceed remaining balance (warning only, don't block)
+		// TC-PAY-001: block payments that exceed the remaining balance. Pending
+		// payments reserve their amount too, so stacked pendings cannot overpay.
+		// Gateway webhooks pass allowOverpayment — a gateway charge that already
+		// happened must still be recorded (warn in notes) or revenue is lost.
 		const existingPayments = await this.paymentRepo.getByBookingId(data.bookingId);
-		const totalPaid = existingPayments
-			.filter((p) => p.status === 'Verified')
+		const charged = existingPayments
+			.filter((p) => p.status === 'Verified' || p.status === 'Pending')
 			.reduce((sum, p) => sum + p.amount, 0);
-		const remaining = booking.totalAmount - totalPaid;
+		const remaining = Math.max(0, booking.totalAmount - charged);
 
-		// Allow overpayment but add a note (business decision)
-		let notes = data.notes ?? null;
 		if (data.amount > remaining) {
-			notes = notes
-				? `${notes}\n\n[Warning] Payment amount exceeds remaining balance by ${data.amount - remaining}`
-				: `[Warning] Payment amount exceeds remaining balance by ${data.amount - remaining}`;
+			if (!options?.allowOverpayment) {
+				throw new ValidationError(
+					`Jumlah pembayaran melebihi sisa tagihan. Sisa: ${remaining}, diminta: ${data.amount}`
+				);
+			}
+			const warning = `[Warning] Payment amount exceeds remaining balance by ${data.amount - remaining}`;
+			notes = notes ? `${notes}\n\n${warning}` : warning;
 		}
 
 		const payment = await this.paymentRepo.create({
@@ -167,7 +179,7 @@ export class PaymentsService {
 
 		// Validate current status
 		if (payment.status !== 'Pending') {
-			throw new ConflictError(`Cannot verify payment with status: ${payment.status}`);
+			throw new ConflictError(`Tidak bisa memverifikasi pembayaran berstatus: ${payment.status}`);
 		}
 
 		// Get user info for response
@@ -196,7 +208,7 @@ export class PaymentsService {
 				// This is the first verified payment, auto-confirm
 				await this.bookingRepo.confirm(booking.id);
 				// TC-BK-003: record the transition so the History tab is not empty
-				await this.bookingRepo.logStatusChange(booking.id, 'Pending', 'Confirmed', userId, 'Auto-confirmed: payment verified');
+				await this.bookingRepo.logStatusChange(booking.id, 'Pending', 'Confirmed', userId, 'Konfirmasi otomatis: pembayaran terverifikasi');
 				bookingStatus = 'Confirmed';
 			}
 		}
@@ -229,7 +241,7 @@ export class PaymentsService {
 
 		// Validate current status
 		if (payment.status !== 'Pending') {
-			throw new ConflictError(`Cannot reject payment with status: ${payment.status}`);
+			throw new ConflictError(`Tidak bisa menolak pembayaran berstatus: ${payment.status}`);
 		}
 
 		const updated = await this.paymentRepo.reject(id, data.reason);

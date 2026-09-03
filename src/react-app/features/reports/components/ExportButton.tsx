@@ -26,8 +26,8 @@ export function ExportButton({ reportType, params, disabled }: ExportButtonProps
 			const lineCount = text.trim().split('\n').length;
 			if (lineCount <= 1) {
 				toast({
-					title: 'No data to export',
-					description: 'There are no records for the selected period.',
+					title: 'Tidak ada data untuk diekspor',
+					description: 'Tidak ada record untuk periode terpilih.',
 					variant: 'destructive',
 				});
 				return;
@@ -44,10 +44,10 @@ export function ExportButton({ reportType, params, disabled }: ExportButtonProps
 			document.body.removeChild(link);
 			URL.revokeObjectURL(url);
 
-			toast({ title: 'Export complete', description: 'CSV file downloaded.' });
+			toast({ title: 'Ekspor selesai', description: 'File CSV telah diunduh.' });
 		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Failed to export CSV';
-			toast({ title: 'Export failed', description: message, variant: 'destructive' });
+			const message = error instanceof Error ? error.message : 'Gagal mengekspor CSV';
+			toast({ title: 'Ekspor gagal', description: message, variant: 'destructive' });
 		} finally {
 			setIsExporting(false);
 		}
@@ -56,7 +56,7 @@ export function ExportButton({ reportType, params, disabled }: ExportButtonProps
 	return (
 		<Button variant="outline" size="sm" onClick={handleExport} disabled={disabled || isExporting}>
 			<Download className="mr-2 h-4 w-4" />
-			{isExporting ? 'Exporting...' : 'Export CSV'}
+			{isExporting ? 'Mengekspor...' : 'Ekspor CSV'}
 		</Button>
 	);
 }

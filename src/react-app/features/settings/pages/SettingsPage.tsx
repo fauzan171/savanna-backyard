@@ -25,6 +25,13 @@ const SETTING_GROUPS = [
 		keys: ['deposit_amount', 'deposit_description'],
 		labels: { deposit_amount: 'Nominal Deposit (IDR)', deposit_description: 'Deskripsi Deposit' },
 	},
+	{
+		// LC-003/LC-006: IDR-per-USD display rate for the public EN storefront
+		title: 'Mata Uang',
+		keys: ['usd_rate'],
+		labels: { usd_rate: 'Kurs (IDR per 1 USD)' },
+		types: { usd_rate: 'number' },
+	},
 ];
 
 export default function SettingsPage() {
@@ -63,6 +70,9 @@ export default function SettingsPage() {
 				}
 				if (type === 'tel' && !/^[0-9+\-\s()]+$/.test(value)) {
 					errs[key] = `${label} hanya boleh berisi angka, +, -, atau spasi`;
+				}
+				if (type === 'number' && !/^[0-9]+$/.test(value)) {
+					errs[key] = `${label} harus berupa angka`;
 				}
 			}
 		}

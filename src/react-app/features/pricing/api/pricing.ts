@@ -7,6 +7,9 @@ export interface PricingTier {
 	description: string | null;
 	dailyPrice: number;
 	multiDayPrice: number;
+	// LC-006: optional USD prices (null → derived from IDR via settings usd_rate)
+	dailyPriceUsd?: number | null;
+	multiDayPriceUsd?: number | null;
 	features: string;
 	notIncluded: string;
 	highlighted: boolean;
@@ -22,6 +25,8 @@ export type CreatePricingRequest = {
 	description?: string | null;
 	dailyPrice: number;
 	multiDayPrice: number;
+	dailyPriceUsd?: number | null;
+	multiDayPriceUsd?: number | null;
 	features: string[];
 	notIncluded: string[];
 	highlighted?: boolean;

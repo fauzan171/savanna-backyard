@@ -18,6 +18,8 @@ export class PricingService {
 		const now = new Date().toISOString();
 		return this.repo.create({
 			...data,
+			dailyPriceUsd: data.dailyPriceUsd ?? null,
+			multiDayPriceUsd: data.multiDayPriceUsd ?? null,
 			description: data.description ?? null,
 			features: typeof data.features === 'string' ? data.features : JSON.stringify(data.features),
 			notIncluded: typeof data.notIncluded === 'string' ? data.notIncluded : JSON.stringify(data.notIncluded),

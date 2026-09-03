@@ -39,19 +39,19 @@ const STATUS_CONFIG: Record<string, { color: string; bgColor: string; icon: Reac
 		color: 'text-emerald-700',
 		bgColor: 'bg-emerald-500',
 		icon: <CheckCircle className="size-5" />,
-		label: 'Available'
+		label: 'Tersedia'
 	},
 	Rented: {
 		color: 'text-amber-700',
 		bgColor: 'bg-amber-500',
 		icon: <Car className="size-5" />,
-		label: 'Rented'
+		label: 'Disewa'
 	},
 	Maintenance: {
 		color: 'text-red-700',
 		bgColor: 'bg-red-500',
 		icon: <Wrench className="size-5" />,
-		label: 'Maintenance'
+		label: 'Perawatan'
 	},
 	Inactive: {
 		color: 'text-gray-700',
@@ -64,6 +64,15 @@ const STATUS_CONFIG: Record<string, { color: string; bgColor: string; icon: Reac
 const TYPE_LABELS: Record<string, string> = {
 	TrailBike: 'Trail Bike',
 	StreetBike: 'Street Bike',
+};
+
+// LC-005: filter pill labels in ID (values stay lowercase keys)
+const STATUS_FILTER_LABELS: Record<string, string> = {
+	all: 'Semua',
+	available: 'Tersedia',
+	rented: 'Disewa',
+	maintenance: 'Perawatan',
+	inactive: 'Nonaktif',
 };
 
 export function VehicleAvailabilityPage() {
@@ -105,8 +114,8 @@ export function VehicleAvailabilityPage() {
 			{/* Mobile-optimized header */}
 			<div className="bg-white border-b sticky top-0 z-10">
 				<div className="px-4 py-3">
-					<h1 className="text-lg font-semibold text-gray-900">Vehicle Availability</h1>
-					<p className="text-sm text-gray-500">Scan or search vehicles</p>
+					<h1 className="text-lg font-semibold text-gray-900">Ketersediaan Kendaraan</h1>
+					<p className="text-sm text-gray-500">Pindai atau cari kendaraan</p>
 				</div>
 			</div>
 
@@ -119,7 +128,7 @@ export function VehicleAvailabilityPage() {
 					<input
 						ref={searchInputRef}
 						type="text"
-						placeholder="Scan barcode or type plate number..."
+						placeholder="Pindai barcode atau masukkan nomor plat..."
 						value={searchQuery}
 						onChange={(e) => setSearchQuery(e.target.value)}
 						className="block w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
@@ -144,7 +153,7 @@ export function VehicleAvailabilityPage() {
 					>
 						<div className="flex items-center gap-2">
 							<Filter className="h-5 w-5" />
-							<span>Status: {statusFilter === 'all' ? 'All' : statusFilter}</span>
+ 							<span>Status: {STATUS_FILTER_LABELS[statusFilter] ?? statusFilter}</span>
 						</div>
 						<ChevronDown className={`h-5 w-5 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
 					</Button>
@@ -166,7 +175,7 @@ export function VehicleAvailabilityPage() {
 										: 'bg-gray-100 text-gray-700 border-2 border-transparent hover:bg-gray-200'
 								}`}
 							>
-								{status.charAt(0).toUpperCase() + status.slice(1)}
+								{STATUS_FILTER_LABELS[status] ?? status}
 							</button>
 						))}
 					</div>
@@ -181,21 +190,21 @@ export function VehicleAvailabilityPage() {
 						</div>
 						<div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-center">
 							<div className="text-xl font-bold text-emerald-600">{summary.available}</div>
-							<div className="text-xs text-emerald-700">Ready</div>
+							<div className="text-xs text-emerald-700">Siap</div>
 						</div>
 						<div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-center">
 							<div className="text-xl font-bold text-amber-600">{summary.rented}</div>
-							<div className="text-xs text-amber-700">Rented</div>
+							<div className="text-xs text-amber-700">Disewa</div>
 						</div>
 						<div className="bg-red-50 p-3 rounded-xl border border-red-200 text-center">
 							<div className="text-xl font-bold text-red-600">{summary.maintenance}</div>
-							<div className="text-xs text-red-700">Fix</div>
+							<div className="text-xs text-red-700">Servis</div>
 						</div>
 						<div className="bg-gray-50 p-3 rounded-xl border border-gray-200 text-center">
 							<div className="text-xl font-bold text-gray-600">
 								{summary.total ? Math.round((summary.rented / summary.total) * 100) : 0}%
 							</div>
-							<div className="text-xs text-gray-700">Use</div>
+							<div className="text-xs text-gray-700">Pakai</div>
 						</div>
 					</div>
 				)}
@@ -216,15 +225,15 @@ export function VehicleAvailabilityPage() {
 						<div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
 							<Car className="h-8 w-8 text-gray-400" />
 						</div>
-						<p className="text-gray-500 text-lg">No vehicles found</p>
+						<p className="text-gray-500 text-lg">Tidak ada kendaraan ditemukan</p>
 						<p className="text-gray-400 text-sm mt-1">
-							{searchQuery ? 'Try a different search term' : 'No vehicles available'}
+							{searchQuery ? 'Coba kata kunci lain' : 'Belum ada kendaraan'}
 						</p>
 					</div>
 				) : (
 					<div className="space-y-3">
 						<p className="text-sm text-gray-500 font-medium">
-							{filteredVehicles.length} vehicle{filteredVehicles.length !== 1 ? 's' : ''}
+							{filteredVehicles.length} kendaraan
 						</p>
 
 						{filteredVehicles.map((vehicle) => {
@@ -272,7 +281,7 @@ export function VehicleAvailabilityPage() {
 												<div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
 													<div className="flex items-center gap-2 text-amber-800 font-medium">
 														<Car className="h-4 w-4" />
-														<span>Currently Rented</span>
+														<span>Sedang Disewa</span>
 													</div>
 													<div className="mt-2 space-y-1">
 														<div className="flex items-center gap-2 text-sm text-amber-700">
@@ -297,7 +306,7 @@ export function VehicleAvailabilityPage() {
 													<div className="flex items-center gap-2 text-emerald-800">
 														<Calendar className="h-4 w-4" />
 														<span className="text-sm font-medium">
-															Available from {format(new Date(vehicle.nextAvailableDate), 'dd MMM yyyy')}
+															Tersedia mulai {format(new Date(vehicle.nextAvailableDate), 'dd MMM yyyy')}
 														</span>
 													</div>
 												</div>
@@ -307,7 +316,7 @@ export function VehicleAvailabilityPage() {
 											{vehicle.status === 'Available' && !vehicle.currentBooking && (
 												<div className="flex items-center gap-2 text-emerald-600 mt-2">
 													<div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-													<span className="text-sm font-medium">Ready for rental</span>
+													<span className="text-sm font-medium">Siap disewa</span>
 												</div>
 											)}
 										</div>

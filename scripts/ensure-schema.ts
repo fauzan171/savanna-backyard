@@ -38,6 +38,9 @@ const ALTERS: AlterSpec[] = [
 	{ table: 'leads', column: 'preferred_start', definition: 'TEXT' },
 	{ table: 'leads', column: 'preferred_end', definition: 'TEXT' },
 	{ table: 'leads', column: 'vehicle_interest', definition: 'TEXT' },
+	// LC-006 pricing_tiers USD prices (migration 0014_pricing_usd.sql)
+	{ table: 'pricing_tiers', column: 'daily_price_usd', definition: 'INTEGER' },
+	{ table: 'pricing_tiers', column: 'multi_day_price_usd', definition: 'INTEGER' },
 ];
 
 function columnExists(db: Database.Database, table: string, column: string): boolean {

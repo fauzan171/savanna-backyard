@@ -873,14 +873,15 @@ function ActionDialog({
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>{action.label}</DialogTitle>
+						{/* LC-004: dialog copy must stay one language (ID, matching admin locale) */}
 						<DialogDescription>
 							{action.action === 'cancel'
-								? 'Please provide a reason for cancelling this booking.'
+								? 'Berikan alasan pembatalan untuk booking ini.'
 								: action.action === 'extend'
-									? 'Select the new end date for this booking.'
+									? 'Pilih tanggal selesai baru untuk booking ini.'
 									: action.action === 'start'
-										? 'Enter the starting odometer reading to begin the rental.'
-										: `Are you sure you want to ${action.label.toLowerCase()} this booking?`}
+										? 'Masukkan angka odometer awal untuk memulai rental.'
+										: `Yakin ingin memproses "${action.label}" untuk booking ini?`}
 						</DialogDescription>
 					</DialogHeader>
 
@@ -903,49 +904,49 @@ function ActionDialog({
 						)}
 
 						{action.action === 'start' && (
-							<FormField label="Start Odometer (km)" required>
+							<FormField label="Odometer Awal (km)" required>
 								<Input
 									type="number"
 									value={startKm}
 									onChange={(e) => setStartKm(e.target.value)}
-									placeholder="e.g. 12500"
+									placeholder="mis. 12500"
 									min={0}
 								/>
 							</FormField>
 						)}
 
 						{action.action === 'complete' && (
-							<FormField label="End Odometer (km)">
+							<FormField label="Odometer Akhir (km)">
 								<Input
 									type="number"
 									value={endKm}
 									onChange={(e) => setEndKm(e.target.value)}
-									placeholder="e.g. 12800"
+									placeholder="mis. 12800"
 									min={0}
 								/>
 							</FormField>
 						)}
 
 						{action.action === 'complete' && (
-							<FormField label="Damage Fee Override (IDR)" hint="Override otomatis (flipped items × rate). Kosongkan untuk auto.">
+							<FormField label="Override Biaya Damage (IDR)" hint="Override otomatis (flipped items × rate). Kosongkan untuk auto.">
 								<Input
 									type="number"
 									value={damageFeeOverride}
 									onChange={(e) => setDamageFeeOverride(e.target.value)}
-									placeholder="e.g. 200000"
+									placeholder="mis. 200000"
 									min={0}
 								/>
 							</FormField>
 						)}
 
 						{action.action === 'complete' && (
-							<FormField label="Vehicle Condition">
+							<FormField label="Kondisi Kendaraan">
 								<select
 									value={conditionStatus}
 									onChange={(e) => setConditionStatus(e.target.value)}
 									className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
 								>
-									<option value="">Auto (derive from checklist)</option>
+									<option value="">Otomatis (dari checklist)</option>
 									<option value="Excellent">Excellent</option>
 									<option value="Good">Good</option>
 									<option value="Fair">Fair</option>
@@ -956,7 +957,7 @@ function ActionDialog({
 						)}
 
 						{action.action === 'extend' && (
-							<FormField label="New End Date" required>
+							<FormField label="Tanggal Selesai Baru" required>
 								<Input
 									type="date"
 									value={newEndDate}
@@ -966,11 +967,11 @@ function ActionDialog({
 						)}
 
 						{['confirm', 'start', 'complete', 'extend'].includes(action.action) && (
-							<FormField label="Notes">
+							<FormField label="Catatan">
 								<Textarea
 									value={notes}
 									onChange={(e) => setNotes(e.target.value)}
-									placeholder="Optional notes..."
+									placeholder="Catatan opsional..."
 									rows={3}
 								/>
 							</FormField>
@@ -986,7 +987,7 @@ function ActionDialog({
 							onClick={handleAction}
 							disabled={isSubmitDisabled}
 						>
-							{isLoading ? 'Memproses...' : action.label === 'Cancel' ? 'Batalkan Booking' : action.label}
+							{isLoading ? 'Memproses...' : action.label}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

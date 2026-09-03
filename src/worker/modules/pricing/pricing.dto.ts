@@ -17,6 +17,13 @@ const priceField = (label: string) =>
 		.min(1, `${label} must be greater than 0`)
 		.max(1_000_000_000, `${label} is too large`);
 
+// LC-006: optional USD counterpart, mirroring vehicles.dailyRateUsd
+const optPriceField = (label: string) =>
+	z.preprocess(
+		(v) => (v === '' || v === undefined ? null : v),
+		z.coerce.number().int().min(1, `${label} must be greater than 0`).max(1_000_000, `${label} is too large`).nullable().optional()
+	);
+
 export const createPricingSchema = z.object({
 	name: z
 		.string()
@@ -27,6 +34,8 @@ export const createPricingSchema = z.object({
 	description: safeOptText,
 	dailyPrice: priceField('Daily price'),
 	multiDayPrice: priceField('Multi-day price'),
+	dailyPriceUsd: optPriceField('Daily USD price'),
+	multiDayPriceUsd: optPriceField('Multi-day USD price'),
 	features: z.array(z.string()),
 	notIncluded: z.array(z.string()),
 	highlighted: z.boolean().optional().default(false),

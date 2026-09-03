@@ -407,7 +407,25 @@ describe('PaymentsService', () => {
 		// P1: Edge Cases - Important boundary conditions
 		// ============================================
 
-		it('[P1] should allow overpayment with warning note', async () => {
+		it('[P0] TC-PAY-001: reject admin overpayment (amount > remaining)', async () => {
+			const mockBooking = createTestBooking({ totalAmount: 1000000 });
+
+			vi.mocked(mockBookingRepo.findById).mockResolvedValue(mockBooking);
+			vi.mocked(mockPaymentRepo.getByBookingId).mockResolvedValue([]);
+
+			await expect(
+				paymentsService.create({
+					bookingId: mockBooking.id,
+					amount: 1500000, // Exceeds remaining
+					currency: 'IDR',
+					method: 'QRIS',
+				})
+			).rejects.toThrow(ValidationError);
+			// Nothing must be persisted when the amount is rejected.
+			expect(mockPaymentRepo.create).not.toHaveBeenCalled();
+		});
+
+		it('[P1] TC-PAY-001: allow gateway overpayment with warning note', async () => {
 			const mockBooking = createTestBooking({ totalAmount: 1000000 });
 			const mockPayment = createTestPayment({ amount: 1500000 });
 
@@ -422,12 +440,15 @@ describe('PaymentsService', () => {
 				verifier: null,
 			});
 
-			const result = await paymentsService.create({
-				bookingId: mockBooking.id,
-				amount: 1500000, // Exceeds remaining
-				currency: 'IDR',
-				method: 'QRIS',
-			});
+			const result = await paymentsService.create(
+				{
+					bookingId: mockBooking.id,
+					amount: 1500000, // Exceeds remaining, but gateway already captured it
+					currency: 'IDR',
+					method: 'QRIS',
+				},
+				{ allowOverpayment: true }
+			);
 
 			expect(result.amount).toBe(1500000);
 			// Check that overpayment warning was added

@@ -42,7 +42,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
 
 	return (
 		<ChartContainer
-			title="Revenue Trend"
+			title="Tren Pendapatan"
 			description={periodLabel ? `Periode: ${periodLabel}` : undefined}
 			loading={isLoading}
 			empty={!data?.trend || data.trend.length === 0}

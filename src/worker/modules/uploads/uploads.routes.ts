@@ -35,11 +35,24 @@ function getExtensionFromMimeType(mimeType: string): string {
   return map[mimeType] || 'bin';
 }
 
+// SEC-08B: customer inspection photos are personal data (photos of a
+// customer's vehicle damage). They live under the `customer-inspections/`
+// key prefix and require an authenticated admin session (Bearer token or
+// httpOnly cookie — the admin SPA is same-origin so <img> requests carry the
+// cookie automatically). Everything else (vehicle/package/trail imagery shown
+// on the public landing page) stays public.
+const isProtectedKey = (key: string): boolean => key.startsWith('customer-inspections/');
+
 export function createUploadRouter(): Hono<UploadEnv> {
 	const router = new Hono<UploadEnv>();
 
-	// Serve uploaded file (public read - NO auth)
-	router.get('/:key{.+}', async (c) => {
+	// Serve uploaded file (public read, EXCEPT inspection photos — SEC-08B)
+	router.get('/:key{.+}', async (c, next) => {
+		if (isProtectedKey(c.req.param('key'))) {
+			return authMiddleware()(c, next);
+		}
+		return next();
+	}, async (c) => {
 		const bucket = c.env.UPLOADS;
 		if (!bucket) {
 			return c.json({ success: false, error: { code: 'NO_BUCKET', message: 'R2 bucket not configured' } }, 500);
@@ -54,7 +67,11 @@ export function createUploadRouter(): Hono<UploadEnv> {
 
 		const headers = new Headers();
 		headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
-		headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+		// SEC-08B: never let a CDN/cache store protected inspection photos.
+		headers.set(
+			'Cache-Control',
+			isProtectedKey(key) ? 'private, no-store' : 'public, max-age=31536000, immutable',
+		);
 
 		return new Response(object.body, { headers });
 	});

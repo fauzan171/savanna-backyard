@@ -48,6 +48,12 @@ export default function PricingPage() {
 							<div className="space-y-1">
 								<div className="text-2xl font-bold">Rp {tier.dailyPrice.toLocaleString()}<span className="text-sm font-normal text-muted-foreground">/hari</span></div>
 								<div className="text-sm text-muted-foreground">Rp {tier.multiDayPrice.toLocaleString()}/multi-hari</div>
+								{/* LC-006: native USD prices when configured (mirrors vehicle/payment IDR+USD) */}
+								{tier.dailyPriceUsd != null && (
+									<div className="text-sm font-medium text-blue-700">
+										${tier.dailyPriceUsd.toLocaleString()}/hari · ${tier.multiDayPriceUsd?.toLocaleString() ?? '-'}/multi-hari
+									</div>
+								)}
 							</div>
 							<div className="flex items-center justify-between mt-4">
 								<span className={`text-xs px-2 py-1 rounded-full ${tier.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{tier.isActive ? 'Aktif' : 'Nonaktif'}</span>

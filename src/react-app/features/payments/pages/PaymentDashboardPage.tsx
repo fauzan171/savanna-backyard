@@ -33,6 +33,15 @@ function formatCurrency(amount: number): string {
 	return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
 }
 
+// LC-005: one language per page (ID, matching the localized admin)
+const statusLabels: Record<string, string> = {
+	Confirmed: 'Terkonfirmasi',
+	pending_payment: 'Menunggu Pembayaran',
+	Active: 'Sedang Berjalan',
+	Completed: 'Selesai',
+	Pending: 'Menunggu',
+};
+
 export function PaymentDashboardPage() {
 	const navigate = useNavigate();
 	const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all');
@@ -71,11 +80,11 @@ export function PaymentDashboardPage() {
 				</Link>
 			),
 		},
-		{ accessorKey: 'customerName', header: 'Customer' },
-		{ accessorKey: 'vehicleName', header: 'Vehicle' },
+		{ accessorKey: 'customerName', header: 'Pelanggan' },
+		{ accessorKey: 'vehicleName', header: 'Kendaraan' },
 		{
 			accessorKey: 'startDate',
-			header: 'Start Date',
+			header: 'Tanggal Mulai',
 			cell: ({ row }) => format(new Date(row.original.startDate), 'dd MMM yyyy'),
 		},
 		{
@@ -85,7 +94,7 @@ export function PaymentDashboardPage() {
 		},
 		{
 			accessorKey: 'totalPaid',
-			header: 'Paid',
+			header: 'Dibayar',
 			cell: ({ row }) => (
 				<span className={row.original.isFullyPaid ? 'text-green-600 font-medium' : ''}>
 					{formatCurrency(row.original.totalPaid)}
@@ -94,7 +103,7 @@ export function PaymentDashboardPage() {
 		},
 		{
 			accessorKey: 'remaining',
-			header: 'Remaining',
+			header: 'Sisa',
 			cell: ({ row }) => (
 				<span className={row.original.remaining > 0 ? 'text-orange-600 font-medium' : ''}>
 					{formatCurrency(row.original.remaining)}
@@ -129,7 +138,7 @@ export function PaymentDashboardPage() {
 				};
 				return (
 					<Badge variant="outline" className={colors[status] ?? ''}>
-						{status}
+						{statusLabels[status] ?? status}
 					</Badge>
 				);
 			},
@@ -143,7 +152,7 @@ export function PaymentDashboardPage() {
 					{item.bookingNumber}
 				</Link>
 				<Badge variant="outline" className={item.isFullyPaid ? 'bg-green-100 text-green-800 border-green-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}>
-					{item.isFullyPaid ? 'Paid' : item.totalPaid > 0 ? 'DP Paid' : 'Unpaid'}
+					{item.isFullyPaid ? 'Lunas' : item.totalPaid > 0 ? 'DP Dibayar' : 'Belum Bayar'}
 				</Badge>
 			</div>
 			<div className="mt-2 text-sm text-muted-foreground">
@@ -159,7 +168,7 @@ export function PaymentDashboardPage() {
 				<span className="text-xs text-muted-foreground">{Math.round(item.paymentProgress)}%</span>
 			</div>
 			<div className="mt-2 flex justify-between text-sm">
-				<span className="text-muted-foreground">Paid: {formatCurrency(item.totalPaid)}</span>
+				<span className="text-muted-foreground">Dibayar: {formatCurrency(item.totalPaid)}</span>
 				<span className="font-medium">{formatCurrency(item.totalAmount)}</span>
 			</div>
 		</div>
@@ -168,15 +177,15 @@ export function PaymentDashboardPage() {
 	return (
 		<div className="space-y-6">
 			<PageHeader
-				title="Payment Dashboard"
-				description="Track payment status for all bookings"
+				title="Dashboard Pembayaran"
+				description="Pantau status pembayaran untuk semua booking"
 			/>
 
 			{/* Stats Cards */}
 			<div className="grid gap-4 md:grid-cols-4">
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
+						<CardTitle className="text-sm font-medium">Total Booking</CardTitle>
 						<CreditCard className="size-4 text-muted-foreground" />
 					</CardHeader>
 					<CardContent>
@@ -185,7 +194,7 @@ export function PaymentDashboardPage() {
 				</Card>
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium">Fully Paid</CardTitle>
+						<CardTitle className="text-sm font-medium">Lunas Penuh</CardTitle>
 						<CheckCircle className="size-4 text-green-600" />
 					</CardHeader>
 					<CardContent>
@@ -194,7 +203,7 @@ export function PaymentDashboardPage() {
 				</Card>
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium">DP Paid</CardTitle>
+						<CardTitle className="text-sm font-medium">DP Dibayar</CardTitle>
 						<Clock className="size-4 text-orange-600" />
 					</CardHeader>
 					<CardContent>
@@ -203,7 +212,7 @@ export function PaymentDashboardPage() {
 				</Card>
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium">Unpaid</CardTitle>
+						<CardTitle className="text-sm font-medium">Belum Bayar</CardTitle>
 						<AlertTriangle className="size-4 text-red-600" />
 					</CardHeader>
 					<CardContent>
@@ -224,7 +233,7 @@ export function PaymentDashboardPage() {
 								: 'bg-muted text-muted-foreground hover:bg-muted/80'
 						}`}
 					>
-						{filter === 'all' ? 'All' : filter === 'paid' ? 'Fully Paid' : filter === 'partial' ? 'DP Paid' : 'Unpaid'}
+						{filter === 'all' ? 'Semua' : filter === 'paid' ? 'Lunas' : filter === 'partial' ? 'DP' : 'Belum Bayar'}
 					</button>
 				))}
 			</div>
@@ -234,11 +243,11 @@ export function PaymentDashboardPage() {
 				columns={columns}
 				data={filteredData}
 				isLoading={isLoading}
-				searchPlaceholder="Search bookings..."
+				searchPlaceholder="Cari booking..."
 				onRowClick={(row) => navigate(`/bookings/${row.bookingId}`)}
 				renderCard={renderCard}
-				noDataMessage="No bookings found"
-				noDataDescription="Payment data will appear here"
+				noDataMessage="Tidak ada booking ditemukan"
+				noDataDescription="Data pembayaran akan tampil di sini"
 			/>
 		</div>
 	);

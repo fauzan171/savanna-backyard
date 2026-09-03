@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '@/react-app/components/ui/button';
 import { Input } from '@/react-app/components/ui/input';
@@ -18,6 +19,7 @@ export default function LoginPage() {
 	const { login } = useAuth();
 	const [error, setError] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
+	const [showPassword, setShowPassword] = useState(false);
 
 	const {
 		register,
@@ -77,10 +79,22 @@ export default function LoginPage() {
 					<Label htmlFor="password">Kata Sandi</Label>
 					<Input
 						id="password"
-						type="password"
+						type={showPassword ? 'text' : 'password'}
 						placeholder="••••••••"
 						{...register('password')}
 						disabled={isLoading}
+						rightIcon={
+							<button
+								type="button"
+								tabIndex={-1}
+								onClick={() => setShowPassword((v) => !v)}
+								aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+								aria-pressed={showPassword}
+								className="cursor-pointer text-muted-foreground transition-colors hover:text-foreground"
+							>
+								{showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+							</button>
+						}
 					/>
 					{errors.password && (
 						<p className="text-sm text-red-600 dark:text-red-400">{errors.password.message}</p>

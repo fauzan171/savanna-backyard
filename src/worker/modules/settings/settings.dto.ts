@@ -23,6 +23,7 @@ const numericKeys = new Set([
 	'deposit_amount_idr',
 	'late_return_fee',
 	'cancellation_fee',
+	'usd_rate', // LC-003: IDR-per-USD display rate for the public storefront
 ]);
 
 // SET-03: keys expected to hold a URL
