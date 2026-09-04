@@ -3,7 +3,12 @@ import { z } from 'zod';
 // Create payment schema
 export const createPaymentSchema = z.object({
 	bookingId: z.string().uuid(),
-	amount: z.number().min(0.01, 'Amount must be greater than 0'),
+	// BIZ-06: whole-rupiah only. IDR has no cents and the gateway/manual flows
+	// sum amounts in float — fractional input caused money drift. min(1) = Rp 1.
+	amount: z
+		.number()
+		.int('Amount must be a whole number (no decimals)')
+		.min(1, 'Amount must be at least 1'),
 	currency: z.enum(['IDR', 'USD']).default('IDR'),
 	method: z.enum(['QRIS', 'Gateway', 'BankTransfer', 'Cash']),
 	transactionReference: z.string().max(200).optional().nullable(),

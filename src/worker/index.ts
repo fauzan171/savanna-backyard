@@ -24,6 +24,7 @@ import { createEquipmentRouter } from './modules/equipment/equipment.routes';
 import { createOtpRouter } from './modules/otp/otp.routes';
 import { createDb } from './core/database';
 import { ConfigRepository } from './core/repositories/config.repository';
+import { TokenBlacklistRepository } from './core/repositories/token-blacklist.repository';
 import { EmailService } from './core/services/email.service';
 import { NotificationService } from './core/services/notification.service';
 import { VehiclesRepository } from './modules/vehicles/vehicles.repository';
@@ -186,6 +187,19 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
     console.log('[Scheduled] Expired booking cleanup:', cleanupResult);
   } catch (error) {
     console.error('[Scheduled] Error running expired booking cleanup:', error);
+  }
+
+  // BIZ-09: purge expired JWT blacklist entries once daily (22:00 UTC = 05:00 WIB
+  // cron slot). Runs before the RESEND_API_KEY gate so cleanup never depends on
+  // email config (same lesson as BIZ-18).
+  if (new Date().getUTCHours() === 22) {
+    try {
+      const blacklistRepo = new TokenBlacklistRepository(db);
+      const purged = await blacklistRepo.cleanupExpired();
+      console.log(`[Scheduled] Token blacklist cleanup: ${purged} expired entries removed`);
+    } catch (error) {
+      console.error('[Scheduled] Error running token blacklist cleanup:', error);
+    }
   }
 
   if (!env.RESEND_API_KEY) {

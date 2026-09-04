@@ -94,6 +94,18 @@ export class NotificationService {
           continue;
         }
 
+        // BIZ-14: cron fires hourly, so without this guard a 08:00 pickup got
+        // "Dimulai 1 Jam Lagi!" at 00:00 WIB. Only send when pickup is genuinely
+        // within the next 1-2 hours. Unparseable pickup time → skip and retry
+        // next hour (reminderHourSentAt stays null).
+        const pickupMs = this.parsePickupWibMs(booking.startDate, data.pickupTime);
+        const msUntilPickup = pickupMs === null ? Number.NaN : pickupMs - Date.now();
+        const ONE_HOUR_MS = 60 * 60 * 1000;
+        if (!(msUntilPickup > 0 && msUntilPickup <= 2 * ONE_HOUR_MS)) {
+          results.skipped++;
+          continue;
+        }
+
         const sent = await this.emailService.sendReminderOneHour(data);
         if (sent) {
           await this.db
@@ -240,5 +252,21 @@ export class NotificationService {
     const wib = new Date(now.getTime() + WIB_OFFSET_MS);
     wib.setUTCDate(wib.getUTCDate() + days);
     return wib.toISOString().split('T')[0];
+  }
+
+  /**
+   * BIZ-14 helper: combine a WIB calendar date (YYYY-MM-DD) with a pickup time
+   * string like "08:00 WIB" into a UTC epoch-ms instant. Returns null when the
+   * time cannot be parsed, so callers skip instead of sending at a wrong hour.
+   */
+  private parsePickupWibMs(date: string, pickupTime: string): number | null {
+    const m = pickupTime.match(/(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if (hh > 23 || mm > 59) return null;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const ms = Date.parse(`${date}T${pad(hh)}:${pad(mm)}:00+07:00`);
+    return Number.isNaN(ms) ? null : ms;
   }
 }
