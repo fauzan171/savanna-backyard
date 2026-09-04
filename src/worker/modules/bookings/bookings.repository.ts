@@ -18,6 +18,24 @@ import {
 import type { Database } from '@/worker/core/database';
 import type { ListBookingsQuery } from './bookings.dto';
 
+/** Columns written by createIfNoConflict (RACE-001 atomic slot insert). */
+export interface CreateBookingSlotData {
+	bookingNumber: string;
+	customerId: string;
+	vehicleId: string;
+	startDate: string;
+	endDate: string;
+	status: Booking['status'];
+	paymentTerms: NewBooking['paymentTerms'];
+	baseAmount: number;
+	addonsAmount: number;
+	lateFee: number;
+	totalAmount: number;
+	currency: 'IDR' | 'USD';
+	notes: string | null;
+	createdBy: string | null;
+}
+
 export class BookingsRepository {
 	constructor(private db: Database) {}
 
@@ -88,7 +106,21 @@ export class BookingsRepository {
 			);
 	}
 
-	async list(query: ListBookingsQuery): Promise<{ items: Booking[]; total: number }> {
+	/**
+	 * BK-08: list with joined customer + vehicle in ONE query.
+	 * Previously the service fanned out ~7 queries per row via Promise.all,
+	 * which burst past D1's per-isolate concurrency limit (intermittent 500s)
+	 * and threw NotFoundError when a joined row was missing (orphan booking).
+	 * LEFT JOINs keep rows for missing customer/vehicle; service maps fallbacks.
+	 */
+	async list(query: ListBookingsQuery): Promise<{
+		rows: Array<{
+			booking: Booking;
+			customer: typeof customers.$inferSelect | null;
+			vehicle: typeof vehicles.$inferSelect | null;
+		}>;
+		total: number;
+	}> {
 		const offset = (query.page - 1) * query.limit;
 
 		// Build where conditions
@@ -120,24 +152,24 @@ export class BookingsRepository {
 
 		const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-		// Get items
+		// Items: bookings + LEFT JOINed customer/vehicle (nested result objects)
 		const items = await this.db
-			.select()
+			.select({ booking: bookings, customer: customers, vehicle: vehicles })
 			.from(bookings)
+			.leftJoin(customers, eq(customers.id, bookings.customerId))
+			.leftJoin(vehicles, eq(vehicles.id, bookings.vehicleId))
 			.where(whereClause)
 			.orderBy(desc(bookings.createdAt))
 			.limit(query.limit)
 			.offset(offset);
 
-		// Get total count
+		// Get total count (single aggregate, not a full id fetch)
 		const countResult = await this.db
-			.select({ id: bookings.id })
+			.select({ count: sql<number>`count(*)` })
 			.from(bookings)
 			.where(whereClause);
 
-		const total = countResult.length;
-
-		return { items, total };
+		return { rows: items, total: Number(countResult[0]?.count ?? 0) };
 	}
 
 	async create(data: Omit<NewBooking, 'id'>): Promise<Booking> {
@@ -148,6 +180,44 @@ export class BookingsRepository {
 			throw new Error('Failed to create booking');
 		}
 		return booking;
+	}
+
+	/**
+	 * RACE-001: overlap check + INSERT in ONE atomic statement.
+	 * D1 serializes write statements through its consensus log, so a second
+	 * concurrent request evaluates the NOT EXISTS subquery AFTER the first
+	 * insert commits → inserts 0 rows → meta.changes === 0 → returns null.
+	 * Why not `BEGIN IMMEDIATE`: drizzle's D1 transaction issues BEGIN/SELECT/
+	 * INSERT as separate stateless D1 HTTP calls (no cross-isolate write lock),
+	 * and a unique index cannot express a date-range overlap predicate.
+	 * Overlap predicate mirrors findConflictingBookings (end-exclusive).
+	 */
+	async createIfNoConflict(data: CreateBookingSlotData): Promise<Booking | null> {
+		const id = crypto.randomUUID();
+		const now = new Date().toISOString();
+		const result = await this.db.run(sql`
+			INSERT INTO bookings (
+				id, booking_number, customer_id, vehicle_id, start_date, end_date,
+				status, payment_terms, base_amount, addons_amount, late_fee,
+				total_amount, currency, notes, created_by, created_at, updated_at
+			)
+			SELECT
+				${id}, ${data.bookingNumber}, ${data.customerId}, ${data.vehicleId}, ${data.startDate}, ${data.endDate},
+				${data.status}, ${data.paymentTerms}, ${data.baseAmount}, ${data.addonsAmount}, ${data.lateFee},
+				${data.totalAmount}, ${data.currency}, ${data.notes}, ${data.createdBy}, ${now}, ${now}
+			WHERE NOT EXISTS (
+				SELECT 1 FROM bookings
+				WHERE vehicle_id = ${data.vehicleId}
+					AND status IN ('Pending', 'pending_payment', 'Confirmed', 'Active')
+					AND start_date < ${data.endDate}
+					AND end_date > ${data.startDate}
+				LIMIT 1
+			)
+		`);
+		if (Number(result.meta.changes) === 0) {
+			return null; // conflict won the slot — nothing inserted
+		}
+		return this.findById(id);
 	}
 
 	async update(id: string, data: Partial<Omit<NewBooking, 'id' | 'createdAt' | 'bookingNumber'>>): Promise<Booking | null> {
@@ -340,6 +410,26 @@ export class BookingsRepository {
 			.select()
 			.from(bookings)
 			.where(and(...conditions));
+	}
+
+	/**
+	 * BK-08: aggregated paid/pending amounts for MANY bookings in one grouped
+	 * query — replaces the per-row getPaymentSummary fan-out in the list path.
+	 */
+	async getPaymentTotals(bookingIds: string[]): Promise<Map<string, { totalPaid: number; pendingAmount: number }>> {
+		if (bookingIds.length === 0) return new Map();
+		const rows = await this.db
+			.select({
+				bookingId: payments.bookingId,
+				totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} = 'Verified' THEN ${payments.amount} ELSE 0 END), 0)`,
+				pendingAmount: sql<number>`COALESCE(SUM(CASE WHEN ${payments.status} = 'Pending' THEN ${payments.amount} ELSE 0 END), 0)`,
+			})
+			.from(payments)
+			.where(inArray(payments.bookingId, bookingIds))
+			.groupBy(payments.bookingId);
+		return new Map(
+			rows.map((r) => [r.bookingId, { totalPaid: Number(r.totalPaid ?? 0), pendingAmount: Number(r.pendingAmount ?? 0) }]),
+		);
 	}
 
 	// Get payments for a booking

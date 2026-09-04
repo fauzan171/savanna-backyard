@@ -172,14 +172,27 @@ app.get('/images/:key{.+}', async (c) => {
 // Scheduled handler for Cloudflare Cron Triggers
 async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext) {
   void _ctx;
-  console.log('[Scheduled] Running notification jobs...');
+  console.log('[Scheduled] Running scheduled jobs...');
+
+  const db = createDb(env.DB);
+
+  // BIZ-18: cleanup runs FIRST and unconditionally. It used to sit below the
+  // RESEND_API_KEY early-return, so whenever the email key was unset the cron
+  // exited before reaching it and expired pending_payment bookings kept
+  // holding vehicle locks forever.
+  try {
+    const cleanupService = new BookingCleanupService(db);
+    const cleanupResult = await cleanupService.runCleanupExpiredBookings();
+    console.log('[Scheduled] Expired booking cleanup:', cleanupResult);
+  } catch (error) {
+    console.error('[Scheduled] Error running expired booking cleanup:', error);
+  }
 
   if (!env.RESEND_API_KEY) {
     console.log('[Scheduled] RESEND_API_KEY not configured, skipping email notifications');
     return;
   }
 
-  const db = createDb(env.DB);
   const configRepo = new ConfigRepository(db);
   const vehicleRepo = new VehiclesRepository(db);
   const emailService = new EmailService({
@@ -212,15 +225,7 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
     const activatedCount = 0;
     const completedCount = 0;
 
-    // 5. Cleanup expired pending_payment bookings (vehicle lock leak prevention)
-    let cleanupResult: { processed: number; stockRestored: number; failed: number } | null = null;
-    try {
-      const cleanupService = new BookingCleanupService(db);
-      cleanupResult = await cleanupService.runCleanupExpiredBookings();
-      console.log('[Scheduled] Expired booking cleanup:', cleanupResult);
-    } catch (error) {
-      console.error('[Scheduled] Error running expired booking cleanup:', error);
-    }
+    // 5. Expired booking cleanup (BIZ-18) already ran above, before the email gate.
 
     console.log('[Scheduled] All jobs completed:', {
       cleanableVehicles,
@@ -229,7 +234,6 @@ async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: Execution
       followups,
       activated: activatedCount,
       overdueCompleted: completedCount,
-      cleanupExpired: cleanupResult,
     });
   } catch (error) {
     console.error('[Scheduled] Error running notification jobs:', error);

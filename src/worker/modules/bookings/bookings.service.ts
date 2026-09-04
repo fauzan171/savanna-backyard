@@ -291,16 +291,33 @@ export class BookingsService {
 		items: BookingListItem[];
 		meta: { page: number; limit: number; total: number; totalPages: number };
 	}> {
-		const { items, total } = await this.bookingRepo.list(query);
-		const totalPages = Math.ceil(total / query.limit);
+		// BK-08: 2 queries total (page join + payment aggregates). The old path
+		// fired ~7 queries per row via Promise.all — bursts of 100+ concurrent D1
+		// requests intermittently tripped the per-isolate concurrency limit (500s),
+		// and a booking whose customer/vehicle row was missing made toResponse
+		// throw, failing the WHOLE list.
+		let rows: Awaited<ReturnType<BookingsRepository['list']>>['rows'] = [];
+		let total = 0;
+		try {
+			({ rows, total } = await this.bookingRepo.list(query));
+		} catch (e) {
+			console.error('[BookingsService.list] query failed:', e);
+			return {
+				items: [],
+				meta: { page: query.page, limit: query.limit, total: 0, totalPages: 0 },
+			};
+		}
 
-		const listItems: BookingListItem[] = await Promise.all(
-			items.map(async (booking) => {
-				const response = await this.toResponse(booking);
-				const paymentStatus = await this.getPaymentSummary(booking.id);
-				return { ...response, paymentStatus };
-			})
-		);
+		let paymentTotals = new Map<string, { totalPaid: number; pendingAmount: number }>();
+		try {
+			paymentTotals = await this.bookingRepo.getPaymentTotals(rows.map((r) => r.booking.id));
+		} catch (e) {
+			// Payment sums are supplementary — never fail the list over them.
+			console.error('[BookingsService.list] payment totals failed, using zeros:', e);
+		}
+
+		const totalPages = Math.ceil(total / query.limit);
+		const listItems: BookingListItem[] = rows.map((row) => this.toListItem(row.booking, row.customer, row.vehicle, paymentTotals.get(row.booking.id)));
 
 		return {
 			items: listItems,
@@ -309,6 +326,63 @@ export class BookingsService {
 				limit: query.limit,
 				total,
 				totalPages,
+			},
+		};
+	}
+
+	/**
+	 * BK-08: list-item projection with graceful fallbacks for missing joins.
+	 * statusHistory is intentionally omitted (the list UI never renders it;
+	 * fetching it per row was part of the N+1 that caused the 500s).
+	 */
+	private toListItem(
+		booking: Booking,
+		customer: { id: string; name: string; phone: string; email: string | null; isBlacklisted: boolean } | null,
+		vehicle: { id: string; name: string; plateNumber: string; type: VehicleSummary['type']; dailyRateIdr: number } | null,
+		totals?: { totalPaid: number; pendingAmount: number },
+	): BookingListItem {
+		const totalPaid = totals?.totalPaid ?? 0;
+		return {
+			id: booking.id,
+			bookingNumber: booking.bookingNumber,
+			customer: {
+				id: customer?.id ?? booking.customerId,
+				name: customer?.name ?? 'Unknown',
+				phone: customer?.phone ?? '-',
+				email: customer?.email ?? null,
+				isBlacklisted: customer?.isBlacklisted ?? false,
+			},
+			vehicle: {
+				id: vehicle?.id ?? booking.vehicleId,
+				name: vehicle?.name ?? 'Unknown',
+				plateNumber: vehicle?.plateNumber ?? '-',
+				type: vehicle?.type ?? 'Other',
+				dailyRateIdr: vehicle?.dailyRateIdr ?? 0,
+			},
+			startDate: booking.startDate,
+			endDate: booking.endDate,
+			actualReturnDate: booking.actualReturnDate,
+			startKm: booking.startKm,
+			endKm: booking.endKm,
+			status: booking.status,
+			paymentTerms: booking.paymentTerms,
+			baseAmount: booking.baseAmount ?? 0,
+			addonsAmount: booking.addonsAmount ?? 0,
+			lateFee: booking.lateFee ?? 0,
+			damageFee: booking.damageFee ?? 0,
+			totalPenalty: booking.totalPenalty ?? 0,
+			penaltyPaid: booking.penaltyPaid ?? false,
+			returnConfirmed: booking.returnConfirmed ?? false,
+			totalAmount: booking.totalAmount ?? 0,
+			currency: booking.currency,
+			notes: booking.notes,
+			createdAt: booking.createdAt,
+			updatedAt: booking.updatedAt,
+			paymentStatus: {
+				totalPaid,
+				pendingAmount: totals?.pendingAmount ?? 0,
+				remaining: Math.max(0, (booking.totalAmount ?? 0) - totalPaid),
+				isFullyPaid: totalPaid >= (booking.totalAmount ?? 0),
 			},
 		};
 	}
@@ -429,22 +503,11 @@ export class BookingsService {
 		// Generate booking number
 		const bookingNumber = generateBookingNumber();
 
-		// B1: re-verify availability immediately before insert to narrow the
-		// TOCTOU window (D1 has no transactions). A concurrent booking that
-		// slipped in between the first check and here will be caught.
-		const recheck = await this.bookingRepo.findConflictingBookings(
-			data.vehicleId,
-			data.startDate,
-			data.endDate,
-		);
-		if (recheck.length > 0) {
-			throw new ConflictError(
-				`Vehicle was just booked for these dates. Conflicting booking: ${recheck[0]?.bookingNumber}`,
-			);
-		}
-
-		// Create booking
-		const booking = await this.bookingRepo.create({
+		// RACE-001: overlap check + insert execute as ONE atomic statement in the
+		// repository (D1 serializes writes through its consensus log, so the loser
+		// sees the winner's row in its NOT EXISTS probe). The old check-then-insert
+		// let two concurrent POSTs both get 201.
+		const booking = await this.bookingRepo.createIfNoConflict({
 			bookingNumber,
 			customerId: data.customerId,
 			vehicleId: data.vehicleId,
@@ -460,6 +523,16 @@ export class BookingsService {
 			notes: data.notes ?? null,
 			createdBy: userId,
 		});
+		if (!booking) {
+			const conflict = await this.bookingRepo.findConflictingBookings(
+				data.vehicleId,
+				data.startDate,
+				data.endDate,
+			);
+			throw new ConflictError(
+				`Vehicle was just booked for these dates. Conflicting booking: ${conflict[0]?.bookingNumber ?? 'unknown'}`,
+			);
+		}
 
 		// Log initial status (hotfix 0012: tolerate missing table)
 		try {
