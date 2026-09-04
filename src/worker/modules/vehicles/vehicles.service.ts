@@ -463,6 +463,7 @@ export class VehiclesService {
 			currentBooking: {
 				bookingNumber: string;
 				customerName: string;
+				startDate: string;
 				endDate: string;
 			} | null;
 			nextAvailableDate: string | null;
@@ -485,7 +486,7 @@ export class VehiclesService {
 			type: string;
 			plateNumber: string;
 			status: string;
-			currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null;
+			currentBooking: { bookingNumber: string; customerName: string; startDate: string; endDate: string } | null;
 			nextAvailableDate: string | null;
 		}[] = [];
 
@@ -497,7 +498,7 @@ export class VehiclesService {
 			else if (v.status === 'Rented') summary.rented++;
 
 			// Find current/next booking for this vehicle
-			let currentBooking: { bookingNumber: string; customerName: string; endDate: string } | null = null;
+			let currentBooking: { bookingNumber: string; customerName: string; startDate: string; endDate: string } | null = null;
 			let nextAvailableDate: string | null = null;
 
 			if (this.bookingRepo) {
@@ -507,6 +508,7 @@ export class VehiclesService {
 					currentBooking = {
 						bookingNumber: b.bookingNumber,
 						customerName: 'Customer',
+						startDate: b.startDate,
 						endDate: b.endDate,
 					};
 					// Next available is day after endDate

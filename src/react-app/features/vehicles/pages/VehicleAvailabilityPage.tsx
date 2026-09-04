@@ -34,6 +34,16 @@ interface AvailabilityTimeline {
 	};
 }
 
+// Null/invalid-safe date formatter. date-fns `format()` throws
+// `RangeError: Invalid time value` on `new Date(undefined | "" | "bad")`.
+// Returns '' for missing/empty/unparseable input so callers can fall back.
+function safeFormat(date: string | null | undefined, pattern: string): string {
+	if (!date) return '';
+	const d = new Date(date);
+	if (Number.isNaN(d.getTime())) return '';
+	return format(d, pattern);
+}
+
 const STATUS_CONFIG: Record<string, { color: string; bgColor: string; icon: React.ReactNode; label: string }> = {
 	Available: {
 		color: 'text-emerald-700',
@@ -238,6 +248,15 @@ export function VehicleAvailabilityPage() {
 
 						{filteredVehicles.map((vehicle) => {
 							const config = STATUS_CONFIG[vehicle.status] ?? STATUS_CONFIG.Inactive;
+							const bookingRange = vehicle.currentBooking
+								? [
+										safeFormat(vehicle.currentBooking.startDate, 'dd MMM'),
+										safeFormat(vehicle.currentBooking.endDate, 'dd MMM yyyy'),
+									]
+										.filter(Boolean)
+										.join(' - ')
+								: '';
+							const nextAvailable = safeFormat(vehicle.nextAvailableDate, 'dd MMM yyyy');
 							return (
 								<Link
 									key={vehicle.id}
@@ -287,12 +306,12 @@ export function VehicleAvailabilityPage() {
 														<div className="flex items-center gap-2 text-sm text-amber-700">
 															<span className="font-medium">{vehicle.currentBooking.customerName}</span>
 														</div>
-														<div className="flex items-center gap-2 text-sm text-amber-600">
-															<Calendar className="h-3 w-3" />
-															<span>
-																{format(new Date(vehicle.currentBooking.startDate), 'dd MMM')} - {format(new Date(vehicle.currentBooking.endDate), 'dd MMM yyyy')}
-															</span>
-														</div>
+														{bookingRange && (
+															<div className="flex items-center gap-2 text-sm text-amber-600">
+																<Calendar className="h-3 w-3" />
+																<span>{bookingRange}</span>
+															</div>
+														)}
 														<div className="text-xs text-amber-600 mt-1">
 															Booking: {vehicle.currentBooking.bookingNumber}
 														</div>
@@ -301,12 +320,12 @@ export function VehicleAvailabilityPage() {
 											)}
 
 											{/* Next available date */}
-											{vehicle.nextAvailableDate && !vehicle.currentBooking && (
+											{nextAvailable && !vehicle.currentBooking && (
 												<div className="bg-emerald-50 rounded-xl p-3 border border-emerald-200">
 													<div className="flex items-center gap-2 text-emerald-800">
 														<Calendar className="h-4 w-4" />
 														<span className="text-sm font-medium">
-															Tersedia mulai {format(new Date(vehicle.nextAvailableDate), 'dd MMM yyyy')}
+															Tersedia mulai {nextAvailable}
 														</span>
 													</div>
 												</div>

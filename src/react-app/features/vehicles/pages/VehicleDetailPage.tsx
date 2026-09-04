@@ -25,7 +25,13 @@ const formatCurrency = (amount: number) =>
 		minimumFractionDigits: 0,
 	}).format(amount);
 
-const formatDate = (date: string) => format(parseISO(date), 'd MMM yyyy');
+// parseISO throws TypeError on non-string; format throws RangeError on Invalid
+// Date. Guard both so a null/empty/malformed booking date renders a dash, not a crash.
+const formatDate = (date: string | null | undefined) => {
+	if (!date) return '-';
+	const d = parseISO(date);
+	return Number.isNaN(d.getTime()) ? '-' : format(d, 'd MMM yyyy');
+};
 const statusLabel = (status: string) => labelFromMap(vehicleStatusLabels, status);
 
 export default function VehicleDetailPage() {
